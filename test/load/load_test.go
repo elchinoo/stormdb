@@ -223,7 +223,9 @@ func runWorkloadLoadTest(ctx context.Context, t *testing.T, cfg *types.Config) *
 	if err != nil {
 		t.Fatalf("Failed to create workload factory: %v", err)
 	}
-	defer factory.Cleanup()
+	defer func() {
+		_ = factory.Cleanup()
+	}()
 
 	if err := factory.Initialize(); err != nil {
 		t.Fatalf("Failed to initialize workload factory: %v", err)

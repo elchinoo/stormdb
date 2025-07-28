@@ -30,7 +30,7 @@ workers: 4
 connections: 8
 `
 
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	if err != nil {
 		t.Fatalf("Failed to write test config file: %v", err)
 	}
@@ -383,6 +383,7 @@ func TestValidateConfig(t *testing.T) {
 					// Check if error message contains expected text
 					if len(tt.errorMsg) > 0 && err.Error() != "" {
 						// Just verify it's an error for now - specific message checking can be too brittle
+						t.Logf("Got expected error: %v", err)
 					}
 				}
 			} else {

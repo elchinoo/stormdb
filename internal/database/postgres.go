@@ -4,9 +4,9 @@ package database
 import (
 	"context"
 	"fmt"
-	"github.com/elchinoo/stormdb/pkg/types"
 	"time"
 
+	"github.com/elchinoo/stormdb/pkg/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

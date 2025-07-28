@@ -2,9 +2,10 @@
 package util
 
 import (
-	"github.com/elchinoo/stormdb/pkg/types"
 	"math"
 	"sort"
+
+	"github.com/elchinoo/stormdb/pkg/types"
 )
 
 func CalculatePercentiles(data []int64, percentiles []int) []int64 {
@@ -25,19 +26,19 @@ func CalculatePercentiles(data []int64, percentiles []int) []int64 {
 	return result
 }
 
-func Stats(data []int64) (avg, min, max, stddev int64) {
+func Stats(data []int64) (avg, minVal, maxVal, stddev int64) {
 	if len(data) == 0 {
 		return 0, 0, 0, 0
 	}
 
-	min, max = data[0], data[0]
+	minVal, maxVal = data[0], data[0]
 	var sum int64
 	for _, v := range data {
-		if v < min {
-			min = v
+		if v < minVal {
+			minVal = v
 		}
-		if v > max {
-			max = v
+		if v > maxVal {
+			maxVal = v
 		}
 		sum += v
 	}
@@ -49,7 +50,7 @@ func Stats(data []int64) (avg, min, max, stddev int64) {
 		sumSq += diff * diff
 	}
 	stddev = int64(math.Sqrt(sumSq / float64(len(data))))
-	return avg, min, max, stddev
+	return avg, minVal, maxVal, stddev
 }
 
 // DistributionStats calculates comprehensive distribution shape metrics
@@ -361,13 +362,13 @@ func findMax(values []float64) float64 {
 	if len(values) == 0 {
 		return 0.0
 	}
-	max := values[0]
+	maxVal := values[0]
 	for _, v := range values {
-		if v > max {
-			max = v
+		if v > maxVal {
+			maxVal = v
 		}
 	}
-	return max
+	return maxVal
 }
 
 func convertToRanks(values []float64) []float64 {
@@ -440,11 +441,11 @@ func findMin(values []float64) float64 {
 	if len(values) == 0 {
 		return 0.0
 	}
-	min := values[0]
+	minVal := values[0]
 	for _, v := range values {
-		if v < min {
-			min = v
+		if v < minVal {
+			minVal = v
 		}
 	}
-	return min
+	return minVal
 }

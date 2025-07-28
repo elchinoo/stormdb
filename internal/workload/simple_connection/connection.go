@@ -333,7 +333,7 @@ func (w *ConnectionWorkload) executePersistentOperation(ctx context.Context, wor
 			success = false
 		}
 	} else {
-		tx.Rollback(ctx)
+		_ = tx.Rollback(ctx)
 	}
 
 	duration := time.Since(start).Nanoseconds()
@@ -407,7 +407,7 @@ func (w *ConnectionWorkload) executeTransientOperation(ctx context.Context, work
 			success = false
 		}
 	} else {
-		tx.Rollback(ctx)
+		_ = tx.Rollback(ctx)
 	}
 
 	duration := time.Since(start).Nanoseconds()

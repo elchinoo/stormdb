@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"github.com/elchinoo/stormdb/pkg/types"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/elchinoo/stormdb/pkg/types"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

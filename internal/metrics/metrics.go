@@ -723,9 +723,8 @@ func formatLargeNumber(n int64) string {
 		return fmt.Sprintf("%.0f%s", result, units[exp+1])
 	} else if result >= 10 {
 		return fmt.Sprintf("%.1f%s", result, units[exp+1])
-	} else {
-		return fmt.Sprintf("%.2f%s", result, units[exp+1])
 	}
+	return fmt.Sprintf("%.2f%s", result, units[exp+1])
 }
 
 // formatFloat formats float numbers with thousand separators

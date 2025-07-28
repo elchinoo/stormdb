@@ -3,6 +3,7 @@ package workload
 
 import (
 	"fmt"
+
 	"github.com/elchinoo/stormdb/pkg/plugin"
 	"github.com/elchinoo/stormdb/pkg/types"
 )

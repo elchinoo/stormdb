@@ -214,35 +214,6 @@ func (c *PgStatsCollector) detectVersion() {
 	c.pgVersion = 15
 }
 
-// captureBaseline captures baseline PostgreSQL statistics at the start of collection
-func (c *PgStatsCollector) captureBaseline() {
-	baseline := &types.PostgreSQLStats{}
-
-	// Collect baseline database statistics
-	if err := c.collectDatabaseStats(baseline); err != nil {
-		log.Printf("Warning: Failed to collect baseline database stats: %v", err)
-		return
-	}
-
-	// Collect baseline buffer cache statistics
-	if err := c.collectBufferStats(baseline); err != nil {
-		log.Printf("Warning: Failed to collect baseline buffer stats: %v", err)
-	}
-
-	// Collect baseline WAL statistics
-	if err := c.collectWALStats(baseline); err != nil {
-		log.Printf("Warning: Failed to collect baseline WAL stats: %v", err)
-	}
-
-	// Collect baseline checkpoint statistics
-	if err := c.collectCheckpointStats(baseline); err != nil {
-		log.Printf("Warning: Failed to collect baseline checkpoint stats: %v", err)
-	}
-
-	c.baselineStats = baseline
-	log.Printf("📊 Captured PostgreSQL baseline statistics")
-}
-
 // collectLoop runs the main collection loop
 func (c *PgStatsCollector) collectLoop() {
 	ticker := time.NewTicker(c.collectInterval)
@@ -457,10 +428,9 @@ func (c *PgStatsCollector) collectCheckpointStats(stats *types.PostgreSQLStats) 
 	if c.pgVersion >= 15 {
 		// PostgreSQL 15+: Use pg_stat_checkpointer
 		return c.collectCheckpointStatsV15Plus(stats)
-	} else {
-		// PostgreSQL 14 and earlier: Use pg_stat_bgwriter
-		return c.collectCheckpointStatsLegacy(stats)
 	}
+	// PostgreSQL 14 and earlier: Use pg_stat_bgwriter
+	return c.collectCheckpointStatsLegacy(stats)
 } // collectActivityStats collects connection and activity statistics
 func (c *PgStatsCollector) collectActivityStats(stats *types.PostgreSQLStats) error {
 	// Get current connections

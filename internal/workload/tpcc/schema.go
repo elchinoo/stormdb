@@ -4,8 +4,9 @@ package tpcc
 import (
 	"context"
 	"fmt"
-	"github.com/elchinoo/stormdb/pkg/types"
 	"log"
+
+	"github.com/elchinoo/stormdb/pkg/types"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

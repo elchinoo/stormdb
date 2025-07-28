@@ -103,10 +103,8 @@ func validateConfig(cfg *types.Config) error {
 		}
 
 		// Validate file exists for dump and sql modes
-		if cfg.DataLoading.Mode == "dump" || cfg.DataLoading.Mode == "sql" {
-			// File existence will be validated when actually used during setup
-			// to avoid requiring the file to exist during config validation
-		}
+		// File existence will be validated when actually used during setup
+		// to avoid requiring the file to exist during config validation
 	}
 
 	return nil
