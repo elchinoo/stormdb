@@ -169,7 +169,7 @@ jobs:
         fi
 
     - name: Upload binary artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ matrix.platform }}
         path: build/release/stormdb-${{ matrix.platform }}*
@@ -206,7 +206,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download binary artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: binaries-linux-amd64
         path: build/
@@ -345,7 +345,7 @@ jobs:
         sha256sum *.rpm > stormdb-${{ steps.version.outputs.VERSION }}-1.${{ matrix.arch }}.rpm.sha256
 
     - name: Upload package artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: packages-${{ matrix.distro }}-${{ matrix.format }}
         path: build/*.{deb,rpm,sha256}
@@ -427,7 +427,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: artifacts/
 
