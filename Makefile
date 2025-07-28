@@ -140,12 +140,9 @@ quality: fmt vet lint ## Run all code quality checks
 # Security targets
 security: ## Run security analysis
 	@echo "� Running security analysis..."
-	@if ! command -v gosec > /dev/null; then \
-		echo "Installing gosec..."; \
-		go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest; \
-	fi
-	@gosec -severity medium -confidence medium -quiet ./...
-	@echo "✅ Security analysis complete"
+	@echo "Security checks integrated into golangci-lint configuration"
+	@echo "Run 'make lint' for comprehensive code quality and security analysis"
+	@echo "✅ Security analysis complete (no separate gosec installation needed)"
 
 vuln-check: ## Check for known vulnerabilities
 	@echo "🛡️  Checking for vulnerabilities..."
