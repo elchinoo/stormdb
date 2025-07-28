@@ -109,14 +109,14 @@ func TestStats(t *testing.T) {
 				return // Skip empty test case for stats
 			}
 
-			avg, min, max, _ := util.Stats(tc.values)
+			avg, minVal, maxVal, _ := util.Stats(tc.values)
 
-			if min != tc.min {
-				t.Errorf("Expected min %d, got %d", tc.min, min)
+			if minVal != tc.min {
+				t.Errorf("Expected min %d, got %d", tc.min, minVal)
 			}
 
-			if max != tc.max {
-				t.Errorf("Expected max %d, got %d", tc.max, max)
+			if maxVal != tc.max {
+				t.Errorf("Expected max %d, got %d", tc.max, maxVal)
 			}
 
 			if avg < tc.avgRange[0] || avg > tc.avgRange[1] {

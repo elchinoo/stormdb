@@ -71,7 +71,7 @@ type Operation struct {
 	UseTransient bool          // Connection strategy: true=transient, false=persistent
 }
 
-func (w *ConnectionWorkload) Setup(ctx context.Context, pool *pgxpool.Pool, config *types.Config) error {
+func (w *ConnectionWorkload) Setup(ctx context.Context, pool *pgxpool.Pool, _ *types.Config) error {
 	log.Println("Setting up connection overhead workload...")
 
 	// Create test table if it doesn't exist
@@ -111,7 +111,7 @@ func (w *ConnectionWorkload) Setup(ctx context.Context, pool *pgxpool.Pool, conf
 	return nil
 }
 
-func (w *ConnectionWorkload) Cleanup(ctx context.Context, pool *pgxpool.Pool, config *types.Config) error {
+func (w *ConnectionWorkload) Cleanup(ctx context.Context, pool *pgxpool.Pool, _ *types.Config) error {
 	log.Println("Cleaning up connection overhead workload...")
 
 	// Clean up test data
@@ -259,7 +259,7 @@ func (w *ConnectionWorkload) generateArgsForQuery(query string) []interface{} {
 func (w *ConnectionWorkload) worker(ctx context.Context, wg *sync.WaitGroup, workerID int, pool *pgxpool.Pool, config *types.Config, metrics *types.Metrics) {
 	defer wg.Done()
 
-	rand.Seed(time.Now().UnixNano() + int64(workerID))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
 
 	for {
 		select {
@@ -271,7 +271,7 @@ func (w *ConnectionWorkload) worker(ctx context.Context, wg *sync.WaitGroup, wor
 				continue
 			}
 
-			op := w.operations[rand.Intn(len(w.operations))]
+			op := w.operations[rng.Intn(len(w.operations))]
 
 			if op.UseTransient {
 				w.executeTransientOperation(ctx, workerID, op, pool, config, metrics)
@@ -280,12 +280,12 @@ func (w *ConnectionWorkload) worker(ctx context.Context, wg *sync.WaitGroup, wor
 			}
 
 			// Small delay to prevent overwhelming the database
-			time.Sleep(time.Millisecond * time.Duration(rand.Intn(10)+1))
+			time.Sleep(time.Millisecond * time.Duration(rng.Intn(10)+1))
 		}
 	}
 }
 
-func (w *ConnectionWorkload) executePersistentOperation(ctx context.Context, workerID int, op Operation, pool *pgxpool.Pool, config *types.Config, metrics *types.Metrics) {
+func (w *ConnectionWorkload) executePersistentOperation(ctx context.Context, workerID int, op Operation, pool *pgxpool.Pool, _ *types.Config, metrics *types.Metrics) {
 	start := time.Now()
 
 	// Use connection from pool (persistent)
@@ -350,7 +350,7 @@ func (w *ConnectionWorkload) executePersistentOperation(ctx context.Context, wor
 	}
 }
 
-func (w *ConnectionWorkload) executeTransientOperation(ctx context.Context, workerID int, op Operation, pool *pgxpool.Pool, config *types.Config, metrics *types.Metrics) {
+func (w *ConnectionWorkload) executeTransientOperation(ctx context.Context, workerID int, op Operation, _ *pgxpool.Pool, config *types.Config, metrics *types.Metrics) {
 	start := time.Now()
 
 	// Create new connection for each operation (transient)

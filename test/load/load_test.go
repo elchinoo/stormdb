@@ -256,7 +256,7 @@ func runWorkloadLoadTest(ctx context.Context, t *testing.T, cfg *types.Config) *
 }
 
 // Helper function to get load test configuration
-func getLoadTestConfig(t *testing.T) *types.Config {
+func getLoadTestConfig(_ *testing.T) *types.Config {
 	cfg := &types.Config{
 		Database: struct {
 			Type     string `mapstructure:"type"`

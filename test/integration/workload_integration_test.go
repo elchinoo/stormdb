@@ -60,7 +60,7 @@ func TestSimpleWorkloadSetup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create workload factory: %v", err)
 	}
-	defer factory.Cleanup()
+	defer func() { _ = factory.Cleanup() }()
 
 	if err := factory.Initialize(); err != nil {
 		t.Fatalf("Failed to initialize factory: %v", err)
@@ -260,7 +260,7 @@ func TestWorkloadExecution(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create workload factory: %v", err)
 			}
-			defer factory.Cleanup()
+			defer func() { _ = factory.Cleanup() }()
 
 			if err := factory.Initialize(); err != nil {
 				t.Fatalf("Failed to initialize factory: %v", err)
@@ -297,7 +297,7 @@ func TestWorkloadExecution(t *testing.T) {
 }
 
 // Helper function to get test configuration
-func getTestConfig(t *testing.T) *types.Config {
+func getTestConfig(_ *testing.T) *types.Config {
 	cfg := &types.Config{
 		Database: struct {
 			Type     string `mapstructure:"type"`
