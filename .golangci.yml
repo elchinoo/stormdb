@@ -1,0 +1,5 @@
+# golangci-lint configuration for StormDB
+# See https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m

@@ -1,0 +1,97 @@
+# Binaries and executables
+/build/
+stormdb
+stormdb-dev
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go build artifacts
+vendor/
+*.mod.backup
+go.work*
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test and coverage files
+/coverage/
+*.out
+*.prof
+*.log
+test_results/
+junit.xml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Configuration files (keep examples, ignore local configs)
+config_local*.yaml
+*.env
+.env*
+
+# Documentation generated files
+/docs/api/
+/docs/generated/
+
+# Plugin build artifacts
+/plugins/*/build/
+/plugins/*/*.so
+/plugins/*/*.dll
+/plugins/*/*.dylib
+
+# Profiling and performance files
+profiles/
+cpu.prof
+mem.prof
+trace.out
+
+# Database dumps and test data
+*.sql.gz
+*.dump
+test_data/
+data/
+
+# Logs
+logs/
+*.log
+debug.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Go mod cache (if local)
+pkg/mod/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Security sensitive files
+*.key
+*.pem
+*.crt
+secrets/
+credentials/
+
+# Local development overrides
+docker-compose.override.yml
+local/

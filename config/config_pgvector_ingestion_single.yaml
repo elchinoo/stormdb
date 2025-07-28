@@ -1,0 +1,34 @@
+# Comprehensive pgvector Ingestion Test - Single Inserts
+# Tests single insert performance with 1M baseline rows and pre-computed vectors
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "stormdb_vector_test"
+  username: "postgres"
+  password: "postgres"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  files:
+    - "./build/plugins/vector_plugin.so"
+  auto_load: true
+
+# Comprehensive pgvector test configuration
+workload: "pgvector_comprehensive_ingestion_single"
+scale: 1000000          # 1M baseline rows
+duration: "60s"         # Test duration
+workers: 4              # Number of concurrent workers
+connections: 8          # Connection pool size
+
+# Test-specific settings
+test_config:
+  dimensions: 1024
+  similarity_metric: "cosine"  # l2, cosine, inner_product
+  batch_size: 500
+  baseline_rows: 1000000
+  precomputed_percentage: 10   # 10% pre-calculated vectors

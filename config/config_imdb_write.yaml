@@ -1,0 +1,31 @@
+# IMDB Write-Only Workload Configuration  
+# Intensive write testing with inserts and updates
+
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "imdb"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+    - "/usr/local/lib/stormdb/plugins"
+  
+  # Specific plugin files to load (optional)
+  files: []
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "imdb_write"          # Write-only intensive operations
+scale: 500                      # Smaller initial dataset for faster setup
+duration: "20s"                 # Test duration
+workers: 2                      # Fewer workers to avoid write contention
+connections: 4                  # Balanced connections for writes

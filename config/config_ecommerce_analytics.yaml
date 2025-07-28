@@ -1,0 +1,43 @@
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "storm"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+    - "/usr/local/lib/stormdb/plugins"
+  
+  # Specific plugin files to load (optional)
+  files: []
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "ecommerce_analytics"
+workers: 3
+duration: "30s"
+scale: 1000
+connections: 6
+
+# E-Commerce Analytics Workload Configuration
+# This workload focuses on complex analytical queries:
+# - Customer segmentation and behavior analysis
+# - Sales trends and revenue analytics
+# - Inventory turnover and stock control reports
+# - Vendor performance analysis
+# - Product recommendation analytics
+# - User spending pattern analysis
+# - Complex CTEs and window functions
+
+metrics:
+  enabled: true
+  interval: "5s"
+  histogram_buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]

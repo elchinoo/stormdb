@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for testing
+  postgres:
+    image: postgres:16-alpine
+    container_name: stormdb-postgres
+    environment:
+      POSTGRES_DB: storm
+      POSTGRES_USER: stormdb
+      POSTGRES_PASSWORD: stormdb123
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./test/fixtures:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stormdb -d storm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stormdb
+
+  # PostgreSQL with pgvector extension for vector workloads
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: stormdb-postgres-vector
+    environment:
+      POSTGRES_DB: storm_vector
+      POSTGRES_USER: stormdb
+      POSTGRES_PASSWORD: stormdb123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_vector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stormdb -d storm_vector"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stormdb
+
+  # StormDB application (for testing)
+  stormdb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stormdb-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - stormdb_logs:/app/logs
+    environment:
+      - STORMDB_DB_HOST=postgres
+      - STORMDB_DB_PORT=5432
+      - STORMDB_DB_NAME=storm
+      - STORMDB_DB_USER=stormdb
+      - STORMDB_DB_PASSWORD=stormdb123
+    networks:
+      - stormdb
+    command: ["--config", "/app/config/config_simple_connection.yaml"]
+
+  # Monitoring stack (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: stormdb-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - stormdb
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: stormdb-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - stormdb
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  postgres_vector_data:
+  stormdb_logs:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  stormdb:
+    driver: bridge

@@ -1,0 +1,29 @@
+# config for inner product similarity vector workload
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+    - "/usr/local/lib/stormdb/plugins"
+  
+  # Specific plugin files to load (optional)
+  files: []
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "vector_1024_inner"   # Inner product similarity search
+scale: 1000                     # Number of vectors to seed
+duration: "30s"
+workers: 4
+connections: 8

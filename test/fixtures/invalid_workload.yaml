@@ -1,0 +1,15 @@
+# Invalid workload type
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test_db"
+  username: "test_user"
+  password: "test_pass"
+  sslmode: "disable"
+
+workload: "invalid_workload"  # Invalid
+scale: 100
+duration: "30s"
+workers: 4
+connections: 8

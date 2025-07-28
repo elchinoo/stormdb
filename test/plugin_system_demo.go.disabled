@@ -1,0 +1,72 @@
+// Simple test to verify plugin system works without database connection
+package main
+
+import (
+	"fmt"
+	"log"
+	"stormdb/internal/workload"
+	"stormdb/pkg/types"
+)
+
+func main() {
+	fmt.Println("🔌 Testing StormDB Plugin System")
+	fmt.Println("===============================")
+
+	// Create a minimal config for testing
+	cfg := &types.Config{}
+	cfg.Plugins.Paths = []string{"./plugins", "./build/plugins"}
+	cfg.Plugins.Files = []string{}
+	cfg.Plugins.AutoLoad = true
+
+	// Initialize factory
+	fmt.Println("🏭 Initializing workload factory...")
+	factory, err := workload.NewFactory(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create factory: %v", err)
+	}
+	defer factory.Cleanup()
+
+	// Initialize factory
+	if err := factory.Initialize(); err != nil {
+		log.Printf("Warning: Factory initialization issues: %v", err)
+	}
+
+	// Discover plugins
+	fmt.Println("🔍 Discovering plugins...")
+	pluginCount, err := factory.DiscoverPlugins()
+	if err != nil {
+		log.Printf("Plugin discovery issues: %v", err)
+	}
+	fmt.Printf("Found %d plugin(s)\n", pluginCount)
+
+	// List supported workloads
+	fmt.Println("\n📋 Supported workload types:")
+	workloads := factory.ListSupportedWorkloads()
+	for i, workload := range workloads {
+		fmt.Printf("  %d. %s\n", i+1, workload)
+	}
+
+	// List plugin information
+	fmt.Println("\n🔌 Plugin information:")
+	plugins := factory.ListPlugins()
+	for _, plugin := range plugins {
+		fmt.Printf("  📦 %s v%s\n", plugin.Metadata.Name, plugin.Metadata.Version)
+		fmt.Printf("     %s\n", plugin.Metadata.Description)
+		fmt.Printf("     Author: %s\n", plugin.Metadata.Author)
+		fmt.Printf("     Types: %v\n", plugin.Metadata.WorkloadTypes)
+		fmt.Printf("     Source: %s\n", plugin.FilePath)
+		fmt.Printf("     Loaded: %t\n", plugin.Loaded)
+		fmt.Println()
+	}
+
+	// Test creating a built-in workload
+	fmt.Println("🧪 Testing built-in workload creation...")
+	wl, err := factory.Get("simple")
+	if err != nil {
+		log.Printf("Failed to create 'simple' workload: %v", err)
+	} else {
+		fmt.Printf("✅ Successfully created 'simple' workload: %T\n", wl)
+	}
+
+	fmt.Println("\n✅ Plugin system test completed!")
+}

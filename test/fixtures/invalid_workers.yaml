@@ -1,0 +1,15 @@
+# Invalid workers (zero)
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test_db"
+  username: "test_user"
+  password: "test_pass"
+  sslmode: "disable"
+
+workload: "simple"
+scale: 100
+duration: "30s"
+workers: 0  # Invalid
+connections: 8

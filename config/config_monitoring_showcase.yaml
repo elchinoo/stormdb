@@ -1,0 +1,40 @@
+# Advanced PostgreSQL Monitoring Configuration
+# Showcases comprehensive PostgreSQL statistics collection
+
+database:
+  type: postgres
+  host: localhost
+  port: 5432
+  dbname: storm
+  username: storm_user
+  password: storm_pwd!123
+  sslmode: disable
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+    - "/usr/local/lib/stormdb/plugins"
+  
+  # Specific plugin files to load (optional)
+  files: []
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: simple
+mode: mixed                      # Mixed read/write operations
+scale: 1000
+duration: 60s
+workers: 8
+connections: 16
+summary_interval: 10s
+
+# Advanced PostgreSQL monitoring options
+collect_pg_stats: true           # Enable comprehensive PostgreSQL statistics
+pg_stats_statements: true        # Enable pg_stat_statements for query analysis
+
+# Connection management
+connection_mode: persistent      # Use connection pooling for optimal performance
