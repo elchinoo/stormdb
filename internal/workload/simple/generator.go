@@ -19,7 +19,7 @@ import (
 type Generator struct{}
 
 // Setup ensures the schema exists (only if --setup or --rebuild)
-func (g *Generator) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
+func (g *Generator) Setup(ctx context.Context, db *pgxpool.Pool, _ *types.Config) error {
 	_, err := db.Exec(ctx, `
         CREATE TABLE IF NOT EXISTS loadtest (
             id BIGINT PRIMARY KEY,

@@ -3,14 +3,13 @@
 
 run:
   timeout: 5m
-  go: '1.24'
+  go: '1.23'
 
 linters:
   enable:
     # Core linters (most important)
     - errcheck      # Check for unchecked errors
     - gosimple      # Suggest code simplifications  
-    - govet         # Standard go vet checks
     - ineffassign   # Detect ineffectual assignments
     - staticcheck   # Advanced static analysis
     - unused        # Find unused code

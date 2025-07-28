@@ -37,7 +37,7 @@ func (t *TPCC) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, met
 }
 
 // worker runs the transaction mix in a loop
-func (t *TPCC) worker(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics) {
+func (t *TPCC) worker(ctx context.Context, db *pgxpool.Pool, _ *types.Config, metrics *types.Metrics) {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for {
@@ -102,7 +102,7 @@ func rollTransaction(rng *rand.Rand) string {
 	}
 }
 
-func (t *TPCC) startRealTimeReporter(ctx context.Context, cfg *types.Config, metrics *types.Metrics, start time.Time) context.CancelFunc {
+func (t *TPCC) startRealTimeReporter(ctx context.Context, _ *types.Config, metrics *types.Metrics, start time.Time) context.CancelFunc {
 	ticker := time.NewTicker(5 * time.Second)
 	reportCtx, cancel := context.WithCancel(context.Background())
 

@@ -19,7 +19,9 @@ func (t *TPCC) paymentTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Update warehouse
 	_, err = tx.Exec(ctx, "UPDATE warehouse SET w_ytd = w_ytd + $1 WHERE w_id = $2::INT", amount, w_id)

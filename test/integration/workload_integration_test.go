@@ -117,7 +117,7 @@ func TestTPCCWorkloadSetup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create workload factory: %v", err)
 	}
-	defer factory.Cleanup()
+	defer func() { _ = factory.Cleanup() }()
 
 	if err := factory.Initialize(); err != nil {
 		t.Fatalf("Failed to initialize factory: %v", err)
@@ -185,7 +185,7 @@ func TestVectorWorkloadSetup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create workload factory: %v", err)
 	}
-	defer factory.Cleanup()
+	defer func() { _ = factory.Cleanup() }()
 
 	if err := factory.Initialize(); err != nil {
 		t.Fatalf("Failed to initialize factory: %v", err)

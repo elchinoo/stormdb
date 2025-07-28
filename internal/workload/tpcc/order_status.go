@@ -59,7 +59,9 @@ func (t *TPCC) orderStatusTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Ra
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Get customer
 	var c_balance float64
@@ -86,10 +88,10 @@ func (t *TPCC) orderStatusTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Ra
 	defer rows.Close()
 
 	for rows.Next() {
-		var ol_i_id, ol_supply_w_id, ol_quantity int
-		var ol_amount float64
-		var ol_delivery_d *int
-		if err := rows.Scan(&ol_i_id, &ol_supply_w_id, &ol_quantity, &ol_amount, &ol_delivery_d); err != nil {
+		var olIID, olSupplyWID, olQuantity int
+		var olAmount float64
+		var olDeliveryD *int
+		if err := rows.Scan(&olIID, &olSupplyWID, &olQuantity, &olAmount, &olDeliveryD); err != nil {
 			return err
 		}
 		// Just read — no processing

@@ -26,7 +26,7 @@
 //   - Understanding connection overhead in high-throughput scenarios
 //   - Evaluating the impact of connection management strategies
 //   - Performance tuning for applications with varying connection patterns
-package connection_overhead
+package simpleconnection
 
 import (
 	"context"

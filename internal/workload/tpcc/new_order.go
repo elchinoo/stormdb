@@ -32,22 +32,24 @@ func (t *TPCC) newOrderTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Get next order ID
-	var next_o_id int
-	err = tx.QueryRow(ctx, "SELECT d_next_o_id FROM district WHERE d_w_id = $1::INT AND d_id = $2::INT FOR UPDATE", w_id, d_id).Scan(&next_o_id)
+	var nextOID int
+	err = tx.QueryRow(ctx, "SELECT d_next_o_id FROM district WHERE d_w_id = $1::INT AND d_id = $2::INT FOR UPDATE", w_id, d_id).Scan(&nextOID)
 	if err != nil {
 		return err
 	}
 
 	// Insert order
-	o_all_local := 1
+	oAllLocal := 1
 	if remote {
-		o_all_local = 0
+		oAllLocal = 0
 	}
 	_, err = tx.Exec(ctx, "INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local) VALUES ($1, $2::INT, $3, $4, NOW(), NULL, $5, $6)",
-		next_o_id, d_id, w_id, c_id, ol_count, o_all_local)
+		nextOID, d_id, w_id, c_id, ol_count, oAllLocal)
 	if err != nil {
 		return err
 	}
@@ -60,20 +62,20 @@ func (t *TPCC) newOrderTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand)
 
 	// Insert order lines
 	for i := 0; i < ol_count; i++ {
-		ol_number := i + 1
-		ol_i_id := i_ids[i]
-		ol_supply_w_id := w_id
+		olNumber := i + 1
+		olIID := i_ids[i]
+		olSupplyWID := w_id
 		if remote && i == ol_count-1 {
-			ol_supply_w_id = (w_id % 1) + 1 // Only 1 warehouse in our test
+			olSupplyWID = w_id // Fixed: avoid x % 1 which is always 0
 		}
-		ol_quantity := ol_quantities[i]
+		olQuantity := ol_quantities[i]
 
 		// Generate random amount
-		ol_amount := 1.0 + rng.Float64()*99.0
+		olAmount := 1.0 + rng.Float64()*99.0
 
 		// Insert order line
 		_, err = tx.Exec(ctx, "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ($1, $2::INT, $3, $4, $5, $6, NULL, $7, $8, 'S_DIST_' || lpad($2::text, 2, '0'))",
-			next_o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount)
+			nextOID, d_id, w_id, olNumber, olIID, olSupplyWID, olQuantity, olAmount)
 		if err != nil {
 			return err
 		}

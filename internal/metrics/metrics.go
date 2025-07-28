@@ -83,7 +83,7 @@ func Report(cfg *types.Config, m *types.Metrics) {
 //   - elapsed: Time elapsed since benchmark start
 //
 // Output format: "⏱️ 30s: 1,250 txns, 41.7 TPS, 98.5% success, P95: 24.3ms"
-func ReportSummary(cfg *types.Config, m *types.Metrics, elapsed time.Duration) {
+func ReportSummary(_ *types.Config, m *types.Metrics, elapsed time.Duration) {
 	elapsedSec := elapsed.Seconds()
 
 	// Calculate success rate for transactions
