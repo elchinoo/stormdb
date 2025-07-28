@@ -3,3 +3,31 @@
 
 run:
   timeout: 5m
+  go: '1.24'
+
+linters:
+  enable:
+    # Core linters (most important)
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Suggest code simplifications  
+    - govet         # Standard go vet checks
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Advanced static analysis
+    - unused        # Find unused code
+    
+    # Code formatting and style
+    - goimports     # Fix import formatting
+    - gofmt         # Check code formatting
+    - misspell      # Fix spelling mistakes
+    - revive        # Replacement for golint
+    
+    # Bug detection
+    - gosec         # Security-focused linter
+    
+  disable:
+    # Temporary disable due to Go version issues
+    - typecheck     # Disable until Go version stabilized
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10

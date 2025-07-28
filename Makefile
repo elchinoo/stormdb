@@ -28,7 +28,7 @@ GO_TEST_FLAGS := -v -race -timeout=30s
 GO_BENCH_FLAGS := -bench=. -benchmem -benchtime=5s
 
 # Tools and linters
-GOLANGCI_LINT_VERSION := v1.55.2
+GOLANGCI_LINT_VERSION := v1.60.1
 GODOC_PORT := 6060
 
 # Build targets
