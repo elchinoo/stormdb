@@ -164,7 +164,11 @@ plugin-dir: ## Create plugin directory
 
 plugins: plugin-dir ## Build all workload plugins
 	@echo "🔌 Building all workload plugins..."
-	@$(MAKE) -C plugins all PLUGIN_DIR=../$(PLUGIN_DIR)
+	@$(MAKE) -C plugins all
+	@echo "🔄 Copying plugins to build directory..."
+	@if [ -d "plugins/build/plugins" ]; then \
+		cp plugins/build/plugins/*.so $(PLUGIN_DIR)/ 2>/dev/null || true; \
+	fi
 	@echo "✅ All plugins built successfully"
 
 plugins-test: ## Test all plugins
