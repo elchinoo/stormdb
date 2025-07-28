@@ -131,7 +131,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "zero workers",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -150,7 +158,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "too many workers",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -169,7 +185,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "zero connections",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -188,7 +212,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "connections less than workers",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -207,7 +239,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "negative scale",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -226,7 +266,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "empty host",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "",
 					Port:     5432,
 					Dbname:   "test",
@@ -245,7 +293,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "invalid port",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     0,
 					Dbname:   "test",
@@ -264,7 +320,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "empty username",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -283,7 +347,15 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "invalid ssl mode",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -332,7 +404,15 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 		{
 			name: "valid generate mode",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -344,7 +424,10 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 				Workers:     4,
 				Connections: 8,
 				Scale:       100,
-				DataLoading: struct{Mode string `mapstructure:"mode"`; FilePath string `mapstructure:"filepath"`}{
+				DataLoading: struct {
+					Mode     string `mapstructure:"mode"`
+					FilePath string `mapstructure:"filepath"`
+				}{
 					Mode: "generate",
 				},
 			},
@@ -353,7 +436,15 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 		{
 			name: "invalid data loading mode",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -365,7 +456,10 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 				Workers:     4,
 				Connections: 8,
 				Scale:       100,
-				DataLoading: struct{Mode string `mapstructure:"mode"`; FilePath string `mapstructure:"filepath"`}{
+				DataLoading: struct {
+					Mode     string `mapstructure:"mode"`
+					FilePath string `mapstructure:"filepath"`
+				}{
 					Mode: "invalid",
 				},
 			},
@@ -375,7 +469,15 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 		{
 			name: "dump mode without filepath",
 			config: &types.Config{
-				Database: struct{Type string `mapstructure:"type"`; Host string `mapstructure:"host"`; Port int `mapstructure:"port"`; Dbname string `mapstructure:"dbname"`; Username string `mapstructure:"username"`; Password string `mapstructure:"password"`; Sslmode string `mapstructure:"sslmode"`}{
+				Database: struct {
+					Type     string `mapstructure:"type"`
+					Host     string `mapstructure:"host"`
+					Port     int    `mapstructure:"port"`
+					Dbname   string `mapstructure:"dbname"`
+					Username string `mapstructure:"username"`
+					Password string `mapstructure:"password"`
+					Sslmode  string `mapstructure:"sslmode"`
+				}{
 					Host:     "localhost",
 					Port:     5432,
 					Dbname:   "test",
@@ -387,7 +489,10 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 				Workers:     4,
 				Connections: 8,
 				Scale:       100,
-				DataLoading: struct{Mode string `mapstructure:"mode"`; FilePath string `mapstructure:"filepath"`}{
+				DataLoading: struct {
+					Mode     string `mapstructure:"mode"`
+					FilePath string `mapstructure:"filepath"`
+				}{
 					Mode: "dump",
 				},
 			},
