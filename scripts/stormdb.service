@@ -1,0 +1,36 @@
+[Unit]
+Description=StormDB PostgreSQL Performance Testing Service
+Documentation=https://github.com/elchinoo/stormdb
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=stormdb
+Group=stormdb
+WorkingDirectory=/var/lib/stormdb
+ExecStart=/usr/local/bin/stormdb -c /var/lib/stormdb/config/stormdb.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=stormdb
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/stormdb /var/log/stormdb
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

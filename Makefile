@@ -445,6 +445,7 @@ help: ## Display this help message
 	@echo "  \033[33mRelease preparation:\033[0m"
 	@echo "    make release-check      # Pre-release checks"
 	@echo "    make release-build      # Multi-platform builds"
+	@echo "    make release-cross      # Cross-platform release"
 	@echo ""
 	@echo "Environment Variables:"
 	@echo "  VERSION               Version tag (default: git describe)"
@@ -454,3 +455,123 @@ help: ## Display this help message
 	@echo "  STORMDB_TEST_DB      PostgreSQL database for tests (default: storm)"
 	@echo "  STORMDB_TEST_USER    PostgreSQL user for tests"
 	@echo "  STORMDB_TEST_PASS    PostgreSQL password for tests"
+
+# Release targets
+release-check: ## Run pre-release validation checks
+	@echo "🔍 Running pre-release checks..."
+	@echo "Version: $(VERSION)"
+	@echo "Commit: $(GIT_COMMIT)"
+	@$(MAKE) validate-full
+	@$(MAKE) test-all
+	@$(MAKE) security
+	@echo "✅ Pre-release checks completed successfully"
+
+release-build: ## Build release binaries for current platform
+	@echo "🚀 Building release binary for current platform..."
+	@mkdir -p $(BUILD_DIR)/release
+	@CGO_ENABLED=1 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME) $(CMD_DIR)/main.go
+	@$(MAKE) plugins
+	@if [ -d $(PLUGIN_DIR) ]; then \
+		cp -r $(PLUGIN_DIR) $(BUILD_DIR)/release/; \
+	fi
+	@echo "✅ Release build complete: $(BUILD_DIR)/release/"
+
+release-cross: ## Build cross-platform release binaries and packages
+	@echo "🌍 Building cross-platform release..."
+	@chmod +x scripts/build-cross-platform.sh
+	@VERSION=$(VERSION) COMMIT=$(GIT_COMMIT) ./scripts/build-cross-platform.sh
+	@echo "✅ Cross-platform release build complete"
+
+release-docker: ## Build and tag Docker images for release
+	@echo "🐳 Building release Docker images..."
+	@docker build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(GIT_COMMIT) \
+		-t $(REGISTRY)/$(BINARY_NAME):$(VERSION) \
+		-t $(REGISTRY)/$(BINARY_NAME):latest .
+	@echo "✅ Docker images built:"
+	@echo "  $(REGISTRY)/$(BINARY_NAME):$(VERSION)"
+	@echo "  $(REGISTRY)/$(BINARY_NAME):latest"
+
+release-docker-push: release-docker ## Build and push Docker images to registry
+	@echo "📤 Pushing Docker images to registry..."
+	@docker push $(REGISTRY)/$(BINARY_NAME):$(VERSION)
+	@docker push $(REGISTRY)/$(BINARY_NAME):latest
+	@echo "✅ Docker images pushed successfully"
+
+release-package-deb: ## Create DEB package (requires fpm)
+	@echo "📦 Creating DEB package..."
+	@command -v fpm >/dev/null 2>&1 || { echo "❌ fpm not found. Install with: gem install fpm"; exit 1; }
+	@$(MAKE) release-build
+	@mkdir -p $(BUILD_DIR)/packages/deb/usr/local/bin
+	@mkdir -p $(BUILD_DIR)/packages/deb/etc/stormdb
+	@mkdir -p $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb
+	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(BUILD_DIR)/packages/deb/usr/local/bin/
+	@cp -r config/* $(BUILD_DIR)/packages/deb/etc/stormdb/
+	@cp README.md CHANGELOG.md $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb/
+	@fpm -s dir -t deb \
+		--name $(BINARY_NAME) \
+		--version $(VERSION:v%=%) \
+		--maintainer "StormDB Team" \
+		--description "PostgreSQL performance testing and benchmarking tool" \
+		--url "https://github.com/elchinoo/stormdb" \
+		--license "MIT" \
+		--after-install scripts/postinstall.sh \
+		--after-remove scripts/postremove.sh \
+		-C $(BUILD_DIR)/packages/deb \
+		--package $(BUILD_DIR)/packages/
+	@echo "✅ DEB package created in $(BUILD_DIR)/packages/"
+
+release-package-rpm: ## Create RPM package (requires fpm)
+	@echo "📦 Creating RPM package..."
+	@command -v fpm >/dev/null 2>&1 || { echo "❌ fpm not found. Install with: gem install fpm"; exit 1; }
+	@$(MAKE) release-build
+	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/local/bin
+	@mkdir -p $(BUILD_DIR)/packages/rpm/etc/stormdb
+	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/share/doc/stormdb
+	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(BUILD_DIR)/packages/rpm/usr/local/bin/
+	@cp -r config/* $(BUILD_DIR)/packages/rpm/etc/stormdb/
+	@cp README.md CHANGELOG.md $(BUILD_DIR)/packages/rpm/usr/share/doc/stormdb/
+	@fpm -s dir -t rpm \
+		--name $(BINARY_NAME) \
+		--version $(VERSION:v%=%) \
+		--maintainer "StormDB Team" \
+		--description "PostgreSQL performance testing and benchmarking tool" \
+		--url "https://github.com/elchinoo/stormdb" \
+		--license "MIT" \
+		--after-install scripts/postinstall.sh \
+		--after-remove scripts/postremove.sh \
+		-C $(BUILD_DIR)/packages/rpm \
+		--package $(BUILD_DIR)/packages/
+	@echo "✅ RPM package created in $(BUILD_DIR)/packages/"
+
+release-packages: release-package-deb release-package-rpm ## Create both DEB and RPM packages
+
+release-checksums: ## Generate checksums for release artifacts
+	@echo "🔐 Generating release checksums..."
+	@find $(BUILD_DIR)/release -type f -name "$(BINARY_NAME)*" -exec sha256sum {} \; > $(BUILD_DIR)/release/SHA256SUMS
+	@find $(BUILD_DIR)/packages -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; >> $(BUILD_DIR)/release/SHA256SUMS 2>/dev/null || true
+	@echo "✅ Checksums generated: $(BUILD_DIR)/release/SHA256SUMS"
+
+release-notes: ## Generate release notes from CHANGELOG
+	@echo "📝 Generating release notes..."
+	@if [ ! -f "GITHUB_RELEASE_DESCRIPTION.md" ]; then \
+		echo "❌ GITHUB_RELEASE_DESCRIPTION.md not found"; \
+		echo "   Create this file with your release description"; \
+		exit 1; \
+	fi
+	@echo "✅ Release notes ready: GITHUB_RELEASE_DESCRIPTION.md"
+
+release-full: release-check release-cross release-docker release-checksums release-notes ## Complete release build process
+	@echo "🎉 Full release build completed!"
+	@echo ""
+	@echo "📋 Release artifacts:"
+	@echo "  Binaries: $(BUILD_DIR)/release/binaries/"
+	@echo "  Packages: $(BUILD_DIR)/release/packages/"
+	@echo "  Checksums: $(BUILD_DIR)/release/SHA256SUMS"
+	@echo "  Docker: $(REGISTRY)/$(BINARY_NAME):$(VERSION)"
+	@echo ""
+	@echo "🚀 Ready for GitHub release!"
+
+release-clean: ## Clean release artifacts
+	@echo "🧹 Cleaning release artifacts..."
+	@rm -rf $(BUILD_DIR)/release $(BUILD_DIR)/packages
+	@echo "✅ Release artifacts cleaned"
