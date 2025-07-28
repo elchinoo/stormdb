@@ -35,7 +35,7 @@ GODOC_PORT := 6060
 build: ## Build the stormdb binary
 	@echo "🔨 Building $(BINARY_NAME) v$(VERSION)..."
 	@mkdir -p $(BUILD_DIR)
-	@go build $(GO_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_DIR)/main.go
+	@go build $(GO_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
 	@echo "✅ Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 	@echo "   Version: $(VERSION)"
 	@echo "   Commit:  $(GIT_COMMIT)"
