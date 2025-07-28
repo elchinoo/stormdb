@@ -108,7 +108,7 @@ jobs:
         BINARY_NAME="stormdb${{ matrix.ext }}"
         go build -ldflags="-X main.version=${VERSION} -X main.commit=${GITHUB_SHA:0:8} -s -w" \
           -o "build/release/stormdb-${{ matrix.platform }}${BINARY_NAME##stormdb}" \
-          ./cmd/stormdb
+          ./cmd/stormdb/main.go
 
     - name: Build plugins (Linux only)
       if: matrix.goos == 'linux'
