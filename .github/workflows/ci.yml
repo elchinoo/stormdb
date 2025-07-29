@@ -1,11 +1,8 @@
-name: CI/CD Pipeline
+name: Release Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
     tags: [ 'v*' ]
-  pull_request:
-    branches: [ main, develop ]
 
 permissions:
   contents: write    # For checking out code and creating releases
@@ -44,11 +41,23 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
+        
+    - name: Set Go environment paths
+      run: |
+        echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
+        echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
+
+    - name: Wipe Go module cache
+      run: |
+        sudo rm -rf "${{ env.GOMODCACHE }}" || true
+        sudo rm -rf "${{ env.GOCACHE }}" || true
 
     - name: Cache Go modules
       uses: actions/cache@v3
       with:
-        path: ~/go/pkg/mod
+        path: |
+          ${{ env.GOMODCACHE }}
+          ${{ env.GOCACHE }}
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
@@ -102,11 +111,23 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
+        
+    - name: Set Go environment paths
+      run: |
+        echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
+        echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
+
+    - name: Wipe Go module cache
+      run: |
+        sudo rm -rf "${{ env.GOMODCACHE }}" || true
+        sudo rm -rf "${{ env.GOCACHE }}" || true
 
     - name: Cache Go modules
       uses: actions/cache@v3
       with:
-        path: ~/go/pkg/mod
+        path: |
+          ${{ env.GOMODCACHE }}
+          ${{ env.GOCACHE }}
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
