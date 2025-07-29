@@ -85,6 +85,12 @@ jobs:
           echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         fi
 
+    - name: Clean build directory
+      run: |
+        # Clean any existing build artifacts to prevent conflicts
+        rm -rf build/release
+        rm -rf stormdb-*
+
     - name: Build binary
       env:
         GOOS: ${{ matrix.goos }}
@@ -142,7 +148,8 @@ jobs:
         cd build/release
         BINARY_NAME="stormdb-${{ matrix.platform }}"
         
-        # Create directory structure
+        # Clean and create directory structure
+        rm -rf "${BINARY_NAME}"
         mkdir -p "${BINARY_NAME}"
         cp "stormdb-${{ matrix.platform }}"* "${BINARY_NAME}/"
         
