@@ -69,15 +69,16 @@ jobs:
         echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
         echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
 
-    - name: Wipe Go module cache
-      run: rm -rf "${{ env.GOMODCACHE }}"
-
-    # Cache both module cache and build cache (with fresh start)
-    # Alternative approach: Cache only build cache for faster, more reliable builds
-    # - name: Cache Go build artifacts
-    #   uses: actions/cache@v3
-    #   with:
-    #     path: ${{ env.GOCACHE }}
+      - name: Wipe Go module cache
+        run: |
+          sudo rm -rf "${{ env.GOMODCACHE }}" || true
+          sudo rm -rf "${{ env.GOCACHE }}" || true
+          
+      # Alternative approach: Cache only build cache for faster, more reliable builds
+      # - name: Cache Go build artifacts
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: ${{ env.GOCACHE }}
     #     key: ${{ runner.os }}-go-buildcache-${{ hashFiles('**/go.sum') }}
     - name: Cache Go modules
       uses: actions/cache@v3
