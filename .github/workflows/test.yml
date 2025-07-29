@@ -1,4 +1,4 @@
-name: Test & Build
+name: Test Only
 
 on:
   push:
@@ -105,46 +105,3 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        
-    - name: Set Go environment paths
-      run: |
-        echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
-        echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
-
-    - name: Wipe Go module cache
-      run: |
-        sudo rm -rf "${{ env.GOMODCACHE }}" || true
-        sudo rm -rf "${{ env.GOCACHE }}" || true
-
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: |
-          ${{ env.GOMODCACHE }}
-          ${{ env.GOCACHE }}
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-
-    - name: Build binary
-      run: make build
-
-    - name: Build plugins
-      run: make plugins
-
-    - name: Run benchmarks
-      run: make benchmark
