@@ -95,3 +95,6 @@ credentials/
 # Local development overrides
 docker-compose.override.yml
 local/
+
+# HCP configurations with sensitive credentials
+hcp/
