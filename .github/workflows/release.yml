@@ -66,9 +66,12 @@ jobs:
     - name: Cache Go modules
       uses: actions/cache@v3
       with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-
           ${{ runner.os }}-go-
 
     - name: Install build dependencies
@@ -87,9 +90,11 @@ jobs:
 
     - name: Clean build directory
       run: |
-        # Clean any existing build artifacts to prevent conflicts
+        # Clean any existing build artifacts and cache conflicts
         rm -rf build/release
         rm -rf stormdb-*
+        # Clean Go module cache conflicts
+        go clean -modcache || true
 
     - name: Build binary
       env:
