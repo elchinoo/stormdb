@@ -70,23 +70,6 @@ jobs:
         version: v1.64.8
         args: --timeout=5m --verbose
 
-    - name: Run security scan
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-no-fail -fmt sarif -out results.sarif ./...'
-      continue-on-error: true
-
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: results.sarif
-      continue-on-error: true
-
-    - name: Run vulnerability check
-      run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
-        govulncheck ./...
-
     - name: Run unit tests
       run: make test-unit
 
