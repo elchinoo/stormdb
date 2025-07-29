@@ -95,22 +95,11 @@ jobs:
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 1
+        CGO_ENABLED: 0
         VERSION: ${{ steps.version.outputs.VERSION }}
       run: |
-        # Set cross-compilation environment
-        if [[ "${{ matrix.goos }}" == "windows" ]]; then
-          if [[ "${{ matrix.goarch }}" == "amd64" ]]; then
-            export CC=x86_64-w64-mingw32-gcc
-            export CXX=x86_64-w64-mingw32-g++
-          else
-            export CC=i686-w64-mingw32-gcc
-            export CXX=i686-w64-mingw32-g++
-          fi
-        elif [[ "${{ matrix.goos }}" == "darwin" ]]; then
-          # macOS cross-compilation (requires osxcross for full CGO support)
-          export CGO_ENABLED=0  # Disable CGO for macOS builds for now
-        fi
+        # Build with CGO disabled for reliable cross-compilation
+        # This works fine since our dependencies (pgx, cobra, viper) are pure Go
         
         # Create build directory
         mkdir -p build/release
@@ -119,7 +108,7 @@ jobs:
         BINARY_NAME="stormdb${{ matrix.ext }}"
         go build -ldflags="-X main.version=${VERSION} -X main.commit=${GITHUB_SHA:0:8} -s -w" \
           -o "build/release/stormdb-${{ matrix.platform }}${BINARY_NAME##stormdb}" \
-          ./cmd/stormdb/main.go
+          ./cmd/stormdb
 
     - name: Build plugins (Linux only)
       if: matrix.goos == 'linux'
