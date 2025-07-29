@@ -223,11 +223,24 @@ jobs:
 
     - name: Create DEB package
       run: |
+        # List what we have in build directory for debugging
+        find build/ -type f -ls
+        
         # Create package structure
         mkdir -p package-deb/{usr/local/bin,usr/local/lib/stormdb/plugins,etc/stormdb,etc/systemd/system,var/lib/stormdb/config}
         
-        # Copy binary
-        cp build/pgstorm package-deb/usr/local/bin/stormdb
+        # Copy binary - look for actual binary file
+        if [ -f build/pgstorm ]; then
+          cp build/pgstorm package-deb/usr/local/bin/stormdb
+        elif [ -f build/stormdb ]; then
+          cp build/stormdb package-deb/usr/local/bin/stormdb
+        elif [ -f build/release/stormdb ]; then
+          cp build/release/stormdb package-deb/usr/local/bin/stormdb
+        else
+          echo "Error: Could not find binary file"
+          find build/ -name "*storm*" -type f
+          exit 1
+        fi
         chmod +x package-deb/usr/local/bin/stormdb
         
         # Copy plugins
@@ -298,11 +311,24 @@ jobs:
 
     - name: Create RPM package
       run: |
+        # List what we have in build directory for debugging
+        find build/ -type f -ls
+        
         # Create package structure
         mkdir -p package-rpm/{usr/local/bin,usr/local/lib/stormdb/plugins,etc/stormdb,etc/systemd/system,var/lib/stormdb/config}
         
-        # Copy binary
-        cp build/pgstorm package-rpm/usr/local/bin/stormdb
+        # Copy binary - look for actual binary file
+        if [ -f build/pgstorm ]; then
+          cp build/pgstorm package-rpm/usr/local/bin/stormdb
+        elif [ -f build/stormdb ]; then
+          cp build/stormdb package-rpm/usr/local/bin/stormdb
+        elif [ -f build/release/stormdb ]; then
+          cp build/release/stormdb package-rpm/usr/local/bin/stormdb
+        else
+          echo "Error: Could not find binary file"
+          find build/ -name "*storm*" -type f
+          exit 1
+        fi
         chmod +x package-rpm/usr/local/bin/stormdb
         
         # Copy plugins
