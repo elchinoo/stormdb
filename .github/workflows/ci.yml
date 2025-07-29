@@ -196,10 +196,156 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+  package-deb:
+    name: Build DEB Package
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: pgstorm-binaries
+        path: build/
+
+    - name: Install FPM for package creation
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ruby ruby-dev rubygems build-essential
+        sudo gem install --no-document fpm
+
+    - name: Extract version from tag
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+    - name: Create DEB package
+      run: |
+        # Create package structure
+        mkdir -p package-deb/{usr/local/bin,usr/local/lib/stormdb/plugins,etc/stormdb,etc/systemd/system,var/lib/stormdb/config}
+        
+        # Copy binary
+        cp build/pgstorm package-deb/usr/local/bin/stormdb
+        chmod +x package-deb/usr/local/bin/stormdb
+        
+        # Copy plugins
+        if [ -d build/plugins ]; then
+          cp build/plugins/*.so package-deb/usr/local/lib/stormdb/plugins/ || true
+        fi
+        
+        # Copy config files
+        cp config/* package-deb/etc/stormdb/
+        
+        # Copy systemd service
+        cp scripts/stormdb.service package-deb/etc/systemd/system/
+        
+        # Create DEB package
+        fpm -s dir -t deb \
+          -n stormdb \
+          -v $VERSION \
+          --description "StormDB - PostgreSQL Performance Testing Tool" \
+          --url "https://github.com/elchinoo/stormdb" \
+          --maintainer "StormDB Team <stormdb@example.com>" \
+          --license "MIT" \
+          --architecture amd64 \
+          --depends postgresql-client \
+          --after-install scripts/postinstall.sh \
+          --after-remove scripts/postremove.sh \
+          --deb-systemd scripts/stormdb.service \
+          -C package-deb \
+          .
+
+    - name: Upload DEB artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: stormdb-deb-package
+        path: "*.deb"
+        retention-days: 30
+
+  package-rpm:
+    name: Build RPM Packages
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    strategy:
+      matrix:
+        os: [rocky, alma]
+        
+    container:
+      image: ${{ matrix.os == 'rocky' && 'rockylinux:9' || 'almalinux:9' }}
+    
+    steps:
+    - name: Install build dependencies
+      run: |
+        dnf update -y
+        dnf install -y rpm-build rpmdevtools ruby ruby-devel gcc make
+        gem install --no-document fpm
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: pgstorm-binaries
+        path: build/
+
+    - name: Extract version from tag
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+    - name: Create RPM package
+      run: |
+        # Create package structure
+        mkdir -p package-rpm/{usr/local/bin,usr/local/lib/stormdb/plugins,etc/stormdb,etc/systemd/system,var/lib/stormdb/config}
+        
+        # Copy binary
+        cp build/pgstorm package-rpm/usr/local/bin/stormdb
+        chmod +x package-rpm/usr/local/bin/stormdb
+        
+        # Copy plugins
+        if [ -d build/plugins ]; then
+          cp build/plugins/*.so package-rpm/usr/local/lib/stormdb/plugins/ || true
+        fi
+        
+        # Copy config files
+        cp config/* package-rpm/etc/stormdb/
+        
+        # Copy systemd service
+        cp scripts/stormdb.service package-rpm/etc/systemd/system/
+        
+        # Create RPM package
+        fpm -s dir -t rpm \
+          -n stormdb \
+          -v $VERSION \
+          --description "StormDB - PostgreSQL Performance Testing Tool" \
+          --url "https://github.com/elchinoo/stormdb" \
+          --maintainer "StormDB Team <stormdb@example.com>" \
+          --license MIT \
+          --architecture x86_64 \
+          --depends postgresql \
+          --after-install scripts/postinstall.sh \
+          --after-remove scripts/postremove.sh \
+          --rpm-init scripts/stormdb.service \
+          -C package-rpm \
+          .
+        
+        # Rename package to include OS identifier
+        mv *.rpm stormdb-$VERSION-1.${{ matrix.os }}.x86_64.rpm
+
+    - name: Upload RPM artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: stormdb-rpm-${{ matrix.os }}-package
+        path: "*.rpm"
+        retention-days: 30
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [test, build, docker]
+    needs: [test, build, docker, package-deb, package-rpm]
     if: startsWith(github.ref, 'refs/tags/')
     
     steps:
@@ -217,11 +363,26 @@ jobs:
         name: pgstorm-binaries
         path: build/
 
+    - name: Download DEB package
+      uses: actions/download-artifact@v4
+      with:
+        name: stormdb-deb-package
+        path: packages/
+
+    - name: Download RPM packages
+      uses: actions/download-artifact@v4
+      with:
+        pattern: stormdb-rpm-*-package
+        path: packages/
+        merge-multiple: true
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
           build/release/*
+          packages/*.deb
+          packages/*.rpm
         generate_release_notes: true
         draft: false
         prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
