@@ -1,0 +1,53 @@
+# TPC-C Workload Configuration for EPAS v16
+# TPC-C is a standard OLTP benchmark that simulates an order-entry environment
+# with 5 transaction types: New-Order, Payment, Order-Status, Delivery, Stock-Level
+
+database:
+  type: postgres
+  host: "p-rzjaqzb0yn-rw-external-31683a08ddd89515.elb.us-east-1.amazonaws.com"
+  port: 5432
+  dbname: "edb_admin"
+  username: "edb_admin"
+  password: "mattdemo123!"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+    - "/usr/local/lib/stormdb/plugins"
+  
+  # Specific plugin files to load (optional)
+  files: []
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+# TPC-C Load settings
+workload: "tpcc"        # TPC-C benchmark workload
+scale: 3                # Number of warehouses (conservative for v16)
+                        # Each warehouse has: 
+                        #     10 districts
+                        #     ~3,000 customers per district
+                        #     Orders, order lines, etc.
+                        # scale: 3 -> 3 warehouses, 30 districts, ~90,000 customers
+duration: "120s"        # Run for 2 minutes to get meaningful TPC-C results
+workers: 10             # Conservative worker count for EPAS v16
+connections: 20         # Max connections in pool (2x workers)
+summary_interval: "10s" # Interval for periodic summaries during run
+
+# TPC-C specific configuration
+workload_config:
+  # Transaction mix (TPC-C standard percentages)
+  transaction_mix:
+    new_order: 45       # 45% New-Order transactions (most intensive)
+    payment: 43         # 43% Payment transactions
+    order_status: 4     # 4% Order-Status transactions (read-only)
+    delivery: 4         # 4% Delivery transactions (batch processing)
+    stock_level: 4      # 4% Stock-Level transactions (analytical)
+  
+  # Performance tuning (conservative for v16)
+  think_time: 0         # No think time for maximum throughput
+  ramp_up_time: 15      # 15 second ramp-up period (longer for v16)

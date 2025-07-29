@@ -1,0 +1,45 @@
+# TPC-C Benchmark Workload Configuration - PGE v16
+# Standard TPC-C benchmark for OLTP performance testing
+
+database:
+  type: postgres
+  host: "p-ys0nl9245c-rw-external-d6e5d894e2a130a6.elb.us-east-1.amazonaws.com"
+  port: 5432
+  dbname: "edb_admin"
+  username: "edb_admin"
+  password: "mattdemo123!"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+    - "/usr/local/lib/stormdb/plugins"
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "tpcc"
+workers: 8
+duration: "5m"
+scale: 10  # Number of warehouses
+connections: 20
+summary_interval: "30s"
+
+# TPC-C specific settings
+tpcc:
+  warehouses: 10
+  ramp_time: "2m"
+  
+metrics:
+  enabled: true
+  interval: "10s"
+  histogram_buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+
+# Optimized for PGE v16 stability
+advanced:
+  prepare_statements: true
+  connection_pooling: true
+  transaction_isolation: "read_committed"

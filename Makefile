@@ -44,6 +44,24 @@ build-all: build plugins ## Build stormdb binary and all plugins
 	@echo "🔨 Building complete solution (binary + plugins)..."
 	@echo "✅ Complete build finished"
 
+ubuntu-build: ## Ubuntu-friendly complete build process
+	@echo "🐧 Ubuntu Build Process Starting..."
+	@echo "Step 1: Installing dependencies..."
+	@$(MAKE) deps
+	@echo "Step 2: Building main binary..."
+	@$(MAKE) build
+	@echo "Step 3: Building plugins..."
+	@$(MAKE) plugins
+	@echo "Step 4: Verifying build..."
+	@if [ -f "$(BUILD_DIR)/$(BINARY_NAME)" ]; then \
+		echo "✅ Binary built successfully: $(BUILD_DIR)/$(BINARY_NAME)"; \
+		./$(BUILD_DIR)/$(BINARY_NAME) --help | head -5; \
+	else \
+		echo "❌ Binary build failed"; \
+		exit 1; \
+	fi
+	@echo "🐧 Ubuntu build complete! Run: ./$(BUILD_DIR)/$(BINARY_NAME) --help"
+
 build-dev: ## Build development version with debug info and race detector
 	@echo "🔨 Building development version..."
 	@mkdir -p $(BUILD_DIR)
@@ -278,10 +296,18 @@ dev-tools: ## Install development tools
 	@go install golang.org/x/tools/cmd/godoc@latest
 	@go install golang.org/x/tools/cmd/goimports@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
-	@go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+	@echo "Installing gosec security scanner..."
+	@go install github.com/securecodewarrior/gosec/v2/cmd/gosec@v2.21.4 || echo "⚠️  gosec installation failed, continuing..."
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	@go install github.com/air-verse/air@latest
 	@echo "✅ Development tools installed"
+
+dev-tools-minimal: ## Install minimal development tools (Ubuntu-friendly)
+	@echo "🛠️  Installing minimal development tools..."
+	@go install golang.org/x/tools/cmd/goimports@latest
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@echo "✅ Minimal development tools installed"
 
 dev-watch: ## Watch for changes and rebuild automatically (requires air)
 	@echo "👀 Watching for changes..."
