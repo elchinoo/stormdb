@@ -147,7 +147,17 @@ jobs:
         # Clean and create directory structure
         rm -rf "${BINARY_NAME}"
         mkdir -p "${BINARY_NAME}"
-        cp "stormdb-${{ matrix.platform }}"* "${BINARY_NAME}/"
+        
+        # Copy the actual binary file (handle both cases with/without extension)
+        if [[ -f "stormdb-${{ matrix.platform }}${{ matrix.ext }}" ]]; then
+          cp "stormdb-${{ matrix.platform }}${{ matrix.ext }}" "${BINARY_NAME}/"
+        elif [[ -f "stormdb-${{ matrix.platform }}" ]]; then
+          cp "stormdb-${{ matrix.platform }}" "${BINARY_NAME}/"
+        else
+          echo "Error: Could not find binary file"
+          ls -la
+          exit 1
+        fi
         
         # Add plugins if they exist
         if [[ -d "plugins-${{ matrix.platform }}" ]]; then
