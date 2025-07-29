@@ -148,16 +148,16 @@ jobs:
     - name: Create tarball
       run: |
         cd build/release
-        BINARY_NAME="stormdb-${{ matrix.platform }}"
+        BINARY_FILE="stormdb-${{ matrix.platform }}${{ matrix.ext }}"
+        PACKAGE_DIR="stormdb-${{ matrix.platform }}-package"
         
-        # Clean and create directory structure
-        rm -rf "${BINARY_NAME}"
-        mkdir -p "${BINARY_NAME}"
+        # Clean and create directory structure  
+        rm -rf "${PACKAGE_DIR}"
+        mkdir -p "${PACKAGE_DIR}"
         
         # Copy the actual binary file (handle both cases with/without extension)
-        BINARY_FILE="stormdb-${{ matrix.platform }}${{ matrix.ext }}"
         if [[ -f "${BINARY_FILE}" ]]; then
-          cp "${BINARY_FILE}" "${BINARY_NAME}/"
+          cp "${BINARY_FILE}" "${PACKAGE_DIR}/"
         else
           echo "Error: Could not find binary file: ${BINARY_FILE}"
           echo "Files in build/release:"
@@ -167,29 +167,32 @@ jobs:
         
         # Add plugins if they exist
         if [[ -d "plugins-${{ matrix.platform }}" ]]; then
-          cp -r "plugins-${{ matrix.platform }}" "${BINARY_NAME}/plugins"
+          cp -r "plugins-${{ matrix.platform }}" "${PACKAGE_DIR}/plugins"
         fi
         
         # Add documentation
-        cp ../../README.md "${BINARY_NAME}/"
-        cp ../../LICENSE "${BINARY_NAME}/" 2>/dev/null || echo "MIT License" > "${BINARY_NAME}/LICENSE"
-        cp ../../CHANGELOG.md "${BINARY_NAME}/"
+        cp ../../README.md "${PACKAGE_DIR}/"
+        cp ../../LICENSE "${PACKAGE_DIR}/" 2>/dev/null || echo "MIT License" > "${PACKAGE_DIR}/LICENSE"
+        cp ../../CHANGELOG.md "${PACKAGE_DIR}/"
         
         # Add config examples
-        cp -r ../../config "${BINARY_NAME}/"
+        cp -r ../../config "${PACKAGE_DIR}/"
+        
+        # Create final archive with proper naming
+        FINAL_NAME="stormdb-${{ matrix.platform }}"
         
         # Create tarball
         if [[ "${{ matrix.goos }}" == "windows" ]]; then
-          zip -r "${BINARY_NAME}.zip" "${BINARY_NAME}"
+          zip -r "${FINAL_NAME}.zip" "${PACKAGE_DIR}"
         else
-          tar -czf "${BINARY_NAME}.tar.gz" "${BINARY_NAME}"
+          tar -czf "${FINAL_NAME}.tar.gz" "${PACKAGE_DIR}"
         fi
         
         # Calculate checksums
         if [[ "${{ matrix.goos }}" == "windows" ]]; then
-          sha256sum "${BINARY_NAME}.zip" > "${BINARY_NAME}.zip.sha256"
+          sha256sum "${FINAL_NAME}.zip" > "${FINAL_NAME}.zip.sha256"
         else
-          sha256sum "${BINARY_NAME}.tar.gz" > "${BINARY_NAME}.tar.gz.sha256"
+          sha256sum "${FINAL_NAME}.tar.gz" > "${FINAL_NAME}.tar.gz.sha256"
         fi
 
     - name: Upload binary artifacts
