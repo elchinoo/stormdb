@@ -227,7 +227,13 @@ jobs:
         find build/ -type f -ls
         
         # Create package structure
-        mkdir -p package-deb/{usr/local/bin,usr/local/lib/stormdb/plugins,etc/stormdb,etc/systemd/system,var/lib/stormdb/config}
+        mkdir -p package-deb/usr/local/bin
+        mkdir -p package-deb/usr/local/lib/stormdb/plugins
+        mkdir -p package-deb/etc/stormdb
+        mkdir -p package-deb/etc/systemd/system
+        mkdir -p package-deb/var/lib/stormdb/config
+        mkdir -p package-deb/var/lib/stormdb/logs
+        mkdir -p package-deb/var/lib/stormdb/plugins
         
         # Copy binary - look for actual binary file
         if [ -f build/pgstorm ]; then

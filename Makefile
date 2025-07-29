@@ -529,10 +529,17 @@ release-package-deb: ## Create DEB package (requires fpm)
 	@command -v fpm >/dev/null 2>&1 || { echo "❌ fpm not found. Install with: gem install fpm"; exit 1; }
 	@$(MAKE) release-build
 	@mkdir -p $(BUILD_DIR)/packages/deb/usr/local/bin
+	@mkdir -p $(BUILD_DIR)/packages/deb/usr/local/lib/stormdb/plugins
 	@mkdir -p $(BUILD_DIR)/packages/deb/etc/stormdb
+	@mkdir -p $(BUILD_DIR)/packages/deb/etc/systemd/system
+	@mkdir -p $(BUILD_DIR)/packages/deb/var/lib/stormdb/config
+	@mkdir -p $(BUILD_DIR)/packages/deb/var/lib/stormdb/logs
+	@mkdir -p $(BUILD_DIR)/packages/deb/var/lib/stormdb/plugins
 	@mkdir -p $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb
 	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(BUILD_DIR)/packages/deb/usr/local/bin/
+	@cp -r $(BUILD_DIR)/plugins/*.so $(BUILD_DIR)/packages/deb/usr/local/lib/stormdb/plugins/ 2>/dev/null || true
 	@cp -r config/* $(BUILD_DIR)/packages/deb/etc/stormdb/
+	@cp scripts/stormdb.service $(BUILD_DIR)/packages/deb/etc/systemd/system/
 	@cp README.md CHANGELOG.md $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb/
 	@fpm -s dir -t deb \
 		--name $(BINARY_NAME) \
@@ -541,8 +548,11 @@ release-package-deb: ## Create DEB package (requires fpm)
 		--description "PostgreSQL performance testing and benchmarking tool" \
 		--url "https://github.com/elchinoo/stormdb" \
 		--license "MIT" \
+		--architecture amd64 \
+		--depends postgresql-client \
 		--after-install scripts/postinstall.sh \
 		--after-remove scripts/postremove.sh \
+		--deb-systemd scripts/stormdb.service \
 		-C $(BUILD_DIR)/packages/deb \
 		--package $(BUILD_DIR)/packages/
 	@echo "✅ DEB package created in $(BUILD_DIR)/packages/"
