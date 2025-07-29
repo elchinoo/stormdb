@@ -93,8 +93,10 @@ jobs:
         # Clean any existing build artifacts and cache conflicts
         rm -rf build/release
         rm -rf stormdb-*
-        # Clean Go module cache conflicts
-        go clean -modcache || true
+        # Clean Go module cache conflicts and build cache
+        go clean -cache -modcache -i -r || true
+        # Remove any temporary files
+        find . -name "*.tmp" -delete || true
 
     - name: Build binary
       env:
