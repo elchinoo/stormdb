@@ -113,9 +113,15 @@ jobs:
         
         # Build main binary
         BINARY_NAME="stormdb${{ matrix.ext }}"
+        OUTPUT_FILE="build/release/stormdb-${{ matrix.platform }}${{ matrix.ext }}"
+        
+        echo "Building binary: ${OUTPUT_FILE}"
         go build -ldflags="-X main.version=${VERSION} -X main.commit=${GITHUB_SHA:0:8} -s -w" \
-          -o "build/release/stormdb-${{ matrix.platform }}${BINARY_NAME##stormdb}" \
+          -o "${OUTPUT_FILE}" \
           ./cmd/stormdb
+          
+        echo "Build completed, checking file:"
+        ls -la build/release/
 
     - name: Build plugins (Linux only)
       if: matrix.goos == 'linux'
@@ -149,12 +155,12 @@ jobs:
         mkdir -p "${BINARY_NAME}"
         
         # Copy the actual binary file (handle both cases with/without extension)
-        if [[ -f "stormdb-${{ matrix.platform }}${{ matrix.ext }}" ]]; then
-          cp "stormdb-${{ matrix.platform }}${{ matrix.ext }}" "${BINARY_NAME}/"
-        elif [[ -f "stormdb-${{ matrix.platform }}" ]]; then
-          cp "stormdb-${{ matrix.platform }}" "${BINARY_NAME}/"
+        BINARY_FILE="stormdb-${{ matrix.platform }}${{ matrix.ext }}"
+        if [[ -f "${BINARY_FILE}" ]]; then
+          cp "${BINARY_FILE}" "${BINARY_NAME}/"
         else
-          echo "Error: Could not find binary file"
+          echo "Error: Could not find binary file: ${BINARY_FILE}"
+          echo "Files in build/release:"
           ls -la
           exit 1
         fi
