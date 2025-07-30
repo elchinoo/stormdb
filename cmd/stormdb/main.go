@@ -22,10 +22,10 @@ import (
 
 // Version information (set by build system via ldflags)
 var (
-	Version   = "dev"     // Version string
-	GitCommit = "unknown" // Git commit hash
-	BuildTime = "unknown" // Build timestamp
-	GoVersion = "unknown" // Go version used for build
+	Version   = "v0.1.0-beta" // Version string
+	GitCommit = "unknown"     // Git commit hash
+	BuildTime = "unknown"     // Build timestamp
+	GoVersion = "unknown"     // Go version used for build
 )
 
 func main() {
