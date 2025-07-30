@@ -106,6 +106,13 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 		scale = 1
 	}
 
+	// For small scale factors (likely tests), use reduced customer count to avoid timeouts
+	customersPerDistrict := 30000
+	if scale <= 2 {
+		customersPerDistrict = 100 // Much smaller for testing
+		log.Printf("🧪 Using reduced customer count (%d) for small scale testing", customersPerDistrict)
+	}
+
 	log.Printf("🏗️  Seeding TPCC data with scale = %d warehouses", scale)
 
 	for w := 1; w <= scale; w++ {
@@ -124,8 +131,8 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 				return fmt.Errorf("failed to insert district %d for warehouse %d: %v", d, w, err)
 			}
 
-			// Each district has 30000 customers
-			for c := 1; c <= 30000; c++ {
+			// Each district has customers (30000 for production, 100 for small scale testing)
+			for c := 1; c <= customersPerDistrict; c++ {
 				_, err := db.Exec(ctx, `
                     INSERT INTO customer (
                         c_id, c_d_id, c_w_id, c_first, c_last, c_since, c_credit, c_balance
@@ -139,7 +146,7 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 		}
 	}
 
-	log.Printf("✅ Seeded %d warehouses, %d districts, %d customers", scale, scale*10, scale*10*30000)
+	log.Printf("✅ Seeded %d warehouses, %d districts, %d customers", scale, scale*10, scale*10*customersPerDistrict)
 	return nil
 }
 

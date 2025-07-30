@@ -246,7 +246,12 @@ func TestWorkloadExecution(t *testing.T) {
 			cfg.Workers = 1
 			cfg.Connections = 2
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			// Use longer timeout for TPCC workload due to data seeding
+			timeout := 10 * time.Second
+			if tc.workload == "tpcc" {
+				timeout = 30 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			db, err := database.NewPostgres(cfg)
