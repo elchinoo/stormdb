@@ -14,9 +14,11 @@ import (
 	"github.com/elchinoo/stormdb/internal/config"
 	"github.com/elchinoo/stormdb/internal/database"
 	"github.com/elchinoo/stormdb/internal/metrics"
+	"github.com/elchinoo/stormdb/internal/progressive"
 	"github.com/elchinoo/stormdb/internal/workload"
 	"github.com/elchinoo/stormdb/pkg/types"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 )
 
@@ -48,6 +50,7 @@ func main() {
 		collectPgStats    bool
 		pgStatsStatements bool
 		showVersion       bool
+		progressiveMode   bool
 	)
 
 	rootCmd := &cobra.Command{
@@ -76,6 +79,7 @@ func main() {
 				NoSummary:         noSummary,
 				CollectPgStats:    collectPgStats,
 				PgStatsStatements: pgStatsStatements,
+				ProgressiveMode:   progressiveMode,
 			})
 		},
 	}
@@ -115,6 +119,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&noSummary, "no-summary", false, "Disable periodic summary reporting")
 	rootCmd.Flags().BoolVar(&collectPgStats, "collect-pg-stats", false, "Enable PostgreSQL statistics collection")
 	rootCmd.Flags().BoolVar(&pgStatsStatements, "pg-stat-statements", false, "Enable pg_stat_statements collection (requires extension)")
+	rootCmd.Flags().BoolVar(&progressiveMode, "progressive", false, "Enable progressive connection scaling (overrides config)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Show version information and exit")
 
 	if err := rootCmd.Execute(); err != nil {
@@ -138,6 +143,7 @@ type CLIOptions struct {
 	NoSummary         bool
 	CollectPgStats    bool
 	PgStatsStatements bool
+	ProgressiveMode   bool
 }
 
 func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOptions) error {
@@ -228,7 +234,65 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 	}
 
 	// -------------------------------
-	// Phase 2: Run the workload
+	// Phase 2: Progressive Scaling or Regular Workload
+	// -------------------------------
+
+	// Check if progressive scaling is enabled
+	if cfg.Progressive.Enabled {
+		log.Printf("🎯 Starting progressive scaling mode")
+
+		// Create a workload adapter for the progressive engine
+		workloadAdapter := &WorkloadAdapter{workload: wl}
+
+		// Create progressive scaling engine
+		engine := progressive.NewScalingEngine(cfg, workloadAdapter, db.Pool)
+
+		// Execute progressive scaling
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Set up signal handling for graceful shutdown
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+		// Start progressive scaling in a goroutine
+		resultChan := make(chan *types.ProgressiveScalingResult, 1)
+		errChan := make(chan error, 1)
+
+		go func() {
+			result, err := engine.Execute(ctx)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			resultChan <- result
+		}()
+
+		// Wait for completion or signal
+		select {
+		case result := <-resultChan:
+			log.Printf("✅ Progressive scaling completed successfully")
+			log.Printf("📊 Tested %d bands, optimal config: %d workers, %d connections (%.2f TPS)",
+				len(result.Bands), result.OptimalConfig.Workers, result.OptimalConfig.Connections, result.OptimalConfig.TPS)
+			return nil
+		case err := <-errChan:
+			return fmt.Errorf("progressive scaling failed: %w", err)
+		case sig := <-sigChan:
+			log.Printf("🛑 Received signal %v, shutting down progressive scaling...", sig)
+			cancel()
+			// Wait a bit for graceful shutdown
+			select {
+			case <-resultChan:
+				log.Printf("✅ Progressive scaling completed after signal")
+			case <-time.After(10 * time.Second):
+				log.Printf("⚠️  Progressive scaling shutdown timeout")
+			}
+			return fmt.Errorf("interrupted by signal: %v", sig)
+		}
+	}
+
+	// -------------------------------
+	// Phase 2: Run the regular workload
 	// -------------------------------
 
 	log.Printf("🚀 Starting %s workload for %v with %d workers", cfg.Workload, duration, cfg.Workers)
@@ -389,4 +453,29 @@ func applyCliOverrides(cfg *types.Config, cliOpts *CLIOptions) {
 	if cliOpts.PgStatsStatements {
 		cfg.PgStatsStatements = true
 	}
+
+	// Progressive scaling override
+	if cliOpts.ProgressiveMode {
+		cfg.Progressive.Enabled = true
+	}
+}
+
+// WorkloadAdapter adapts the plugin workload interface to the progressive engine interface
+type WorkloadAdapter struct {
+	workload workload.Workload
+}
+
+// Setup ensures schema exists (called with --setup or --rebuild)
+func (w *WorkloadAdapter) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
+	return w.workload.Setup(ctx, db, cfg)
+}
+
+// Run executes the load test with the given configuration
+func (w *WorkloadAdapter) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics) error {
+	return w.workload.Run(ctx, db, cfg, metrics)
+}
+
+// Cleanup drops tables and reloads data (called only with --rebuild)
+func (w *WorkloadAdapter) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
+	return w.workload.Cleanup(ctx, db, cfg)
 }

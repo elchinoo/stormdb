@@ -1,4 +1,7 @@
-# config.yaml
+# Progressive TPC-C Configuration
+# Tests TPC-C workload with progressive connection scaling
+# Automatically scales from 4 to 32 workers with linear increments
+
 database:
   type: postgres
   host: "localhost"
@@ -35,9 +38,25 @@ scale: 2                # This works differently for each workload.
                         #     scale: 10 -> 10 warehouses, 100 districts, ~300,000 customers
                         # For simple, it defines the number of transactions to run.
 duration: "30s"         # e.g., 30s, 1m, 5m
-workers: 8              # number of concurrent worker threads
-connections: 16         # max connections in pool
+workers: 8              # Base workers (will be overridden by progressive settings)
+connections: 16         # Base connections (will be overridden by progressive settings)
 summary_interval: "5s"  # Interval for periodic summaries during run
+
+# Progressive scaling configuration - 3 hour test with 6 bands of 30 minutes each
+progressive:
+  enabled: true
+  min_workers: 10
+  step_workers: 10
+  max_workers: 60
+  min_connections: 20
+  step_connections: 20
+  max_connections: 120
+  band_duration: "1800s"         # 30 minutes per band (3 hours total ÷ 6 bands)
+  warmup_time: "60s"             # 1 minute warmup
+  cooldown_time: "30s"           # 30 second cooldown
+  strategy: "linear"
+  export_format: "csv"
+  export_path: "./progressive_results"
 
 # PostgreSQL monitoring options
 collect_pg_stats: true      # Enable PostgreSQL statistics collection
