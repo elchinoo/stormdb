@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     ruby-dev \
     rubygems \
     curl \
+    wget \
     dpkg-dev \
     lintian \
     postgresql-client \
@@ -20,10 +21,18 @@ RUN apt-get update && apt-get install -y \
     man-db \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Go 1.22 from official source
-RUN wget https://go.dev/dl/go1.22.10.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.22.10.linux-amd64.tar.gz && \
-    rm go1.22.10.linux-amd64.tar.gz
+# Install Go 1.22 from official source (detect architecture)
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        GO_ARCH="amd64"; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        GO_ARCH="arm64"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    wget https://go.dev/dl/go1.22.10.linux-${GO_ARCH}.tar.gz && \
+    tar -C /usr/local -xzf go1.22.10.linux-${GO_ARCH}.tar.gz && \
+    rm go1.22.10.linux-${GO_ARCH}.tar.gz
 
 # Add Go to PATH
 ENV PATH="/usr/local/go/bin:$PATH"
