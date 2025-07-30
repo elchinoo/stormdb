@@ -1,0 +1,47 @@
+# Progressive Test Configuration - Short test to verify fixes
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  files: []
+  auto_load: true
+
+workload: "simple"
+scale: 100
+duration: "10s"
+workers: 4
+connections: 8
+summary_interval: "5s"
+
+# Progressive scaling configuration - Short test (5 bands x 30 seconds = 2.5 minutes)
+progressive:
+  enabled: true
+  min_workers: 2
+  step_workers: 2
+  max_workers: 10
+  min_connections: 4
+  step_connections: 4
+  max_connections: 20
+  band_duration: "30s"           # 30 seconds per band for quick testing
+  warmup_time: "5s"              # 5 second warmup
+  cooldown_time: "3s"            # 3 second cooldown
+  strategy: "linear"
+  export_format: "both"
+  export_path: "./progressive_results"
+
+# PostgreSQL monitoring options
+collect_pg_stats: true
+pg_stats_statements: false
+
+# Connection management options
+connection_mode: "persistent"

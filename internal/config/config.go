@@ -56,6 +56,13 @@ func validateConfig(cfg *types.Config) error {
 		return fmt.Errorf("connections (%d) should be >= workers (%d) for optimal performance", cfg.Connections, cfg.Workers)
 	}
 
+	// Validate progressive scaling configuration if enabled
+	if cfg.Progressive.Enabled {
+		if err := validateProgressiveConfig(&cfg.Progressive); err != nil {
+			return fmt.Errorf("progressive scaling configuration error: %w", err)
+		}
+	}
+
 	// Validate scale
 	if cfg.Scale < 0 {
 		return fmt.Errorf("scale must be non-negative, got: %d", cfg.Scale)
@@ -107,5 +114,69 @@ func validateConfig(cfg *types.Config) error {
 		// to avoid requiring the file to exist during config validation
 	}
 
+	return nil
+}
+
+// validateProgressiveConfig validates progressive scaling configuration
+func validateProgressiveConfig(p *struct {
+	Enabled          bool   `mapstructure:"enabled"`
+	Strategy         string `mapstructure:"strategy"`
+	MinWorkers       int    `mapstructure:"min_workers"`
+	MaxWorkers       int    `mapstructure:"max_workers"`
+	MinConns         int    `mapstructure:"min_connections"`
+	MaxConns         int    `mapstructure:"max_connections"`
+	TestDuration     string `mapstructure:"test_duration"`
+	WarmupDuration   string `mapstructure:"warmup_duration"`
+	CooldownDuration string `mapstructure:"cooldown_duration"`
+	Bands            int    `mapstructure:"bands"`
+	ExportCSV        bool   `mapstructure:"export_csv"`
+	ExportJSON       bool   `mapstructure:"export_json"`
+	EnableAnalysis   bool   `mapstructure:"enable_analysis"`
+	// Legacy fields for backward compatibility
+	StepWorkers  int    `mapstructure:"step_workers"`
+	StepConns    int    `mapstructure:"step_connections"`
+	BandDuration string `mapstructure:"band_duration"`
+	WarmupTime   string `mapstructure:"warmup_time"`
+	CooldownTime string `mapstructure:"cooldown_time"`
+	ExportFormat string `mapstructure:"export_format"`
+	ExportPath   string `mapstructure:"export_path"`
+}) error {
+	if p.MinWorkers <= 0 {
+		return fmt.Errorf("min_workers must be positive, got: %d", p.MinWorkers)
+	}
+	if p.MaxWorkers <= 0 {
+		return fmt.Errorf("max_workers must be positive, got: %d", p.MaxWorkers)
+	}
+	if p.MinWorkers > p.MaxWorkers {
+		return fmt.Errorf("min_workers (%d) must be <= max_workers (%d)", p.MinWorkers, p.MaxWorkers)
+	}
+
+	if p.MinConns <= 0 {
+		return fmt.Errorf("min_connections must be positive, got: %d", p.MinConns)
+	}
+	if p.MaxConns <= 0 {
+		return fmt.Errorf("max_connections must be positive, got: %d", p.MaxConns)
+	}
+	if p.MinConns > p.MaxConns {
+		return fmt.Errorf("min_connections (%d) must be <= max_connections (%d)", p.MinConns, p.MaxConns)
+	}
+
+	// Check format - prefer v0.2 format
+	usingV2Format := p.Bands > 0 || p.TestDuration != ""
+
+	if !usingV2Format {
+		// Legacy format validation
+		if p.StepWorkers <= 0 {
+			return fmt.Errorf("step_workers must be positive, got: %d", p.StepWorkers)
+		}
+		if p.StepConns <= 0 {
+			return fmt.Errorf("step_connections must be positive, got: %d", p.StepConns)
+		}
+		if p.BandDuration == "" {
+			return fmt.Errorf("band_duration is required")
+		}
+	}
+
+	// Basic validation only - detailed validation happens in progressive engine
 	return nil
 }

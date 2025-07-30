@@ -1,0 +1,343 @@
+{
+  "test_start_time": "2025-07-30T15:09:05.919021-05:00",
+  "test_end_time": "2025-07-30T15:12:15.925118-05:00",
+  "total_duration": 190004354833,
+  "workload": "tpcc",
+  "strategy": "exponential",
+  "bands": [
+    {
+      "band_id": 1,
+      "workers": 5,
+      "connections": 10,
+      "start_time": "2025-07-30T15:09:05.91921-05:00",
+      "end_time": "2025-07-30T15:09:35.920671-05:00",
+      "duration": 20000028583,
+      "total_tps": 0,
+      "total_qps": 0,
+      "avg_latency_ms": 0,
+      "p50_latency_ms": 0,
+      "p95_latency_ms": 0,
+      "p99_latency_ms": 0,
+      "max_latency_ms": 0,
+      "min_latency_ms": 0,
+      "error_rate": 0,
+      "total_errors": 0,
+      "stddev_latency": 0,
+      "variance_latency": 0,
+      "coefficient_of_var": 0,
+      "confidence_interval": {
+        "lower": 0,
+        "upper": 0
+      },
+      "tps_per_worker": 0,
+      "tps_per_connection": 0,
+      "worker_efficiency": 0,
+      "connection_util": 0
+    },
+    {
+      "band_id": 2,
+      "workers": 10,
+      "connections": 20,
+      "start_time": "2025-07-30T15:09:45.921506-05:00",
+      "end_time": "2025-07-30T15:10:15.921745-05:00",
+      "duration": 20000025166,
+      "total_tps": 0,
+      "total_qps": 0,
+      "avg_latency_ms": 0,
+      "p50_latency_ms": 0,
+      "p95_latency_ms": 0,
+      "p99_latency_ms": 0,
+      "max_latency_ms": 0,
+      "min_latency_ms": 0,
+      "error_rate": 0,
+      "total_errors": 0,
+      "stddev_latency": 0,
+      "variance_latency": 0,
+      "coefficient_of_var": 0,
+      "confidence_interval": {
+        "lower": 0,
+        "upper": 0
+      },
+      "tps_per_worker": 0,
+      "tps_per_connection": 0,
+      "worker_efficiency": 0,
+      "connection_util": 0
+    },
+    {
+      "band_id": 3,
+      "workers": 20,
+      "connections": 40,
+      "start_time": "2025-07-30T15:10:25.922855-05:00",
+      "end_time": "2025-07-30T15:10:55.923153-05:00",
+      "duration": 20000018458,
+      "total_tps": 0,
+      "total_qps": 0,
+      "avg_latency_ms": 0,
+      "p50_latency_ms": 0,
+      "p95_latency_ms": 0,
+      "p99_latency_ms": 0,
+      "max_latency_ms": 0,
+      "min_latency_ms": 0,
+      "error_rate": 0,
+      "total_errors": 0,
+      "stddev_latency": 0,
+      "variance_latency": 0,
+      "coefficient_of_var": 0,
+      "confidence_interval": {
+        "lower": 0,
+        "upper": 0
+      },
+      "tps_per_worker": 0,
+      "tps_per_connection": 0,
+      "worker_efficiency": 0,
+      "connection_util": 0
+    },
+    {
+      "band_id": 4,
+      "workers": 40,
+      "connections": 80,
+      "start_time": "2025-07-30T15:11:05.923499-05:00",
+      "end_time": "2025-07-30T15:11:35.923874-05:00",
+      "duration": 20000178000,
+      "total_tps": 0,
+      "total_qps": 0,
+      "avg_latency_ms": 0,
+      "p50_latency_ms": 0,
+      "p95_latency_ms": 0,
+      "p99_latency_ms": 0,
+      "max_latency_ms": 0,
+      "min_latency_ms": 0,
+      "error_rate": 0,
+      "total_errors": 0,
+      "stddev_latency": 0,
+      "variance_latency": 0,
+      "coefficient_of_var": 0,
+      "confidence_interval": {
+        "lower": 0,
+        "upper": 0
+      },
+      "tps_per_worker": 0,
+      "tps_per_connection": 0,
+      "worker_efficiency": 0,
+      "connection_util": 0
+    },
+    {
+      "band_id": 5,
+      "workers": 80,
+      "connections": 100,
+      "start_time": "2025-07-30T15:11:45.924871-05:00",
+      "end_time": "2025-07-30T15:12:15.925108-05:00",
+      "duration": 20000058709,
+      "total_tps": 0,
+      "total_qps": 0,
+      "avg_latency_ms": 0,
+      "p50_latency_ms": 0,
+      "p95_latency_ms": 0,
+      "p99_latency_ms": 0,
+      "max_latency_ms": 0,
+      "min_latency_ms": 0,
+      "error_rate": 0,
+      "total_errors": 0,
+      "stddev_latency": 0,
+      "variance_latency": 0,
+      "coefficient_of_var": 0,
+      "confidence_interval": {
+        "lower": 0,
+        "upper": 0
+      },
+      "tps_per_worker": 0,
+      "tps_per_connection": 0,
+      "worker_efficiency": 0,
+      "connection_util": 0
+    }
+  ],
+  "analysis": {
+    "marginal_gains": [
+      {
+        "band_id": 2,
+        "worker_delta": 5,
+        "connection_delta": 10,
+        "tps_delta": 0,
+        "tps_per_worker": 0,
+        "tps_per_connection": 0,
+        "efficiency_delta": 0,
+        "latency_delta": 0
+      },
+      {
+        "band_id": 3,
+        "worker_delta": 10,
+        "connection_delta": 20,
+        "tps_delta": 0,
+        "tps_per_worker": 0,
+        "tps_per_connection": 0,
+        "efficiency_delta": 0,
+        "latency_delta": 0
+      },
+      {
+        "band_id": 4,
+        "worker_delta": 20,
+        "connection_delta": 40,
+        "tps_delta": 0,
+        "tps_per_worker": 0,
+        "tps_per_connection": 0,
+        "efficiency_delta": 0,
+        "latency_delta": 0
+      },
+      {
+        "band_id": 5,
+        "worker_delta": 40,
+        "connection_delta": 20,
+        "tps_delta": 0,
+        "tps_per_worker": 0,
+        "tps_per_connection": 0,
+        "efficiency_delta": 0,
+        "latency_delta": 0
+      }
+    ],
+    "inflection_points": [],
+    "curve_fitting": {
+      "model": "linear",
+      "coefficients": [],
+      "r_squared": 0,
+      "rmse": 0,
+      "predictions": [
+        {
+          "workers": 5,
+          "connections": 10,
+          "predicted_tps": 0,
+          "actual_tps": 0,
+          "residual": 0
+        },
+        {
+          "workers": 10,
+          "connections": 20,
+          "predicted_tps": 0,
+          "actual_tps": 0,
+          "residual": 0
+        },
+        {
+          "workers": 20,
+          "connections": 40,
+          "predicted_tps": 0,
+          "actual_tps": 0,
+          "residual": 0
+        },
+        {
+          "workers": 40,
+          "connections": 80,
+          "predicted_tps": 0,
+          "actual_tps": 0,
+          "residual": 0
+        },
+        {
+          "workers": 80,
+          "connections": 100,
+          "predicted_tps": 0,
+          "actual_tps": 0,
+          "residual": 0
+        }
+      ],
+      "formula": ""
+    },
+    "cumulative_capacity": {
+      "total_area_under_curve": 0,
+      "average_capacity": 0,
+      "peak_capacity": 0,
+      "capacity_efficiency": 0
+    },
+    "queueing_theory": {
+      "model_type": "M/M/c",
+      "utilization": [
+        {
+          "band_id": 1,
+          "rho": 0,
+          "arrival_rate": 0,
+          "service_rate": 0,
+          "servers": 10
+        },
+        {
+          "band_id": 2,
+          "rho": 0,
+          "arrival_rate": 0,
+          "service_rate": 0,
+          "servers": 20
+        },
+        {
+          "band_id": 3,
+          "rho": 0,
+          "arrival_rate": 0,
+          "service_rate": 0,
+          "servers": 40
+        },
+        {
+          "band_id": 4,
+          "rho": 0,
+          "arrival_rate": 0,
+          "service_rate": 0,
+          "servers": 80
+        },
+        {
+          "band_id": 5,
+          "rho": 0,
+          "arrival_rate": 0,
+          "service_rate": 0,
+          "servers": 100
+        }
+      ],
+      "predicted_wait_times": [
+        {
+          "band_id": 1,
+          "predicted_wait_ms": 10000,
+          "observed_latency_ms": 0,
+          "deviation": -10000,
+          "bottleneck_type": "cpu"
+        },
+        {
+          "band_id": 2,
+          "predicted_wait_ms": 10000,
+          "observed_latency_ms": 0,
+          "deviation": -10000,
+          "bottleneck_type": "cpu"
+        },
+        {
+          "band_id": 3,
+          "predicted_wait_ms": 10000,
+          "observed_latency_ms": 0,
+          "deviation": -10000,
+          "bottleneck_type": "cpu"
+        },
+        {
+          "band_id": 4,
+          "predicted_wait_ms": 10000,
+          "observed_latency_ms": 0,
+          "deviation": -10000,
+          "bottleneck_type": "cpu"
+        },
+        {
+          "band_id": 5,
+          "predicted_wait_ms": 10000,
+          "observed_latency_ms": 0,
+          "deviation": -10000,
+          "bottleneck_type": "cpu"
+        }
+      ]
+    },
+    "performance_regions": [
+      {
+        "start_band": 2,
+        "end_band": 5,
+        "region": "transitional",
+        "confidence": 0.7,
+        "description": "Performance behavior is transitioning between different scaling patterns."
+      }
+    ],
+    "recommendations": []
+  },
+  "optimal_config": {
+    "workers": 5,
+    "connections": 10,
+    "tps": 0,
+    "efficiency": 0,
+    "reasoning": "Selected for optimal efficiency while maintaining high throughput"
+  }
+}
