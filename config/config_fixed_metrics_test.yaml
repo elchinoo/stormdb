@@ -1,0 +1,37 @@
+# Fixed Metrics Test - Run Phase Sampling Only
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+workload: "simple"
+scale: 100
+duration: "5s"
+workers: 2
+connections: 4
+summary_interval: "2s"
+
+# Test with proper run-phase sampling
+progressive:
+  enabled: true
+  min_workers: 2
+  step_workers: 2
+  max_workers: 6
+  min_connections: 2
+  step_connections: 2
+  max_connections: 6
+  band_duration: "20s"           # 20 seconds run phase
+  warmup_time: "5s"              # 5 second warmup (excluded from analysis)
+  cooldown_time: "2s"            # 2 second cooldown (excluded from analysis)
+  strategy: "synchronized"       # Workers = connections
+  export_format: "both"
+  export_path: "./progressive_results"
+
+plugins:
+  auto_load: false
+  paths: []
+  files: []
