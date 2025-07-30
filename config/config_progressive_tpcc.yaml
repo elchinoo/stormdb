@@ -24,27 +24,16 @@ database:
 # Progressive scaling configuration
 progressive:
   enabled: true
-  
-  # Start small and scale exponentially to find saturation point
-  min_workers: 5       # Start with 5 workers
-  max_workers: 80      # Scale up to 80 workers
-  step_workers: 5      # Used as minimum increment
-  
-  min_connections: 10  # Start with 10 connections
-  max_connections: 100 # Scale up to 100 connections
-  step_connections: 10 # Used as minimum increment
-  
-  # Shorter bands for quick scaling analysis
-  band_duration: "20s" # Run each band for 45 seconds
-  warmup_time: "10s"   # Longer warmup for TPCC
-  cooldown_time: "10s" # Longer cooldown for stability
-  
-  # Use exponential scaling to quickly find performance limits
-  strategy: "exponential"
-  
-  # Export detailed results for analysis
-  export_format: "both"
-  export_path: "./progressive_results/tpcc"
+  strategy: "exponential"          # linear, exponential, fibonacci
+  min_workers: 5                   # Start with 5 workers
+  max_workers: 80                  # Scale up to 80 workers
+  min_connections: 10              # Start with 10 connections
+  max_connections: 100             # Scale up to 100 connections
+  test_duration: "20s"             # Run each band for 20 seconds
+  warmup_duration: "10s"           # Warmup time per band
+  cooldown_duration: "10s"         # Cooldown time between bands
+  bands: 5                         # Number of test configurations
+  enable_analysis: true            # Enable mathematical analysis
 
 # Enable comprehensive PostgreSQL monitoring for TPCC
 collect_pg_stats: true

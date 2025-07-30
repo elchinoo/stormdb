@@ -23,6 +23,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elchinoo/stormdb/pkg/types"
@@ -105,20 +106,43 @@ func (e *ScalingEngine) Execute(ctx context.Context) (*types.ProgressiveScalingR
 		return nil, fmt.Errorf("invalid progressive configuration: %w", err)
 	}
 
-	// Parse durations
-	bandDuration, err := time.ParseDuration(e.config.Progressive.BandDuration)
-	if err != nil {
-		return nil, fmt.Errorf("invalid band_duration: %w", err)
-	}
+	// Parse durations - handle both v0.2 and legacy formats
+	var bandDuration, warmupTime, cooldownTime time.Duration
+	var err error
 
-	warmupTime, err := time.ParseDuration(e.config.Progressive.WarmupTime)
-	if err != nil {
-		return nil, fmt.Errorf("invalid warmup_time: %w", err)
-	}
+	// Determine which format to use
+	if e.config.Progressive.TestDuration != "" {
+		// v0.2 format
+		bandDuration, err = time.ParseDuration(e.config.Progressive.TestDuration)
+		if err != nil {
+			return nil, fmt.Errorf("invalid test_duration: %w", err)
+		}
 
-	cooldownTime, err := time.ParseDuration(e.config.Progressive.CooldownTime)
-	if err != nil {
-		return nil, fmt.Errorf("invalid cooldown_time: %w", err)
+		warmupTime, err = time.ParseDuration(e.config.Progressive.WarmupDuration)
+		if err != nil {
+			return nil, fmt.Errorf("invalid warmup_duration: %w", err)
+		}
+
+		cooldownTime, err = time.ParseDuration(e.config.Progressive.CooldownDuration)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cooldown_duration: %w", err)
+		}
+	} else {
+		// Legacy format
+		bandDuration, err = time.ParseDuration(e.config.Progressive.BandDuration)
+		if err != nil {
+			return nil, fmt.Errorf("invalid band_duration: %w", err)
+		}
+
+		warmupTime, err = time.ParseDuration(e.config.Progressive.WarmupTime)
+		if err != nil {
+			return nil, fmt.Errorf("invalid warmup_time: %w", err)
+		}
+
+		cooldownTime, err = time.ParseDuration(e.config.Progressive.CooldownTime)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cooldown_time: %w", err)
+		}
 	}
 
 	// Generate scaling sequence
@@ -140,7 +164,13 @@ func (e *ScalingEngine) Execute(ctx context.Context) (*types.ProgressiveScalingR
 		bandConfig := *e.config
 		bandConfig.Workers = band.Workers
 		bandConfig.Connections = band.Connections
-		bandConfig.Duration = e.config.Progressive.BandDuration
+
+		// Set duration based on format being used
+		if e.config.Progressive.TestDuration != "" {
+			bandConfig.Duration = e.config.Progressive.TestDuration
+		} else {
+			bandConfig.Duration = e.config.Progressive.BandDuration
+		}
 
 		// Execute the band
 		bandMetrics, err := e.executeBand(ctx, i+1, &bandConfig, bandDuration, warmupTime)
@@ -184,6 +214,10 @@ func (e *ScalingEngine) generateScalingSequence() ([]ScalingBand, error) {
 	switch e.config.Progressive.Strategy {
 	case "linear", "":
 		sequence = e.generateLinearSequence()
+	case "balanced":
+		sequence = e.generateBalancedSequence()
+	case "synchronized":
+		sequence = e.generateSynchronizedSequence()
 	case "exponential":
 		sequence = e.generateExponentialSequence()
 	case "fibonacci":
@@ -211,6 +245,70 @@ func (e *ScalingEngine) generateLinearSequence() []ScalingBand {
 				Connections: conns,
 			})
 		}
+	}
+
+	return sequence
+}
+
+// generateBalancedSequence creates a balanced scaling sequence where workers and connections scale together
+func (e *ScalingEngine) generateBalancedSequence() []ScalingBand {
+	var sequence []ScalingBand
+
+	// For balanced scaling, we scale workers and connections proportionally
+	// Use the worker range as the primary guide and calculate proportional connections
+	workerRange := e.config.Progressive.MaxWorkers - e.config.Progressive.MinWorkers
+	connRange := e.config.Progressive.MaxConns - e.config.Progressive.MinConns
+	stepWorkers := e.config.Progressive.StepWorkers
+	if stepWorkers <= 0 {
+		stepWorkers = 1 // Default step
+	}
+
+	for workers := e.config.Progressive.MinWorkers; workers <= e.config.Progressive.MaxWorkers; workers += stepWorkers {
+		// Calculate proportional connections
+		workerProgress := float64(workers-e.config.Progressive.MinWorkers) / float64(workerRange)
+		if workerRange == 0 {
+			workerProgress = 0 // Handle case where min == max
+		}
+		conns := e.config.Progressive.MinConns + int(workerProgress*float64(connRange))
+
+		// Ensure connections don't exceed maximum
+		if conns > e.config.Progressive.MaxConns {
+			conns = e.config.Progressive.MaxConns
+		}
+
+		sequence = append(sequence, ScalingBand{
+			Workers:     workers,
+			Connections: conns,
+		})
+	}
+
+	return sequence
+}
+
+// generateSynchronizedSequence creates a sequence where workers equals connections
+func (e *ScalingEngine) generateSynchronizedSequence() []ScalingBand {
+	var sequence []ScalingBand
+
+	// Use workers as the primary scaling factor, set connections = workers
+	stepWorkers := e.config.Progressive.StepWorkers
+	if stepWorkers <= 0 {
+		stepWorkers = 1 // Default step
+	}
+
+	for workers := e.config.Progressive.MinWorkers; workers <= e.config.Progressive.MaxWorkers; workers += stepWorkers {
+		// Set connections equal to workers, but respect min/max constraints
+		conns := workers
+		if conns < e.config.Progressive.MinConns {
+			conns = e.config.Progressive.MinConns
+		}
+		if conns > e.config.Progressive.MaxConns {
+			conns = e.config.Progressive.MaxConns
+		}
+
+		sequence = append(sequence, ScalingBand{
+			Workers:     workers,
+			Connections: conns,
+		})
 	}
 
 	return sequence
@@ -303,6 +401,26 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 
 	startTime := time.Now()
 
+	// Create a band-specific connection pool with the exact number of connections needed
+	dsn := fmt.Sprintf(
+		"user=%s password=%s host=%s port=%d dbname=%s sslmode=%s pool_max_conns=%d pool_min_conns=%d pool_max_conn_lifetime=1h pool_max_conn_idle_time=30m pool_health_check_period=1m connect_timeout=10",
+		config.Database.Username, config.Database.Password,
+		config.Database.Host, config.Database.Port,
+		config.Database.Dbname, config.Database.Sslmode,
+		config.Connections, config.Connections/2, // min connections = half of max
+	)
+
+	bandPool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create band-specific connection pool: %w", err)
+	}
+	defer bandPool.Close()
+
+	// Test the band connection pool
+	if err := bandPool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ping database with band pool: %w", err)
+	}
+
 	// Create metrics for this band
 	metrics := &types.Metrics{
 		ErrorTypes:    make(map[string]int64),
@@ -316,25 +434,59 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 	bandCtx, cancel := context.WithTimeout(ctx, bandDuration+warmupTime+10*time.Second)
 	defer cancel()
 
-	// Start the workload
+	// Start the workload with the band-specific pool
 	workloadErr := make(chan error, 1)
 	go func() {
-		workloadErr <- e.workload.Run(bandCtx, e.db, config, metrics)
+		workloadErr <- e.workload.Run(bandCtx, bandPool, config, metrics)
 	}()
 
 	// Wait for warmup period
+	var metricsStartTime time.Time
 	if warmupTime > 0 {
 		fmt.Printf("🔥 Warming up for %v...\n", warmupTime)
 		select {
 		case <-time.After(warmupTime):
-			// Reset metrics after warmup
-			metrics = &types.Metrics{
-				ErrorTypes:    make(map[string]int64),
-				WorkerMetrics: make(map[int]*types.WorkerStats),
-				Mu:            sync.Mutex{},
+			// Capture initial state after warmup instead of resetting
+			metricsStartTime = time.Now()
+			initialTPS := atomic.LoadInt64(&metrics.TPS)
+			initialQPS := atomic.LoadInt64(&metrics.QPS)
+			initialErrors := atomic.LoadInt64(&metrics.Errors)
+
+			// Wait for the actual measurement period
+			select {
+			case <-time.After(bandDuration):
+				// Band completed successfully
+			case err := <-workloadErr:
+				if err != nil {
+					return nil, fmt.Errorf("workload failed during measurement: %w", err)
+				}
+			case <-bandCtx.Done():
+				return nil, fmt.Errorf("band context cancelled during measurement")
 			}
-			metrics.InitializeLatencyHistogram()
-			metrics.InitializeWorkerMetrics(config.Workers)
+
+			endTime := time.Now()
+			actualDuration := endTime.Sub(metricsStartTime)
+
+			// Create measurement-period metrics by calculating the delta
+			measurementMetrics := &types.Metrics{
+				TPS:        atomic.LoadInt64(&metrics.TPS) - initialTPS,
+				QPS:        atomic.LoadInt64(&metrics.QPS) - initialQPS,
+				Errors:     atomic.LoadInt64(&metrics.Errors) - initialErrors,
+				ErrorTypes: make(map[string]int64),
+			}
+
+			// Copy latency data (TODO: could be improved to only capture measurement period)
+			metrics.Mu.Lock()
+			measurementMetrics.TransactionDur = make([]int64, len(metrics.TransactionDur))
+			copy(measurementMetrics.TransactionDur, metrics.TransactionDur)
+			metrics.Mu.Unlock()
+
+			// Calculate band metrics
+			bandMetrics := e.calculateBandMetrics(bandID, config.Workers, config.Connections,
+				startTime, endTime, actualDuration, measurementMetrics)
+
+			return bandMetrics, nil
+
 		case err := <-workloadErr:
 			if err != nil {
 				return nil, fmt.Errorf("workload failed during warmup: %w", err)
@@ -342,20 +494,23 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 		case <-bandCtx.Done():
 			return nil, fmt.Errorf("band context cancelled during warmup")
 		}
+	} else {
+		// No warmup, start measuring immediately
+		metricsStartTime = time.Now()
 	}
 
-	metricsStartTime := time.Now()
-
-	// Wait for the actual measurement period
-	select {
-	case <-time.After(bandDuration):
-		// Band completed successfully
-	case err := <-workloadErr:
-		if err != nil {
-			return nil, fmt.Errorf("workload failed during measurement: %w", err)
+	// Wait for the actual measurement period (when no warmup)
+	if warmupTime == 0 {
+		select {
+		case <-time.After(bandDuration):
+			// Band completed successfully
+		case err := <-workloadErr:
+			if err != nil {
+				return nil, fmt.Errorf("workload failed during measurement: %w", err)
+			}
+		case <-bandCtx.Done():
+			return nil, fmt.Errorf("band context cancelled during measurement")
 		}
-	case <-bandCtx.Done():
-		return nil, fmt.Errorf("band context cancelled during measurement")
 	}
 
 	endTime := time.Now()
@@ -372,6 +527,7 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 func (e *ScalingEngine) validateConfig() error {
 	p := &e.config.Progressive
 
+	// Basic validation
 	if p.MinWorkers <= 0 {
 		return fmt.Errorf("min_workers must be positive, got: %d", p.MinWorkers)
 	}
@@ -380,9 +536,6 @@ func (e *ScalingEngine) validateConfig() error {
 	}
 	if p.MinWorkers > p.MaxWorkers {
 		return fmt.Errorf("min_workers (%d) must be <= max_workers (%d)", p.MinWorkers, p.MaxWorkers)
-	}
-	if p.StepWorkers <= 0 {
-		return fmt.Errorf("step_workers must be positive, got: %d", p.StepWorkers)
 	}
 
 	if p.MinConns <= 0 {
@@ -394,38 +547,58 @@ func (e *ScalingEngine) validateConfig() error {
 	if p.MinConns > p.MaxConns {
 		return fmt.Errorf("min_connections (%d) must be <= max_connections (%d)", p.MinConns, p.MaxConns)
 	}
-	if p.StepConns <= 0 {
-		return fmt.Errorf("step_connections must be positive, got: %d", p.StepConns)
-	}
 
-	if p.BandDuration == "" {
-		return fmt.Errorf("band_duration is required")
-	}
-	if _, err := time.ParseDuration(p.BandDuration); err != nil {
-		return fmt.Errorf("invalid band_duration format: %s", p.BandDuration)
+	// Check if using v0.2 format (preferred) or legacy format
+	usingV2Format := p.Bands > 0 || p.TestDuration != ""
+
+	if usingV2Format {
+		// v0.2 format validation
+		if p.Bands > 0 {
+			if p.Bands < 3 {
+				return fmt.Errorf("bands must be at least 3 for meaningful analysis, got: %d", p.Bands)
+			}
+			if p.Bands > 25 {
+				return fmt.Errorf("bands cannot exceed 25 for practical reasons, got: %d", p.Bands)
+			}
+		}
+
+		// Use defaults if not specified
+		if p.TestDuration == "" {
+			p.TestDuration = "30m"
+		}
+		if p.WarmupDuration == "" {
+			p.WarmupDuration = "60s"
+		}
+		if p.CooldownDuration == "" {
+			p.CooldownDuration = "30s"
+		}
+		if p.Bands == 0 {
+			p.Bands = 5
+		}
+	} else {
+		// Legacy format validation
+		if p.StepWorkers <= 0 {
+			return fmt.Errorf("step_workers must be positive, got: %d", p.StepWorkers)
+		}
+		if p.StepConns <= 0 {
+			return fmt.Errorf("step_connections must be positive, got: %d", p.StepConns)
+		}
+		if p.BandDuration == "" {
+			return fmt.Errorf("band_duration is required")
+		}
 	}
 
 	// Validate strategy
 	validStrategies := map[string]bool{
-		"linear":      true,
-		"exponential": true,
-		"fibonacci":   true,
-		"":            true, // default to linear
+		"linear":       true,
+		"balanced":     true,
+		"synchronized": true,
+		"exponential":  true,
+		"fibonacci":    true,
+		"":             true, // default to linear
 	}
 	if !validStrategies[p.Strategy] {
-		return fmt.Errorf("invalid strategy: %s (valid: linear, exponential, fibonacci)", p.Strategy)
-	}
-
-	// Validate export format
-	if p.ExportFormat != "" {
-		validFormats := map[string]bool{
-			"csv":  true,
-			"json": true,
-			"both": true,
-		}
-		if !validFormats[p.ExportFormat] {
-			return fmt.Errorf("invalid export_format: %s (valid: csv, json, both)", p.ExportFormat)
-		}
+		return fmt.Errorf("invalid strategy: %s (valid: linear, balanced, synchronized, exponential, fibonacci)", p.Strategy)
 	}
 
 	return nil
@@ -532,12 +705,8 @@ func (e *ScalingEngine) finalizeResults() (*types.ProgressiveScalingResult, erro
 	// Find optimal configuration
 	e.findOptimalConfiguration()
 
-	// Export results if configured
-	if e.config.Progressive.ExportFormat != "" && e.config.Progressive.ExportPath != "" {
-		if err := e.exportResults(); err != nil {
-			fmt.Printf("Warning: Failed to export results: %v\n", err)
-		}
-	}
+	// Generate comprehensive terminal report
+	e.generateProgressiveReport()
 
 	return e.results, nil
 }

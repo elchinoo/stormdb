@@ -59,19 +59,28 @@ type Config struct {
 
 	// Progressive scaling configuration for load testing across multiple connection levels
 	Progressive struct {
-		Enabled      bool   `mapstructure:"enabled"`          // Enable progressive connection scaling
-		MinWorkers   int    `mapstructure:"min_workers"`      // Starting number of workers
-		MaxWorkers   int    `mapstructure:"max_workers"`      // Maximum number of workers
-		StepWorkers  int    `mapstructure:"step_workers"`     // Worker increment per band
-		MinConns     int    `mapstructure:"min_connections"`  // Starting number of connections
-		MaxConns     int    `mapstructure:"max_connections"`  // Maximum number of connections
-		StepConns    int    `mapstructure:"step_connections"` // Connection increment per band
-		BandDuration string `mapstructure:"band_duration"`    // Duration to run each band (e.g., "30s", "1m")
-		WarmupTime   string `mapstructure:"warmup_time"`      // Warmup time before collecting metrics (e.g., "10s")
-		CooldownTime string `mapstructure:"cooldown_time"`    // Cooldown time between bands (e.g., "5s")
-		Strategy     string `mapstructure:"strategy"`         // Scaling strategy: "linear", "exponential", "fibonacci"
-		ExportFormat string `mapstructure:"export_format"`    // Export format for results: "csv", "json", "both"
-		ExportPath   string `mapstructure:"export_path"`      // Path to export progressive results
+		Enabled          bool   `mapstructure:"enabled"`           // Enable progressive connection scaling
+		Strategy         string `mapstructure:"strategy"`          // Scaling strategy: "linear", "exponential", "fibonacci"
+		MinWorkers       int    `mapstructure:"min_workers"`       // Starting number of workers
+		MaxWorkers       int    `mapstructure:"max_workers"`       // Maximum number of workers
+		MinConns         int    `mapstructure:"min_connections"`   // Starting number of connections
+		MaxConns         int    `mapstructure:"max_connections"`   // Maximum number of connections
+		TestDuration     string `mapstructure:"test_duration"`     // Duration to run each band (e.g., "30m", "1h")
+		WarmupDuration   string `mapstructure:"warmup_duration"`   // Warmup time before collecting metrics (e.g., "60s")
+		CooldownDuration string `mapstructure:"cooldown_duration"` // Cooldown time between bands (e.g., "30s")
+		Bands            int    `mapstructure:"bands"`             // Number of test configurations (3-25)
+		ExportCSV        bool   `mapstructure:"export_csv"`        // Export results to CSV
+		ExportJSON       bool   `mapstructure:"export_json"`       // Export results to JSON
+		EnableAnalysis   bool   `mapstructure:"enable_analysis"`   // Enable mathematical analysis
+
+		// Legacy fields for backward compatibility (deprecated in v0.2)
+		StepWorkers  int    `mapstructure:"step_workers"`     // Deprecated: use bands instead
+		StepConns    int    `mapstructure:"step_connections"` // Deprecated: use bands instead
+		BandDuration string `mapstructure:"band_duration"`    // Deprecated: use test_duration instead
+		WarmupTime   string `mapstructure:"warmup_time"`      // Deprecated: use warmup_duration instead
+		CooldownTime string `mapstructure:"cooldown_time"`    // Deprecated: use cooldown_duration instead
+		ExportFormat string `mapstructure:"export_format"`    // Deprecated: use export_csv/export_json instead
+		ExportPath   string `mapstructure:"export_path"`      // Deprecated: file export removed in v0.2
 	} `mapstructure:"progressive"`
 
 	// PostgreSQL monitoring and statistics collection options
