@@ -499,11 +499,11 @@ release-check: ## Run pre-release validation checks
 	@$(MAKE) security
 	@echo "✅ Pre-release checks completed successfully"
 
-release-build: ## Build release binaries for current platform
-	@echo "🚀 Building release binary for current platform..."
+release-build: ## Build release binary for x86_64 Linux
+	@echo "🚀 Building release binary for x86_64 Linux..."
 	@mkdir -p $(BUILD_DIR)/release
-	@CGO_ENABLED=1 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME) $(CMD_DIR)/main.go
-	@$(MAKE) plugins
+	@CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME) $(CMD_DIR)/main.go
+	@GOOS=linux GOARCH=amd64 $(MAKE) plugins
 	@if [ -d $(PLUGIN_DIR) ]; then \
 		cp -r $(PLUGIN_DIR) $(BUILD_DIR)/release/; \
 	fi
