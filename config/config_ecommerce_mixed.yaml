@@ -1,5 +1,5 @@
-# E-Commerce Mixed Workload Configuration
-# This workload simulates a modern e-commerce platform with:
+# Progressive E-Commerce Mixed Workload Configuration
+# This workload simulates a modern e-commerce platform with progressive scaling:
 # - 75% read operations (product searches, user queries, analytics)
 # - 25% write operations (orders, reviews, inventory updates, stock control)
 # - Automated vendor management and purchase orders
@@ -32,12 +32,28 @@ plugins:
   auto_load: true
 
 workload: "ecommerce_mixed"
-workers: 10
+workers: 10                      # Base workers (overridden by progressive)
 duration: "30s"
 scale: 1000
-connections: 20
-summary_interval: "10s"  # Show progress every 10 seconds
+connections: 20                  # Base connections (overridden by progressive)
+summary_interval: "10s"          # Show progress every 10 seconds
 
+# Progressive scaling configuration - 3 hour test with 6 bands of 30 minutes each
+progressive:
+  enabled: true
+  min_workers: 10
+  step_workers: 10
+  max_workers: 60
+  min_connections: 20
+  step_connections: 20
+  max_connections: 120
+  band_duration: "1800s"         # 30 minutes per band (3 hours total ÷ 6 bands)
+  warmup_time: "60s"         # Warmup for e-commerce data loading
+  cooldown_time: "30s"
+  strategy: "linear"     # Linear scaling for consistent analysis
+  
+  export_format: "csv"
+  export_path: "./progressive_results"
 metrics:
   enabled: true
   interval: "5s"

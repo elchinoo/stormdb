@@ -57,6 +57,23 @@ type Config struct {
 	Connections     int    `mapstructure:"connections"`      // Maximum database connections in pool
 	SummaryInterval string `mapstructure:"summary_interval"` // Interval for progress reports (e.g., "10s", "30s")
 
+	// Progressive scaling configuration for load testing across multiple connection levels
+	Progressive struct {
+		Enabled      bool   `mapstructure:"enabled"`          // Enable progressive connection scaling
+		MinWorkers   int    `mapstructure:"min_workers"`      // Starting number of workers
+		MaxWorkers   int    `mapstructure:"max_workers"`      // Maximum number of workers
+		StepWorkers  int    `mapstructure:"step_workers"`     // Worker increment per band
+		MinConns     int    `mapstructure:"min_connections"`  // Starting number of connections
+		MaxConns     int    `mapstructure:"max_connections"`  // Maximum number of connections
+		StepConns    int    `mapstructure:"step_connections"` // Connection increment per band
+		BandDuration string `mapstructure:"band_duration"`    // Duration to run each band (e.g., "30s", "1m")
+		WarmupTime   string `mapstructure:"warmup_time"`      // Warmup time before collecting metrics (e.g., "10s")
+		CooldownTime string `mapstructure:"cooldown_time"`    // Cooldown time between bands (e.g., "5s")
+		Strategy     string `mapstructure:"strategy"`         // Scaling strategy: "linear", "exponential", "fibonacci"
+		ExportFormat string `mapstructure:"export_format"`    // Export format for results: "csv", "json", "both"
+		ExportPath   string `mapstructure:"export_path"`      // Path to export progressive results
+	} `mapstructure:"progressive"`
+
 	// PostgreSQL monitoring and statistics collection options
 	CollectPgStats    bool `mapstructure:"collect_pg_stats"`    // Enable comprehensive PostgreSQL statistics collection
 	PgStatsStatements bool `mapstructure:"pg_stats_statements"` // Enable pg_stat_statements query analysis
@@ -699,4 +716,161 @@ func (m *Metrics) RecordConnectionSetup(setupTime int64) {
 
 	m.TransientConnMetrics.ConnectionSetup = append(m.TransientConnMetrics.ConnectionSetup, setupTime)
 	m.TransientConnMetrics.ConnectionCount++
+}
+
+// ProgressiveBandMetrics contains metrics and analysis for a single progressive scaling band
+type ProgressiveBandMetrics struct {
+	// Band configuration
+	BandID      int           `json:"band_id"`     // Sequential band identifier
+	Workers     int           `json:"workers"`     // Number of workers for this band
+	Connections int           `json:"connections"` // Number of connections for this band
+	StartTime   time.Time     `json:"start_time"`  // When this band started
+	EndTime     time.Time     `json:"end_time"`    // When this band ended
+	Duration    time.Duration `json:"duration"`    // Actual duration of the band
+
+	// Core performance metrics
+	TotalTPS     float64 `json:"total_tps"`      // Transactions per second
+	TotalQPS     float64 `json:"total_qps"`      // Queries per second
+	AvgLatencyMs float64 `json:"avg_latency_ms"` // Average latency in milliseconds
+	P50LatencyMs float64 `json:"p50_latency_ms"` // 50th percentile latency
+	P95LatencyMs float64 `json:"p95_latency_ms"` // 95th percentile latency
+	P99LatencyMs float64 `json:"p99_latency_ms"` // 99th percentile latency
+	MaxLatencyMs float64 `json:"max_latency_ms"` // Maximum latency
+	MinLatencyMs float64 `json:"min_latency_ms"` // Minimum latency
+	ErrorRate    float64 `json:"error_rate"`     // Error rate as percentage
+	TotalErrors  int64   `json:"total_errors"`   // Total error count
+
+	// Advanced statistical metrics
+	StdDevLatency      float64 `json:"stddev_latency"`     // Standard deviation of latency
+	VarianceLatency    float64 `json:"variance_latency"`   // Variance of latency
+	CoefficientOfVar   float64 `json:"coefficient_of_var"` // Coefficient of variation (stddev/mean)
+	ConfidenceInterval struct {
+		Lower float64 `json:"lower"` // Lower bound of 95% confidence interval
+		Upper float64 `json:"upper"` // Upper bound of 95% confidence interval
+	} `json:"confidence_interval"`
+
+	// Throughput analysis
+	TPSPerWorker     float64 `json:"tps_per_worker"`     // TPS per worker (efficiency metric)
+	TPSPerConnection float64 `json:"tps_per_connection"` // TPS per connection (utilization metric)
+	WorkerEfficiency float64 `json:"worker_efficiency"`  // Worker efficiency vs theoretical maximum
+	ConnectionUtil   float64 `json:"connection_util"`    // Connection utilization percentage
+
+	// PostgreSQL statistics for this band (if collected)
+	PgStats *PostgreSQLStats `json:"pg_stats,omitempty"`
+
+	// Raw sample data for further analysis
+	LatencySamples []int64   `json:"latency_samples,omitempty"` // Raw latency samples in nanoseconds
+	TPSSamples     []float64 `json:"tps_samples,omitempty"`     // TPS samples over time
+}
+
+// ProgressiveScalingResult contains complete results and analysis of progressive scaling test
+type ProgressiveScalingResult struct {
+	// Test configuration
+	TestStartTime time.Time     `json:"test_start_time"`
+	TestEndTime   time.Time     `json:"test_end_time"`
+	TotalDuration time.Duration `json:"total_duration"`
+	Workload      string        `json:"workload"`
+	Strategy      string        `json:"strategy"`
+
+	// All band results
+	Bands []ProgressiveBandMetrics `json:"bands"`
+
+	// Progressive analysis
+	Analysis ProgressiveAnalysis `json:"analysis"`
+
+	// Optimal configuration findings
+	OptimalConfig struct {
+		Workers     int     `json:"workers"`     // Optimal number of workers
+		Connections int     `json:"connections"` // Optimal number of connections
+		TPS         float64 `json:"tps"`         // TPS at optimal configuration
+		Efficiency  float64 `json:"efficiency"`  // Efficiency at optimal configuration
+		Reasoning   string  `json:"reasoning"`   // Why this configuration is optimal
+	} `json:"optimal_config"`
+}
+
+// ProgressiveAnalysis contains advanced mathematical analysis of progressive scaling results
+type ProgressiveAnalysis struct {
+	// Discrete derivatives (marginal gains)
+	MarginalGains []struct {
+		BandID           int     `json:"band_id"`
+		WorkerDelta      int     `json:"worker_delta"`       // Change in workers
+		ConnectionDelta  int     `json:"connection_delta"`   // Change in connections
+		TPSDelta         float64 `json:"tps_delta"`          // Change in TPS
+		TPSPerWorker     float64 `json:"tps_per_worker"`     // Marginal TPS per additional worker
+		TPSPerConnection float64 `json:"tps_per_connection"` // Marginal TPS per additional connection
+		EfficiencyDelta  float64 `json:"efficiency_delta"`   // Change in efficiency
+		LatencyDelta     float64 `json:"latency_delta"`      // Change in average latency
+	} `json:"marginal_gains"`
+
+	// Second derivatives (inflection points)
+	InflectionPoints []struct {
+		BandID           int     `json:"band_id"`
+		Type             string  `json:"type"`              // "beneficial_to_harmful", "acceleration", "deceleration"
+		Metric           string  `json:"metric"`            // Which metric shows inflection (tps, latency, efficiency)
+		SecondDerivative float64 `json:"second_derivative"` // Actual second derivative value
+		Significance     string  `json:"significance"`      // "low", "medium", "high"
+		Description      string  `json:"description"`       // Human-readable description
+	} `json:"inflection_points"`
+
+	// Curve fitting results
+	CurveFitting struct {
+		Model        string    `json:"model"`        // "linear", "logarithmic", "exponential", "logistic"
+		Coefficients []float64 `json:"coefficients"` // Model coefficients
+		RSquared     float64   `json:"r_squared"`    // Goodness of fit (0-1)
+		RMSE         float64   `json:"rmse"`         // Root mean square error
+		Predictions  []struct {
+			Workers      int     `json:"workers"`
+			Connections  int     `json:"connections"`
+			PredictedTPS float64 `json:"predicted_tps"`
+			ActualTPS    float64 `json:"actual_tps"`
+			Residual     float64 `json:"residual"`
+		} `json:"predictions"`
+		Formula string `json:"formula"` // Human-readable formula
+	} `json:"curve_fitting"`
+
+	// Integral analysis (cumulative capacity)
+	CumulativeCapacity struct {
+		TotalAreaUnderCurve float64 `json:"total_area_under_curve"` // Total work capacity across range
+		AverageCapacity     float64 `json:"average_capacity"`       // Average capacity across range
+		PeakCapacity        float64 `json:"peak_capacity"`          // Peak capacity achieved
+		CapacityEfficiency  float64 `json:"capacity_efficiency"`    // Efficiency relative to theoretical peak
+	} `json:"cumulative_capacity"`
+
+	// Queueing theory analysis
+	QueueingTheory struct {
+		ModelType   string `json:"model_type"` // "M/M/c", "M/M/c/K", etc.
+		Utilization []struct {
+			BandID      int     `json:"band_id"`
+			Rho         float64 `json:"rho"`          // Utilization factor (λ/μc)
+			ArrivalRate float64 `json:"arrival_rate"` // λ (requests/sec)
+			ServiceRate float64 `json:"service_rate"` // μ (service rate per server)
+			Servers     int     `json:"servers"`      // c (number of servers/connections)
+		} `json:"utilization"`
+		PredictedWaitTimes []struct {
+			BandID            int     `json:"band_id"`
+			PredictedWaitMs   float64 `json:"predicted_wait_ms"`   // Theoretical wait time
+			ObservedLatencyMs float64 `json:"observed_latency_ms"` // Actual observed latency
+			Deviation         float64 `json:"deviation"`           // Difference from theory
+			BottleneckType    string  `json:"bottleneck_type"`     // "cpu", "io", "queue", "contention"
+		} `json:"predicted_wait_times"`
+	} `json:"queueing_theory"`
+
+	// Performance categorization
+	PerformanceRegions []struct {
+		StartBand   int     `json:"start_band"`
+		EndBand     int     `json:"end_band"`
+		Region      string  `json:"region"`     // "linear_scaling", "diminishing_returns", "saturation", "degradation"
+		Confidence  float64 `json:"confidence"` // Confidence in this classification (0-1)
+		Description string  `json:"description"`
+	} `json:"performance_regions"`
+
+	// Recommendations
+	Recommendations []struct {
+		Type         string  `json:"type"`          // "configuration", "hardware", "tuning"
+		Priority     string  `json:"priority"`      // "high", "medium", "low"
+		Category     string  `json:"category"`      // "workers", "connections", "database", "system"
+		Suggestion   string  `json:"suggestion"`    // Human-readable recommendation
+		ExpectedGain float64 `json:"expected_gain"` // Expected performance improvement (%)
+		Confidence   float64 `json:"confidence"`    // Confidence in recommendation (0-1)
+	} `json:"recommendations"`
 }

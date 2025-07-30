@@ -486,26 +486,6 @@ help: ## Display this help message
 	@echo "  STORMDB_TEST_USER    PostgreSQL user for tests"
 	@echo "  STORMDB_TEST_PASS    PostgreSQL password for tests"
 
-# Release targets
-release-check: ## Run pre-release validation checks
-	@echo "🔍 Running pre-release checks..."
-	@echo "Version: $(VERSION)"
-	@echo "Commit: $(GIT_COMMIT)"
-	@$(MAKE) validate-full
-	@$(MAKE) test-all
-	@$(MAKE) security
-	@echo "✅ Pre-release checks completed successfully"
-
-release-build: ## Build release binaries for current platform
-	@echo "🚀 Building release binary for current platform..."
-	@mkdir -p $(BUILD_DIR)/release
-	@CGO_ENABLED=1 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME) $(CMD_DIR)/main.go
-	@$(MAKE) plugins
-	@if [ -d $(PLUGIN_DIR) ]; then \
-		cp -r $(PLUGIN_DIR) $(BUILD_DIR)/release/; \
-	fi
-	@echo "✅ Release build complete: $(BUILD_DIR)/release/"
-
 release-cross: ## Build cross-platform release binaries and packages
 	@echo "🌍 Building cross-platform release..."
 	@chmod +x scripts/build-cross-platform.sh

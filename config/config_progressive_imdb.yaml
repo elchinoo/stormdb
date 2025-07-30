@@ -1,0 +1,57 @@
+# Progressive scaling configuration for IMDB workload
+# This configuration demonstrates progressive connection scaling
+# from 10 to 100 workers/connections using linear scaling strategy
+
+workload: "imdb"
+mode: "mixed"  # read, write, or mixed operations
+scale: 10      # Scale factor for data generation
+
+# Regular benchmark settings (ignored in progressive mode)
+duration: "5m"
+workers: 50
+connections: 50
+summary_interval: "10s"
+
+# Database configuration
+database:
+  type: "postgres"
+  host: "localhost"
+  port: 5432
+  dbname: "stormdb_test"
+  username: "postgres"
+  password: "password"
+  sslmode: "disable"
+
+# Data loading configuration for IMDB
+data_loading:
+  mode: "generate"  # generate, dump, or sql
+
+# Progressive scaling configuration
+progressive:
+  enabled: true
+  
+  # Worker scaling parameters
+  min_workers: 10      # Start with 10 workers
+  max_workers: 60      # Scale up to 60 workers
+  step_workers: 10     # Increment by 10 workers per band
+  
+  # Connection scaling parameters  
+  min_connections: 20  # Start with 20 connections
+  max_connections: 120 # Scale up to 120 connections
+  step_connections: 20 # Increment by 20 connections per band
+  
+  # Timing configuration - 3 hour test with 6 bands of 30 minutes each
+  band_duration: "1800s" # Run each band for 30 minutes (3 hours total ÷ 6 bands)
+  warmup_time: "60s"   # Warmup time before collecting metrics
+  cooldown_time: "30s" # Cool down between bands
+  
+  # Scaling strategy: linear, exponential, fibonacci
+  strategy: "linear"
+  
+  # Results export
+  export_format: "both"  # csv, json, or both
+  export_path: "./progressive_results"
+
+# PostgreSQL monitoring
+collect_pg_stats: true
+pg_stats_statements: true

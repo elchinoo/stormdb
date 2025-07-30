@@ -45,6 +45,15 @@ StormDB is a comprehensive PostgreSQL benchmarking and load testing tool designe
 - **Lock Contention**: Deadlock and wait event tracking
 - **Autovacuum Activity**: Monitoring background maintenance
 
+### 🎯 Progressive Connection Scaling
+- **Automated Scaling**: Test multiple worker/connection configurations in a single run
+- **Mathematical Analysis**: Advanced statistical analysis with discrete derivatives and inflection points
+- **Curve Fitting**: Linear, logarithmic, exponential, and logistic model fitting
+- **Queueing Theory**: M/M/c queue modeling for bottleneck identification
+- **Scaling Strategies**: Linear, exponential, and fibonacci scaling patterns
+- **Optimal Configuration Discovery**: Automatically identifies best performance configurations
+- **Export Options**: CSV and JSON export for further analysis and visualization
+
 ## 🏗️ Architecture
 
 StormDB uses a modular plugin architecture that separates core functionality from workload implementations:
@@ -1380,7 +1389,36 @@ for w in "${WORKERS[@]}"; do
 done
 ```
 
-#### 3. Multi-Database Testing
+#### 3. Progressive Connection Scaling (Automated)
+```bash
+# Automated progressive scaling with mathematical analysis
+./stormdb -c config/config_progressive_imdb.yaml --setup
+
+# Enable progressive mode via CLI flag
+./stormdb -c config/imdb_mixed.yaml --progressive --setup
+
+# Quick scaling analysis
+./stormdb -c config/progressive_tpcc.yaml --progressive
+```
+
+**Example Progressive Output:**
+```
+🎯 Starting progressive scaling test with 25 bands
+📊 Strategy: linear, Band Duration: 30s, Warmup: 10s, Cooldown: 5s
+
+🔄 Band 1/25: 10 workers, 20 connections
+📊 Band 1 completed: 1,234 TPS, 45.2ms avg latency
+
+🔄 Band 15/25: 70 workers, 100 connections  
+📊 Band 15 completed: 4,123 TPS, 89.1ms avg latency
+
+✅ Progressive scaling completed successfully
+📊 Tested 25 bands, optimal config: 40 workers, 60 connections (2,341 TPS)
+📈 Mathematical analysis: Linear scaling until band 12, diminishing returns detected
+🎯 Recommendation: Use 40-50 workers for optimal efficiency
+```
+
+#### 4. Multi-Database Testing
 ```bash
 #!/bin/bash
 # multi_db_test.sh - Test across multiple database instances
@@ -2561,6 +2599,7 @@ grep -i "connection" stormdb.log | grep -i "fail"
 ## 📚 Additional Resources
 
 ### Documentation Links
+- [Progressive Scaling Guide](docs/PROGRESSIVE_SCALING.md) - Connection scaling and mathematical analysis
 - [E-Commerce Workload Guide](docs/ECOMMERCE_WORKLOAD.md) - Comprehensive e-commerce testing
 - [IMDB Workload Guide](docs/IMDB_WORKLOAD.md) - Movie database testing scenarios
 - [Vector Search Guide](docs/VECTOR_WORKLOAD.md) - pgvector integration and testing
@@ -2568,6 +2607,7 @@ grep -i "connection" stormdb.log | grep -i "fail"
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Configuration Examples
+- [Progressive Scaling Configurations](config/config_progressive_*.yaml) - Progressive connection scaling
 - [E-Commerce Configurations](config/config_ecommerce_*.yaml) - Various e-commerce scenarios
 - [IMDB Configurations](config/config_imdb_*.yaml) - Movie database testing
 - [Vector Configurations](config/config_vector_*.yaml) - Vector similarity search
