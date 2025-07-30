@@ -2600,6 +2600,7 @@ grep -i "connection" stormdb.log | grep -i "fail"
 
 ### Documentation Links
 - [Progressive Scaling Guide](docs/PROGRESSIVE_SCALING.md) - Connection scaling and mathematical analysis
+- [Progressive Scaling v0.2 Fixes](docs/PROGRESSIVE_SCALING_V2_FIXES.md) - Issue resolution and improvements
 - [E-Commerce Workload Guide](docs/ECOMMERCE_WORKLOAD.md) - Comprehensive e-commerce testing
 - [IMDB Workload Guide](docs/IMDB_WORKLOAD.md) - Movie database testing scenarios
 - [Vector Search Guide](docs/VECTOR_WORKLOAD.md) - pgvector integration and testing
