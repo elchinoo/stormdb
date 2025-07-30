@@ -20,6 +20,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version information (set by build system via ldflags)
+var (
+	Version   = "dev"     // Version string
+	GitCommit = "unknown" // Git commit hash
+	BuildTime = "unknown" // Build timestamp
+	GoVersion = "unknown" // Go version used for build
+)
+
 func main() {
 	var (
 		configFile        string
@@ -39,12 +47,20 @@ func main() {
 		noSummary         bool
 		collectPgStats    bool
 		pgStatsStatements bool
+		showVersion       bool
 	)
 
 	rootCmd := &cobra.Command{
 		Use:   "stormdb",
 		Short: "A extensible database load testing tool",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			if showVersion {
+				fmt.Printf("StormDB v%s\n", Version)
+				fmt.Printf("  Git Commit: %s\n", GitCommit)
+				fmt.Printf("  Build Time: %s\n", BuildTime)
+				fmt.Printf("  Go Version: %s\n", GoVersion)
+				return nil
+			}
 			return runLoadTest(configFile, setup, rebuild, &CLIOptions{
 				Host:              host,
 				Port:              port,
@@ -63,6 +79,19 @@ func main() {
 			})
 		},
 	}
+
+	// Version command
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show version information",
+		Run: func(_ *cobra.Command, _ []string) {
+			fmt.Printf("StormDB v%s\n", Version)
+			fmt.Printf("  Git Commit: %s\n", GitCommit)
+			fmt.Printf("  Build Time: %s\n", BuildTime)
+			fmt.Printf("  Go Version: %s\n", GoVersion)
+		},
+	}
+	rootCmd.AddCommand(versionCmd)
 
 	// File and setup options
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Path to config file")
@@ -86,6 +115,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&noSummary, "no-summary", false, "Disable periodic summary reporting")
 	rootCmd.Flags().BoolVar(&collectPgStats, "collect-pg-stats", false, "Enable PostgreSQL statistics collection")
 	rootCmd.Flags().BoolVar(&pgStatsStatements, "pg-stat-statements", false, "Enable pg_stat_statements collection (requires extension)")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Show version information and exit")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
