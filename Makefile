@@ -13,7 +13,10 @@ BUILD_DIR := build
 COVERAGE_DIR := coverage
 PLUGIN_DIR := $(BUILD_DIR)/plugins
 DOCS_DIR := docs
-PROFILES_DIR := profiles
+
+# Cross-compilation settings (default to current platform, override for releases)
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 
 # FPM binary location (try common locations)
 FPM := $(shell command -v fpm 2>/dev/null || command -v /opt/homebrew/opt/ruby/bin/fpm 2>/dev/null || echo "fpm")
@@ -182,7 +185,7 @@ plugin-dir: ## Create plugin directory
 
 plugins: plugin-dir ## Build all workload plugins
 	@echo "🔌 Building all workload plugins..."
-	@$(MAKE) -C plugins all
+	@GOOS=$(GOOS) GOARCH=$(GOARCH) $(MAKE) -C plugins all
 	@echo "🔄 Copying plugins to build directory..."
 	@if [ -d "plugins/build/plugins" ]; then \
 		cp plugins/build/plugins/*.so $(PLUGIN_DIR)/ 2>/dev/null || true; \

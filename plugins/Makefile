@@ -6,8 +6,11 @@
 # Default plugin output directory (can be overridden)
 PLUGIN_DIR ?= ../build/plugins
 
-# Go build flags for plugins
+# Go build flags for plugins (default to current platform)
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 GO_PLUGIN_FLAGS := -buildmode=plugin -ldflags="-s -w"
+BUILD_ENV := CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH)
 
 # Build all plugins
 all: build-dir imdb vector ecommerce_basic ecommerce
@@ -19,25 +22,25 @@ build-dir:
 # Build IMDB plugin
 imdb: build-dir
 	@echo "🔌 Building IMDB plugin..."
-	@cd imdb_plugin && go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/imdb_plugin.so *.go
+	@cd imdb_plugin && $(BUILD_ENV) go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/imdb_plugin.so *.go
 	@echo "✅ IMDB plugin built: $(PLUGIN_DIR)/imdb_plugin.so"
 
 # Build Vector plugin  
 vector: build-dir
 	@echo "🔌 Building Vector plugin..."
-	@cd vector_plugin && go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/vector_plugin.so *.go
+	@cd vector_plugin && $(BUILD_ENV) go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/vector_plugin.so *.go
 	@echo "✅ Vector plugin built: $(PLUGIN_DIR)/vector_plugin.so"
 
 # Build E-commerce Basic plugin
 ecommerce_basic: build-dir
 	@echo "🔌 Building E-commerce Basic plugin..."
-	@cd ecommerce_basic_plugin && go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/ecommerce_basic_plugin.so *.go
+	@cd ecommerce_basic_plugin && $(BUILD_ENV) go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/ecommerce_basic_plugin.so *.go
 	@echo "✅ E-commerce Basic plugin built: $(PLUGIN_DIR)/ecommerce_basic_plugin.so"
 
 # Build E-commerce plugin
 ecommerce: build-dir
 	@echo "🔌 Building E-commerce plugin..."
-	@cd ecommerce_plugin && go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/ecommerce_plugin.so *.go
+	@cd ecommerce_plugin && $(BUILD_ENV) go build $(GO_PLUGIN_FLAGS) -o $(PLUGIN_DIR)/ecommerce_plugin.so *.go
 	@echo "✅ E-commerce plugin built: $(PLUGIN_DIR)/ecommerce_plugin.so"
 
 # Test all plugins

@@ -6,6 +6,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.ubuntu
+    platform: linux/amd64
     container_name: stormdb-test-ubuntu
     volumes:
       - ../build/packages:/output/ubuntu
@@ -20,6 +21,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.debian
+    platform: linux/amd64
     container_name: stormdb-test-debian
     volumes:
       - ../build/packages:/output/debian
@@ -34,6 +36,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.centos
+    platform: linux/amd64
     container_name: stormdb-test-centos
     volumes:
       - ../build/packages:/output/centos
