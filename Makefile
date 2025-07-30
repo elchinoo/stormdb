@@ -641,6 +641,33 @@ release-package-rpm: ## Create RPM package with proper Linux filesystem layout
 
 release-packages: release-package-deb release-package-rpm ## Create both DEB and RPM packages
 
+# Package testing targets
+test-packages: ## Test packages locally using Docker across multiple distributions
+	@echo "🧪 Testing packages across multiple Linux distributions..."
+	@./docker/test-packages.sh
+
+test-packages-local: ## Test package building locally (without Docker)
+	@echo "🧪 Testing package building locally..."
+	@./docker/test-local.sh
+
+test-packages-ubuntu: ## Test DEB package on Ubuntu using Docker
+	@echo "🧪 Testing DEB package on Ubuntu..."
+	@./docker/test-packages.sh --distro ubuntu
+
+test-packages-debian: ## Test DEB package on Debian using Docker
+	@echo "🧪 Testing DEB package on Debian..."
+	@./docker/test-packages.sh --distro debian
+
+test-packages-centos: ## Test RPM package on CentOS using Docker
+	@echo "🧪 Testing RPM package on CentOS..."
+	@./docker/test-packages.sh --distro centos
+
+test-packages-verbose: ## Test packages with verbose output
+	@echo "🧪 Testing packages with verbose output..."
+	@./docker/test-packages.sh --verbose
+
+release-test: release-packages test-packages ## Build and test packages before release
+
 release-checksums: ## Generate checksums for release artifacts
 	@echo "🔐 Generating release checksums..."
 	@find $(BUILD_DIR)/release -type f -name "$(BINARY_NAME)*" -exec sha256sum {} \; > $(BUILD_DIR)/release/SHA256SUMS

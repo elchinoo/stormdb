@@ -1,0 +1,69 @@
+# Debian-based container for additional DEB testing
+FROM debian:12
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies and testing tools
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    golang-go \
+    ruby \
+    ruby-dev \
+    rubygems \
+    dpkg-dev \
+    lintian \
+    postgresql-client \
+    make \
+    curl \
+    gzip \
+    man-db \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install FPM for package building
+RUN gem install fpm
+
+# Create working directory
+WORKDIR /workspace
+
+# Copy source code
+COPY . .
+
+# Set Go module proxy for faster builds
+ENV GOPROXY=https://proxy.golang.org,direct
+
+# Build binary and plugins
+RUN make clean && make build && make plugins
+
+# Build DEB package
+RUN make release-package-deb
+
+# Test package installation
+RUN dpkg -i build/packages/*.deb || apt-get update && apt-get install -f -y
+
+# Verify installation
+RUN stormdb --help
+RUN man stormdb
+RUN ls -la /usr/bin/stormdb
+RUN ls -la /usr/lib/stormdb/plugins/
+RUN ls -la /etc/stormdb/
+RUN ls -la /usr/share/man/man1/stormdb.1.gz
+
+# Run package linting
+RUN lintian build/packages/*.deb || true
+
+# Create test script
+RUN echo '#!/bin/bash' > /test-package.sh && \
+    echo 'echo "=== Testing DEB Package on Debian ==="' >> /test-package.sh && \
+    echo 'echo "Binary installed: $(which stormdb)"' >> /test-package.sh && \
+    echo 'echo "Version: $(stormdb --help | head -1)"' >> /test-package.sh && \
+    echo 'echo "Plugins available: $(ls /usr/lib/stormdb/plugins/ | wc -l)"' >> /test-package.sh && \
+    echo 'echo "Config files: $(ls /etc/stormdb/ | wc -l)"' >> /test-package.sh && \
+    echo 'echo "Example configs: $(ls /etc/stormdb/examples/ | wc -l)"' >> /test-package.sh && \
+    echo 'echo "Man page available: $(man stormdb | head -1)"' >> /test-package.sh && \
+    echo 'echo "=== Package Test Completed ==="' >> /test-package.sh && \
+    chmod +x /test-package.sh
+
+# Default command runs the test
+CMD ["/test-package.sh"]

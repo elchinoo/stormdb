@@ -1,0 +1,54 @@
+# Docker ignore file for StormDB package testing
+# This file reduces the build context size for faster Docker builds
+
+# Build artifacts
+build/packages/
+build/release/
+build/coverage/
+build/profiles/
+
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Coverage and test results
+coverage/
+profiles/
+docker/test-results/
+
+# Docker files (except the ones we need)
+docker/test-results/
+
+# Documentation that's not needed in containers
+docs/images/
+docs/diagrams/
+
+# Example files that are copied separately
+examples/
+
+# Development scripts
+scripts/dev/
+scripts/local/
+
+# Node modules if any
+node_modules/
+
+# Test data
+test/fixtures/large_data/

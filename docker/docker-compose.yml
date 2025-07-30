@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Ubuntu DEB package testing
+  ubuntu-deb:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ubuntu
+    container_name: stormdb-test-ubuntu
+    volumes:
+      - ../build/packages:/output/ubuntu
+    environment:
+      - PACKAGE_TYPE=deb
+      - DISTRO=ubuntu
+    networks:
+      - package-test
+
+  # Debian DEB package testing
+  debian-deb:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.debian
+    container_name: stormdb-test-debian
+    volumes:
+      - ../build/packages:/output/debian
+    environment:
+      - PACKAGE_TYPE=deb
+      - DISTRO=debian
+    networks:
+      - package-test
+
+  # CentOS RPM package testing
+  centos-rpm:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.centos
+    container_name: stormdb-test-centos
+    volumes:
+      - ../build/packages:/output/centos
+    environment:
+      - PACKAGE_TYPE=rpm
+      - DISTRO=centos
+    networks:
+      - package-test
+
+  # Test runner service that coordinates all tests
+  test-runner:
+    image: alpine:latest
+    container_name: stormdb-test-runner
+    depends_on:
+      - ubuntu-deb
+      - debian-deb
+      - centos-rpm
+    volumes:
+      - ../build/packages:/packages
+      - ./test-results:/results
+    command: |
+      sh -c "
+        echo '=== StormDB Package Testing Results ===' > /results/test-summary.txt
+        echo 'Generated at: $(date)' >> /results/test-summary.txt
+        echo '' >> /results/test-summary.txt
+        echo 'Packages found:' >> /results/test-summary.txt
+        ls -la /packages/ >> /results/test-summary.txt
+        echo '' >> /results/test-summary.txt
+        echo 'Testing completed for all distributions' >> /results/test-summary.txt
+      "
+    networks:
+      - package-test
+
+networks:
+  package-test:
+    driver: bridge

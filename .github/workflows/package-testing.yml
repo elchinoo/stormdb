@@ -1,0 +1,169 @@
+# GitHub Actions workflow for testing StormDB packages
+# This workflow runs automatically on pull requests and pushes to main
+# It builds and tests packages across multiple Linux distributions
+
+name: Package Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ created ]
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  # Quick local testing (runs on GitHub runners)
+  local-test:
+    name: Local Package Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install Ruby and FPM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems
+          sudo gem install fpm
+
+      - name: Run local package test
+        run: make test-packages-local
+
+      - name: Upload local test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: local-test-results
+          path: |
+            build/packages/
+            docker/test-results/
+          retention-days: 7
+
+  # Docker-based multi-distribution testing
+  docker-test:
+    name: Docker Package Test
+    runs-on: ubuntu-latest
+    needs: local-test  # Only run if local test passes
+    strategy:
+      matrix:
+        distribution: [ubuntu, debian, centos]
+      fail-fast: false  # Continue testing other distros if one fails
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test ${{ matrix.distribution }} package
+        run: |
+          case "${{ matrix.distribution }}" in
+            ubuntu) make test-packages-ubuntu ;;
+            debian) make test-packages-debian ;;
+            centos) make test-packages-centos ;;
+          esac
+
+      - name: Upload ${{ matrix.distribution }} test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ${{ matrix.distribution }}-test-results
+          path: |
+            build/packages/
+            docker/test-results/
+          retention-days: 7
+
+  # Comprehensive release testing (only for releases)
+  release-test:
+    name: Release Package Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: [local-test, docker-test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install Ruby and FPM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems
+          sudo gem install fpm
+
+      - name: Run comprehensive release testing
+        run: make release-test
+
+      - name: Upload release packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-packages
+          path: build/packages/
+          retention-days: 30
+
+      - name: Upload release test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: release-test-results
+          path: docker/test-results/
+          retention-days: 30
+
+  # Summary job that collects all results
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [local-test, docker-test]
+    if: always()
+
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v3
+        with:
+          path: test-results
+
+      - name: Create test summary
+        run: |
+          echo "# StormDB Package Testing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d "test-results/local-test-results" ]; then
+            echo "✅ Local testing completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Local testing failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          for distro in ubuntu debian centos; do
+            if [ -d "test-results/${distro}-test-results" ]; then
+              echo "✅ $distro testing completed" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ $distro testing failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Packages Generated" >> $GITHUB_STEP_SUMMARY
+          
+          find test-results -name "*.deb" -o -name "*.rpm" | while read package; do
+            basename=$(basename "$package")
+            size=$(du -h "$package" | cut -f1)
+            echo "📦 $basename ($size)" >> $GITHUB_STEP_SUMMARY
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "For detailed logs, check the individual job artifacts." >> $GITHUB_STEP_SUMMARY

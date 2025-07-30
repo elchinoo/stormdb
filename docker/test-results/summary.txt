@@ -1,0 +1,6 @@
+Timestamp: Tue Jul 29 21:23:29 CDT 2025
+Tested Distributions: ubuntu
+
+Failed: ubuntu
+
+Detailed logs available in: /Users/charly.batista/proj/pgstorm/stormdb/docker/test-results/
