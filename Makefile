@@ -398,14 +398,14 @@ release-check: clean-all validate-full docs-generate benchmark ## Pre-release va
 	@$(MAKE) test-coverage
 	@echo "✅ Release checks complete"
 
-release-build: ## Build release artifacts for multiple platforms
-	@echo "🚀 Building release artifacts..."
+release-cross: ## Build cross-platform release artifacts
+	@echo "🚀 Building cross-platform release artifacts..."
 	@mkdir -p $(BUILD_DIR)/release
-	@GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-linux-amd64 $(CMD_DIR)/main.go
-	@GOOS=darwin GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-darwin-amd64 $(CMD_DIR)/main.go
-	@GOOS=darwin GOARCH=arm64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-darwin-arm64 $(CMD_DIR)/main.go
-	@GOOS=windows GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-windows-amd64.exe $(CMD_DIR)/main.go
-	@echo "✅ Release artifacts built in $(BUILD_DIR)/release/"
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-linux-amd64 $(CMD_DIR)/main.go
+	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-darwin-amd64 $(CMD_DIR)/main.go
+	@CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-darwin-arm64 $(CMD_DIR)/main.go
+	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME)-windows-amd64.exe $(CMD_DIR)/main.go
+	@echo "✅ Cross-platform release artifacts built in $(BUILD_DIR)/release/"
 
 # Information targets
 version: ## Show version information
@@ -489,28 +489,28 @@ help: ## Display this help message
 	@echo "  STORMDB_TEST_USER    PostgreSQL user for tests"
 	@echo "  STORMDB_TEST_PASS    PostgreSQL password for tests"
 
-# Release targets
-release-check: ## Run pre-release validation checks
-	@echo "🔍 Running pre-release checks..."
-	@echo "Version: $(VERSION)"
-	@echo "Commit: $(GIT_COMMIT)"
-	@$(MAKE) validate-full
-	@$(MAKE) test-all
-	@$(MAKE) security
-	@echo "✅ Pre-release checks completed successfully"
+# Build targets for x86_64 Linux (used by package creation)
 
-release-build: ## Build release binary for x86_64 Linux
+release-build: ## Build release binary for x86_64 Linux (cross-platform aware)
 	@echo "🚀 Building release binary for x86_64 Linux..."
 	@mkdir -p $(BUILD_DIR)/release
-	@CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME) $(CMD_DIR)/main.go
-	@GOOS=linux GOARCH=amd64 $(MAKE) plugins
-	@if [ -d $(PLUGIN_DIR) ]; then \
-		cp -r $(PLUGIN_DIR) $(BUILD_DIR)/release/; \
+	@if [ "$(shell uname)" = "Darwin" ]; then \
+		echo "⚡ Cross-compiling x86_64 static binary from macOS..."; \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME) $(CMD_DIR)/main.go; \
+		echo "⚠️  Plugins skipped: Go plugins require CGO and cannot be cross-compiled"; \
+		echo "   💡 Use './build-docker-native.sh' for complete packages with plugins"; \
+	else \
+		echo "🐧 Building native Linux binary with plugins..."; \
+		CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o $(BUILD_DIR)/release/$(BINARY_NAME) $(CMD_DIR)/main.go; \
+		GOOS=linux GOARCH=amd64 $(MAKE) plugins; \
+		if [ -d $(PLUGIN_DIR) ]; then \
+			cp -r $(PLUGIN_DIR) $(BUILD_DIR)/release/; \
+		fi; \
 	fi
 	@echo "✅ Release build complete: $(BUILD_DIR)/release/"
 
-release-cross: ## Build cross-platform release binaries and packages
-	@echo "🌍 Building cross-platform release..."
+release-script-cross: ## Build cross-platform release using external script
+	@echo "🌍 Building cross-platform release using script..."
 	@chmod +x scripts/build-cross-platform.sh
 	@VERSION=$(VERSION) COMMIT=$(GIT_COMMIT) ./scripts/build-cross-platform.sh
 	@echo "✅ Cross-platform release build complete"
@@ -643,6 +643,107 @@ release-package-rpm: ## Create RPM package with proper Linux filesystem layout
 	@echo "✅ RPM package created in $(BUILD_DIR)/packages/"
 
 release-packages: release-package-deb release-package-rpm ## Create both DEB and RPM packages
+
+# Native package creation targets (for use inside Docker containers)
+package-deb-native: ## Create DEB package natively inside container
+	@echo "📦 Creating native DEB package..."
+	@mkdir -p build/packages
+	@mkdir -p $(BUILD_DIR)/deb/stormdb-$(VERSION)
+	
+	# Install binary and plugins to standard Linux locations
+	@mkdir -p $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/bin
+	@mkdir -p $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/lib/stormdb/plugins
+	@mkdir -p $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/share/doc/stormdb
+	@mkdir -p $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/share/man/man1
+	@mkdir -p $(BUILD_DIR)/deb/stormdb-$(VERSION)/etc/stormdb
+	
+	# Copy binary (built natively inside container)
+	@cp $(BUILD_DIR)/stormdb $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/bin/
+	
+	# Copy plugins (built natively inside container)
+	@if [ -d "$(PLUGIN_DIR)" ]; then \
+		cp $(PLUGIN_DIR)/*.so $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/lib/stormdb/plugins/ 2>/dev/null || true; \
+	fi
+	
+	# Copy documentation
+	@cp README.md $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/share/doc/stormdb/
+	@cp ARCHITECTURE.md $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/share/doc/stormdb/ 2>/dev/null || true
+	@if [ -d "docs" ]; then \
+		cp -r docs/* $(BUILD_DIR)/deb/stormdb-$(VERSION)/usr/share/doc/stormdb/ 2>/dev/null || true; \
+	fi
+	
+	# Copy configuration files
+	@if [ -d "config" ]; then \
+		cp -r config/* $(BUILD_DIR)/deb/stormdb-$(VERSION)/etc/stormdb/ 2>/dev/null || true; \
+	fi
+	
+	# Create package using FPM with proper DEB architecture (amd64 for x86_64)
+	$(FPM) -s dir -t deb \
+		-n stormdb \
+		-v $(VERSION) \
+		-a amd64 \
+		--description "StormDB - PostgreSQL Performance Benchmarking Tool" \
+		--url "https://github.com/charly-batista/stormdb" \
+		--maintainer "Charly Batista <charly.batista@example.com>" \
+		--license "MIT" \
+		--category "database" \
+		--depends "postgresql-client" \
+		--config-files "/etc/stormdb" \
+		-C $(BUILD_DIR)/deb/stormdb-$(VERSION) \
+		-p build/packages/stormdb_$(VERSION)_amd64.deb \
+		.
+	
+	@echo "✅ Native DEB package created: build/packages/stormdb_$(VERSION)_amd64.deb"
+
+package-rpm-native: ## Create RPM package natively inside container
+	@echo "📦 Creating native RPM package..."
+	@mkdir -p build/packages
+	@mkdir -p $(BUILD_DIR)/rpm/stormdb-$(VERSION)
+	
+	# Install binary and plugins to standard Linux locations
+	@mkdir -p $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/bin
+	@mkdir -p $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/lib64/stormdb/plugins
+	@mkdir -p $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/share/doc/stormdb
+	@mkdir -p $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/share/man/man1
+	@mkdir -p $(BUILD_DIR)/rpm/stormdb-$(VERSION)/etc/stormdb
+	
+	# Copy binary (built natively inside container)
+	@cp $(BUILD_DIR)/stormdb $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/bin/
+	
+	# Copy plugins (built natively inside container)
+	@if [ -d "$(PLUGIN_DIR)" ]; then \
+		cp $(PLUGIN_DIR)/*.so $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/lib64/stormdb/plugins/ 2>/dev/null || true; \
+	fi
+	
+	# Copy documentation
+	@cp README.md $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/share/doc/stormdb/
+	@cp ARCHITECTURE.md $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/share/doc/stormdb/ 2>/dev/null || true
+	@if [ -d "docs" ]; then \
+		cp -r docs/* $(BUILD_DIR)/rpm/stormdb-$(VERSION)/usr/share/doc/stormdb/ 2>/dev/null || true; \
+	fi
+	
+	# Copy configuration files
+	@if [ -d "config" ]; then \
+		cp -r config/* $(BUILD_DIR)/rpm/stormdb-$(VERSION)/etc/stormdb/ 2>/dev/null || true; \
+	fi
+	
+	# Create package using FPM with proper RPM architecture (x86_64)
+	$(FPM) -s dir -t rpm \
+		-n stormdb \
+		-v $(VERSION) \
+		-a x86_64 \
+		--description "StormDB - PostgreSQL Performance Benchmarking Tool" \
+		--url "https://github.com/charly-batista/stormdb" \
+		--maintainer "Charly Batista <charly.batista@example.com>" \
+		--license "MIT" \
+		--category "Applications/Databases" \
+		--depends "postgresql" \
+		--config-files "/etc/stormdb" \
+		-C $(BUILD_DIR)/rpm/stormdb-$(VERSION) \
+		-p build/packages/stormdb-$(VERSION)-1.x86_64.rpm \
+		.
+	
+	@echo "✅ Native RPM package created: build/packages/stormdb-$(VERSION)-1.x86_64.rpm"
 
 # Package testing targets
 test-packages: ## Test packages locally using Docker across multiple distributions

@@ -1,0 +1,50 @@
+# StormDB Fedora Builder Base Image for RPM packages
+# This image contains all build dependencies and should be built once and reused
+FROM fedora:39
+
+# Install system build dependencies
+RUN dnf update -y && dnf groupinstall -y "Development Tools" && \
+    dnf install -y \
+    git \
+    wget \
+    curl \
+    rpm-build \
+    rpm-devel \
+    rpmlint \
+    rpmdevtools \
+    postgresql \
+    man-db \
+    gzip \
+    ca-certificates \
+    ruby \
+    ruby-devel \
+    rubygems
+
+# Install Go 1.22 natively for x86_64
+RUN wget https://go.dev/dl/go1.22.10.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.22.10.linux-amd64.tar.gz && \
+    rm go1.22.10.linux-amd64.tar.gz
+
+# Install FPM for package creation
+RUN gem install fpm --no-document
+
+# Set up Go environment
+ENV PATH="/usr/local/go/bin:$PATH"
+ENV GOPATH="/root/go"
+ENV GOOS=linux
+ENV GOARCH=amd64
+ENV CGO_ENABLED=1
+
+# Create working directory
+WORKDIR /workspace
+
+# Verify build environment
+RUN echo "=== Build Environment Info ===" && \
+    uname -a && \
+    go version && \
+    ruby --version && \
+    fpm --version && \
+    echo "=== Base image ready ==="
+
+# This base image can be tagged and reused
+# Build with: docker build -f docker/Dockerfile.fedora-base -t stormdb-fedora-base .

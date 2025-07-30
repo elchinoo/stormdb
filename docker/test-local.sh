@@ -60,23 +60,81 @@ print_section "Creating Packages"
 
 # Try to build DEB package
 print_info "Attempting to build DEB package..."
-if make release-package-deb 2>/dev/null; then
-    print_success "DEB package built successfully"
-    DEB_SUCCESS=true
+if command -v fpm >/dev/null 2>&1; then
+    print_info "📦 Creating DEB package with x86_64 binary..."
+    
+    # Build x86_64 static binary (no CGO issues)
+    print_info "🚀 Building x86_64 static binary..."
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+        -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty)" \
+        -o build/stormdb-linux-x86_64 \
+        cmd/stormdb/main.go
+    
+    # Create package structure
+    mkdir -p build/packages-local/deb/usr/bin
+    mkdir -p build/packages-local/deb/usr/lib/stormdb/plugins
+    mkdir -p build/packages-local/deb/etc/stormdb/examples
+    mkdir -p build/packages-local/deb/usr/share/man/man1
+    mkdir -p build/packages-local/deb/usr/share/doc/stormdb
+    mkdir -p build/packages-local/deb/usr/share/stormdb
+    
+    # Install x86_64 binary
+    cp build/stormdb-linux-x86_64 build/packages-local/deb/usr/bin/stormdb
+    
+    # Install plugins (current platform - noted in output)
+    if [ -d "build/plugins" ]; then
+        cp build/plugins/*.so build/packages-local/deb/usr/lib/stormdb/plugins/ 2>/dev/null || true
+    fi
+    
+    # Install configuration files
+    cp config/*.yaml build/packages-local/deb/etc/stormdb/examples/
+    cp config/config_tpcc.yaml build/packages-local/deb/etc/stormdb/
+    
+    # Install man page
+    cp stormdb.1 build/packages-local/deb/usr/share/man/man1/
+    gzip -9 -f build/packages-local/deb/usr/share/man/man1/stormdb.1
+    
+    # Install documentation
+    cp README.md CHANGELOG.md ARCHITECTURE.md build/packages-local/deb/usr/share/doc/stormdb/
+    cp -r docs/* build/packages-local/deb/usr/share/doc/stormdb/
+    
+    # Install static data
+    cp imdb.sql build/packages-local/deb/usr/share/stormdb/ 2>/dev/null || true
+    cp -r config build/packages-local/deb/usr/share/stormdb/templates
+    
+    # Create DEB package
+    mkdir -p build/packages
+    CLEAN_VERSION=$(git describe --tags --always --dirty | sed 's/^v//')
+    fpm -s dir -t deb \
+        --name stormdb \
+        --version ${CLEAN_VERSION} \
+        --maintainer "StormDB Team <team@stormdb.org>" \
+        --description "PostgreSQL performance testing and benchmarking tool with plugin-based workload architecture" \
+        --url "https://github.com/elchinoo/stormdb" \
+        --license "MIT" \
+        --architecture amd64 \
+        --depends postgresql-client \
+        --category database \
+        -C build/packages-local/deb \
+        --package build/packages/ 2>/dev/null
+    
+    if [ $? -eq 0 ]; then
+        print_success "DEB package built successfully"
+        DEB_SUCCESS=true
+    else
+        print_error "DEB package build failed"
+    fi
 else
-    print_error "DEB package build failed (expected on macOS without fpm)"
+    print_error "❌ DEB package build failed (fpm not found)"
     DEB_SUCCESS=false
 fi
 
 # Try to build RPM package
 print_info "Attempting to build RPM package..."
-if make release-package-rpm 2>/dev/null; then
-    print_success "RPM package built successfully"
-    RPM_SUCCESS=true
-else
-    print_error "RPM package build failed (expected on macOS without rpmbuild)"
-    RPM_SUCCESS=false
-fi
+print_info "⚠️  RPM packages require Linux environment with rpmbuild"
+print_info "💡 Use Docker for RPM creation: make test-packages-centos"
+print_info "📝 Local RPM build skipped on macOS (use Docker or Linux system)"
+RPM_SUCCESS=false
 
 echo ""
 print_section "Package Validation"

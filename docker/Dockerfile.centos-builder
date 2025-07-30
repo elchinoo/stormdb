@@ -1,0 +1,32 @@
+# Optimized CentOS x86_64 builder using cached base image
+# Uses pre-built base image with all dependencies
+FROM stormdb-centos-base:latest
+
+# Copy source code (this layer changes frequently, so it's last)
+COPY . .
+
+# Build script for native compilation
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "=== Native CentOS x86_64 Build ==="\n\
+\n\
+# Clean previous builds\n\
+make clean\n\
+\n\
+# Build natively (no cross-compilation needed)\n\
+echo "🔨 Building native x86_64 binary..."\n\
+CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty)" -o build/stormdb cmd/stormdb/main.go\n\
+\n\
+# Build plugins natively\n\
+echo "🔌 Building native x86_64 plugins..."\n\
+make plugins\n\
+\n\
+# Create RPM package\n\
+echo "📦 Creating native RPM package..."\n\
+make package-rpm-native\n\
+\n\
+echo "✅ Native CentOS build complete"\n\
+' > /usr/local/bin/build-native.sh && chmod +x /usr/local/bin/build-native.sh
+
+# Default command
+CMD ["/usr/local/bin/build-native.sh"]

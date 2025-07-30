@@ -9,8 +9,9 @@ PLUGIN_DIR ?= ../build/plugins
 # Go build flags for plugins (default to current platform)
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
+CGO_ENABLED ?= 1
 GO_PLUGIN_FLAGS := -buildmode=plugin -ldflags="-s -w"
-BUILD_ENV := CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH)
+BUILD_ENV := CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH)
 
 # Build all plugins
 all: build-dir imdb vector ecommerce_basic ecommerce
