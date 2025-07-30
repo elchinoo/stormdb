@@ -40,7 +40,7 @@ func (e *ScalingEngine) findOptimalConfiguration() {
 		// Sanitize values
 		tps := sanitizeFloat(band.TotalTPS)
 		latency := sanitizeFloat(band.AvgLatencyMs)
-		
+
 		if band.Workers == 0 { // Avoid division by zero
 			continue
 		}
@@ -66,7 +66,7 @@ func (e *ScalingEngine) findOptimalConfiguration() {
 
 	// Sanitize TPS values for comparison
 	mostEfficientTPS := sanitizeFloat(mostEfficientBand.TotalTPS)
-	
+
 	if mostEfficientTPS >= bestTPS*0.8 { // Within 80% of peak TPS
 		optimalBand = mostEfficientBand
 		reasoning = "Selected for optimal efficiency while maintaining high throughput"

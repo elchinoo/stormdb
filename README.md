@@ -46,13 +46,14 @@ StormDB is a comprehensive PostgreSQL benchmarking and load testing tool designe
 - **Autovacuum Activity**: Monitoring background maintenance
 
 ### 🎯 Progressive Connection Scaling
-- **Automated Scaling**: Test multiple worker/connection configurations in a single run
-- **Mathematical Analysis**: Advanced statistical analysis with discrete derivatives and inflection points
-- **Curve Fitting**: Linear, logarithmic, exponential, and logistic model fitting
-- **Queueing Theory**: M/M/c queue modeling for bottleneck identification
-- **Scaling Strategies**: Linear, exponential, and fibonacci scaling patterns
-- **Optimal Configuration Discovery**: Automatically identifies best performance configurations
-- **Export Options**: CSV and JSON export for further analysis and visualization
+- **Automated Discovery**: Systematically test multiple worker/connection configurations
+- **Mathematical Analysis**: Advanced statistical analysis including discrete derivatives, inflection points, and curve fitting
+- **Queueing Theory**: M/M/c queue modeling for scientific bottleneck identification  
+- **Scaling Strategies**: Linear (thorough), exponential (fast), and fibonacci (research) scaling patterns
+- **Bottleneck Classification**: Automatic identification of CPU, I/O, queue, and memory bottlenecks
+- **Optimal Configuration**: AI-driven recommendation of best performance configurations
+- **Scientific Export**: Comprehensive CSV/JSON export with statistical analysis for research and production planning
+- **Real-time Analysis**: Live mathematical insights during test execution
 
 ## 🏗️ Architecture
 
@@ -1390,33 +1391,255 @@ done
 ```
 
 #### 3. Progressive Connection Scaling (Automated)
+
+Progressive connection scaling is StormDB's advanced feature for automatically discovering optimal database configurations through systematic scaling analysis. Instead of guessing the right number of workers and connections, progressive scaling tests multiple configurations automatically and provides mathematical insights into performance characteristics.
+
+##### 🎯 Why Progressive Scaling?
+
+**Problem**: Finding the optimal number of workers and connections for your workload traditionally requires:
+- Manual testing of different configurations
+- Guesswork based on system resources
+- Time-consuming trial-and-error approaches
+- Limited understanding of scaling behavior
+
+**Solution**: Progressive scaling automates this process by:
+- Testing multiple configurations in a single run
+- Providing mathematical analysis of scaling behavior
+- Identifying performance bottlenecks and saturation points
+- Recommending optimal configurations based on efficiency metrics
+
+##### 🏗️ Architecture & Implementation
+
+Progressive scaling works by:
+
+1. **Scaling Engine**: Manages the progression through different worker/connection bands
+2. **Mathematical Analysis**: Applies statistical methods to understand performance patterns
+3. **Bottleneck Detection**: Uses queueing theory to identify system limitations
+4. **Export System**: Provides detailed data for further analysis
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Progressive Scaling Engine                    │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  Scaling Logic  │  │   Mathematical  │  │   Export &      │  │
+│  │  • Linear       │  │   Analysis      │  │   Reporting     │  │
+│  │  • Exponential  │  │  • Derivatives  │  │  • CSV/JSON     │  │
+│  │  • Fibonacci    │  │  • Curve Fit    │  │  • Optimal      │  │
+│  │                 │  │  • Queue Theory │  │    Config       │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                      Workload Interface                         │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │    Band 1       │  │    Band 2       │  │    Band N       │  │
+│  │  10W, 20C       │  │  20W, 40C       │  │  60W, 120C      │  │
+│  │  30min test     │  │  30min test     │  │  30min test     │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+##### ⚙️ Configuration Parameters
+
+Progressive scaling is configured through the `progressive` section in YAML:
+
+```yaml
+progressive:
+  enabled: true                    # Enable progressive scaling
+  
+  # Worker scaling parameters
+  min_workers: 10                  # Starting number of workers
+  max_workers: 60                  # Maximum number of workers  
+  step_workers: 10                 # Worker increment per band
+  
+  # Connection scaling parameters
+  min_connections: 20              # Starting number of connections
+  max_connections: 120             # Maximum number of connections
+  step_connections: 20             # Connection increment per band
+  
+  # Timing configuration
+  band_duration: "1800s"           # Duration per band (30 minutes for 3-hour total)
+  warmup_time: "60s"               # Warmup before metrics collection
+  cooldown_time: "30s"             # Cooldown between bands
+  
+  # Scaling strategy
+  strategy: "linear"               # linear, exponential, or fibonacci
+  
+  # Export configuration
+  export_format: "csv"             # csv, json, or both
+  export_path: "./progressive_results"
+```
+
+**Parameter Details:**
+
+- **Worker/Connection Ranges**: Define the testing scope
+  - `min_*`: Starting point for scaling
+  - `max_*`: Upper limit for testing
+  - `step_*`: Increment between bands
+
+- **Timing Configuration**: 
+  - `band_duration`: How long each configuration runs
+  - `warmup_time`: Stabilization period before metrics collection
+  - `cooldown_time`: Recovery time between bands
+
+- **Scaling Strategies**:
+  - `linear`: Fixed increments (10, 20, 30, 40...)
+  - `exponential`: Exponential growth (10, 20, 40, 80...)
+  - `fibonacci`: Fibonacci sequence (10, 10, 20, 30, 50...)
+
+##### 🔍 Mathematical Analysis
+
+Progressive scaling provides comprehensive mathematical insights:
+
+**1. Marginal Gains Analysis (Discrete Derivatives)**
+- Calculates TPS gain per additional worker/connection
+- Identifies when adding resources becomes inefficient
+- Formula: `Δ TPS / Δ Workers`
+
+**2. Inflection Point Detection (Second Derivatives)**
+- Finds points where performance characteristics change
+- Detects acceleration, deceleration, and saturation points
+- Formula: `Δ² TPS / Δ Workers²`
+
+**3. Curve Fitting**
+- Fits mathematical models to performance data
+- Supports linear, logarithmic, exponential, and logistic curves
+- Provides R² values for model accuracy
+
+**4. Queueing Theory Analysis (M/M/c Model)**
+- Models system as a queue with multiple servers
+- Calculates utilization factors and wait times
+- Identifies bottleneck types: CPU, I/O, contention, or queue
+
+**5. Performance Region Classification**
+- **Linear Region**: Scaling provides proportional benefits
+- **Saturation Region**: Diminishing returns, approaching limits
+- **Degradation Region**: Performance decreases with more resources
+
+##### 🎛️ Scaling Strategy Comparison
+
+| Strategy | Use Case | Pros | Cons |
+|----------|----------|------|------|
+| **Linear** | Production planning, capacity analysis | Predictable, thorough coverage | Time-intensive, may miss rapid changes |
+| **Exponential** | Quick bottleneck discovery | Fast saturation detection | May skip optimal ranges |
+| **Fibonacci** | Research, mathematical analysis | Natural progression, golden ratio properties | Complex interpretation |
+
+##### 📊 Usage Examples
+
+**1. Quick Bottleneck Discovery (Exponential)**
 ```bash
-# Automated progressive scaling with mathematical analysis
-./stormdb -c config/config_progressive_imdb.yaml --setup
+# Fast scaling to find saturation point
+./stormdb --config config_progressive_tpcc.yaml --progressive
+```
 
-# Enable progressive mode via CLI flag
-./stormdb -c config/imdb_mixed.yaml --progressive --setup
+**2. Production Capacity Planning (Linear)**
+```bash
+# Thorough analysis for production sizing
+./stormdb --config config_progressive_imdb.yaml --progressive
+```
 
-# Quick scaling analysis
-./stormdb -c config/progressive_tpcc.yaml --progressive
+**3. Research & Mathematical Analysis (Fibonacci)**
+```bash
+# Advanced mathematical scaling patterns
+./stormdb --config config_progressive_ecommerce.yaml --progressive
+```
+
+**Example Progressive Configuration (3-Hour Test):**
+```yaml
+# config_progressive_tpcc.yaml
+workload: "tpcc"
+scale: 5
+
+progressive:
+  enabled: true
+  min_workers: 10
+  max_workers: 60
+  step_workers: 10
+  min_connections: 20  
+  max_connections: 120
+  step_connections: 20
+  band_duration: "1800s"    # 30 minutes per band
+  warmup_time: "60s"
+  cooldown_time: "30s"
+  strategy: "linear"
+  export_format: "both"
+  export_path: "./progressive_results"
 ```
 
 **Example Progressive Output:**
 ```
-🎯 Starting progressive scaling test with 25 bands
-📊 Strategy: linear, Band Duration: 30s, Warmup: 10s, Cooldown: 5s
+🎯 Starting progressive scaling test with 6 bands (3 hours total)
+📊 Strategy: linear, Band Duration: 30m, Warmup: 1m, Cooldown: 30s
 
-🔄 Band 1/25: 10 workers, 20 connections
-📊 Band 1 completed: 1,234 TPS, 45.2ms avg latency
+🔄 Band 1/6: 10 workers, 20 connections
+🔥 Warming up for 60s...
+� REALTIME [30m] TPS: 1,234.5 | Latency: P50=15.2ms P95=45.3ms
+�📊 Band 1 completed: 1,234 TPS, 45.2ms avg latency, 0.0% errors
 
-🔄 Band 15/25: 70 workers, 100 connections  
-📊 Band 15 completed: 4,123 TPS, 89.1ms avg latency
+🔄 Band 3/6: 30 workers, 60 connections  
+📈 REALTIME [30m] TPS: 3,456.7 | Latency: P50=25.1ms P95=67.8ms
+📊 Band 3 completed: 3,457 TPS, 67.1ms avg latency, 0.1% errors
+
+🔄 Band 6/6: 60 workers, 120 connections
+📈 REALTIME [30m] TPS: 4,123.8 | Latency: P50=89.4ms P95=234.5ms
+📊 Band 6 completed: 4,124 TPS, 189.1ms avg latency, 2.3% errors
 
 ✅ Progressive scaling completed successfully
-📊 Tested 25 bands, optimal config: 40 workers, 60 connections (2,341 TPS)
-📈 Mathematical analysis: Linear scaling until band 12, diminishing returns detected
-🎯 Recommendation: Use 40-50 workers for optimal efficiency
+
+📊 Mathematical Analysis Results:
+┌─────────────────────────────────────────────────────────────────┐
+│                    Performance Summary                          │
+├─────────────────────────────────────────────────────────────────┤
+│ Optimal Configuration: 40 workers, 80 connections              │
+│ Peak TPS: 4,124 (60W/120C)                                     │ 
+│ Optimal TPS: 3,789 (40W/80C) - Best efficiency                 │
+│ Scaling Efficiency: Linear until band 4, then diminishing      │
+│ Bottleneck Type: Queue saturation at high connection counts    │
+│ Inflection Points: Band 4 (deceleration), Band 5 (saturation) │
+│ Curve Fit: Logarithmic (R²=0.94)                               │
+│ Utilization Factor: 0.73 (optimal), 0.91 (peak)               │
+└─────────────────────────────────────────────────────────────────┘
+
+🎯 Recommendations:
+• Use 40-50 workers for optimal efficiency (TPS per worker)
+• Connection pool size: 80-100 connections recommended
+• Beyond 50 workers: diminishing returns due to queue contention
+• Consider partitioning workload if higher TPS needed
+
+📁 Results exported to: ./progressive_results/progressive_scaling_tpcc_20250730_143022.csv
+📁 JSON analysis exported to: ./progressive_results/progressive_scaling_tpcc_20250730_143022.json
 ```
+
+##### 🔍 Bottleneck Identification
+
+Progressive scaling helps identify different types of bottlenecks:
+
+**1. CPU Bottleneck**
+- Symptoms: Linear scaling stops abruptly
+- Analysis: High utilization factor, low latency increase
+- Solution: Vertical scaling (more CPU cores)
+
+**2. I/O Bottleneck** 
+- Symptoms: Latency increases faster than TPS
+- Analysis: High latency deviation from predicted values
+- Solution: Storage optimization, connection pooling
+
+**3. Queue/Contention Bottleneck**
+- Symptoms: TPS plateaus, errors increase
+- Analysis: High utilization factor (>0.8), increasing error rates
+- Solution: Workload optimization, reduced contention
+
+**4. Memory Bottleneck**
+- Symptoms: Performance degradation at higher scales
+- Analysis: Increased latency variance, system instability
+- Solution: Memory optimization, garbage collection tuning
+
+##### 🚀 Advanced Features
+
+**Real-time Analysis**: Live mathematical analysis during test execution
+**Export Integration**: Direct integration with analysis tools (R, Python, Excel)
+**Historical Comparison**: Compare results across different test runs
+**Multi-dimensional Scaling**: Scale workers and connections independently
+**Custom Metrics**: Include custom application metrics in analysis
 
 #### 4. Multi-Database Testing
 ```bash

@@ -1,16 +1,99 @@
-# Progressive Connection Scaling
+# Progressive Connection Scaling v0.2
 
-StormDB's progressive scaling feature allows you to automatically test your PostgreSQL database performance across multiple connection and worker configurations in a single run. This advanced feature provides comprehensive mathematical analysis of performance characteristics, helping you find optimal configurations and understand system behavior under different load conditions.
+StormDB's progressive scaling feature is an advanced automated performance testing system that systematically evaluates your PostgreSQL database across multiple connection and worker configurations. This scientific approach eliminates guesswork in performance tuning by providing comprehensive mathematical analysis, bottleneck identification, and optimal configuration recommendations.
+
+## 🎯 Why Progressive Scaling?
+
+### The Traditional Problem
+Database performance tuning typically involves:
+- **Manual Configuration Testing**: Time-consuming trial-and-error
+- **Guesswork**: Estimating optimal settings based on system resources
+- **Limited Understanding**: No insight into scaling behavior or bottlenecks
+- **Incomplete Analysis**: Testing only a few configurations
+- **Subjective Decisions**: Choosing configurations without scientific basis
+
+### The Progressive Scaling Solution
+Progressive scaling automates and scientifically enhances this process:
+- **Automated Testing**: Test 6-25+ configurations in a single run
+- **Mathematical Analysis**: Apply statistical methods to understand performance patterns
+- **Bottleneck Identification**: Use queueing theory to classify limitation types
+- **Optimal Discovery**: AI-driven recommendation of best configurations
+- **Scientific Export**: Comprehensive data for research and production planning
+
+## 🏗️ Architecture & Implementation
+
+Progressive scaling is built on a modular architecture designed for extensibility and scientific rigor:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 Progressive Scaling Engine v0.2                 │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  Scaling Logic  │  │   Mathematical  │  │   Export &      │  │
+│  │  • Linear       │  │   Analysis      │  │   Reporting     │  │
+│  │  • Exponential  │  │  • Derivatives  │  │  • CSV/JSON     │  │
+│  │  • Fibonacci    │  │  • Curve Fit    │  │  • Optimal      │  │
+│  │  • Validation   │  │  • Queue Theory │  │    Detection    │  │
+│  │  • Sanitization │  │  • NaN/Inf Safe │  │  • Real-time    │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                    Workload Interface Adapter                   │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │    Built-in     │  │     Plugin      │  │   Dynamic       │  │
+│  │   Workloads     │  │   Workloads     │  │   Loading       │  │
+│  │  • TPCC         │  │  • E-commerce   │  │  • Any Plugin   │  │
+│  │  • Simple       │  │  • IMDB         │  │  • Automatic    │  │
+│  │  • Connection   │  │  • Vector       │  │    Adaptation   │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                      Band Execution Engine                      │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │    Band 1       │  │    Band 2       │  │    Band N       │  │
+│  │  10W, 20C       │  │  20W, 40C       │  │  60W, 120C      │  │
+│  │  Warmup: 60s    │  │  Warmup: 60s    │  │  Warmup: 60s    │  │
+│  │  Test: 1800s    │  │  Test: 1800s    │  │  Test: 1800s    │  │
+│  │  Cooldown: 30s  │  │  Cooldown: 30s  │  │  Cooldown: 30s  │  │
+│  │  Metrics ✓      │  │  Metrics ✓      │  │  Metrics ✓      │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Core Components
+
+**1. Scaling Engine (`internal/progressive/engine.go`)**
+- Orchestrates band execution and metric collection
+- Implements scaling strategies (linear, exponential, fibonacci)
+- Manages workload interface adaptation
+- Provides real-time progress updates
+
+**2. Mathematical Analysis (`internal/progressive/analysis.go`)**
+- Calculates discrete derivatives (marginal gains)
+- Detects inflection points (second derivatives)
+- Performs curve fitting (linear, log, exponential, logistic)
+- Applies queueing theory (M/M/c modeling)
+- Classifies performance regions
+
+**3. Export System (`internal/progressive/export.go`)**
+- Generates CSV and JSON exports
+- Identifies optimal configurations
+- Provides scientific data for external analysis
+- Includes comprehensive metadata
+
+**4. Configuration Validation**
+- Parameter validation and sanitization
+- Strategy-specific configuration checks
+- Error handling and user feedback
 
 ## Overview
 
 Progressive scaling runs your workload through a series of "bands" - each with different numbers of workers and database connections. It collects detailed metrics for each band and performs advanced statistical analysis to identify:
 
-- Optimal worker/connection configurations
-- Performance scaling patterns (linear, diminishing returns, saturation, degradation)
-- Inflection points where adding resources becomes counterproductive
-- Mathematical models describing your system's performance characteristics
-- Queueing theory analysis for bottleneck identification
+- **Optimal Configurations**: Best worker/connection combinations for your workload
+- **Scaling Patterns**: Linear scaling, diminishing returns, saturation, degradation regions
+- **Inflection Points**: Critical points where adding resources becomes counterproductive  
+- **Mathematical Models**: Curve fitting to predict performance at untested configurations
+- **Bottleneck Classification**: Scientific identification of limitation types (CPU, I/O, queue, memory)
+- **Efficiency Metrics**: TPS per worker, connection utilization, cost-effectiveness analysis
 
 ## Quick Start
 
@@ -49,91 +132,245 @@ Or enable it via command line:
 ./stormdb --config config_imdb.yaml --progressive --setup
 ```
 
-## Configuration Options
+## Configuration Options v0.2
+
+Progressive scaling uses a comprehensive configuration system that defines both test parameters and scaling behavior. All configurations must match the precise YAML format to ensure compatibility with v0.2's enhanced validation system.
+
+### Basic Configuration Format
+
+```yaml
+progressive:
+  enabled: true
+  strategy: "exponential"          # linear, exponential, fibonacci
+  min_workers: 10                  # Starting point (must be > 0)
+  max_workers: 60                  # Ending point (must be > min_workers)
+  min_connections: 20              # Starting connections (must be > 0)
+  max_connections: 120             # Ending connections (must be > min_connections)
+  test_duration: "30m"             # Duration per band (recommended: 30m for production)
+  warmup_duration: "60s"           # Warmup time per band
+  cooldown_duration: "30s"         # Cooldown time per band
+  bands: 6                         # Number of test configurations (3-25 recommended)
+  export_csv: true                 # Enable CSV export
+  export_json: true                # Enable JSON export
+  enable_analysis: true            # Enable mathematical analysis
+```
 
 ### Core Progressive Settings
 
 | Parameter | Description | Example | Required |
 |-----------|-------------|---------|----------|
 | `enabled` | Enable progressive scaling | `true` | Yes |
+| `strategy` | Scaling algorithm | `"exponential"` | Yes |
 | `min_workers` | Starting number of workers | `10` | Yes |
 | `max_workers` | Maximum number of workers | `100` | Yes |
-| `step_workers` | Worker increment per band | `10` | Yes |
-| `min_connections` | Starting connections | `10` | Yes |
-| `max_connections` | Maximum connections | `100` | Yes |
-| `step_connections` | Connection increment | `10` | Yes |
-| `band_duration` | Duration per band | `"30s"` | Yes |
+| `min_connections` | Starting connections | `20` | Yes |
+| `max_connections` | Maximum connections | `200` | Yes |
+| `test_duration` | Duration per band | `"30m"` | No (default: "30m") |
+| `warmup_duration` | Warmup before metrics | `"60s"` | No (default: "60s") |
+| `cooldown_duration` | Rest time between bands | `"30s"` | No (default: "30s") |
+| `bands` | Number of test configurations | `6` | No (default: 5) |
+| `export_csv` | Export results to CSV | `true` | No (default: true) |
+| `export_json` | Export results to JSON | `true` | No (default: true) |
+| `enable_analysis` | Enable mathematical analysis | `true` | No (default: true) |
 
-### Timing Configuration
+### Scaling Strategies Explained
 
-| Parameter | Description | Default | Notes |
-|-----------|-------------|---------|-------|
-| `warmup_time` | Warmup before metrics collection | `"10s"` | Allows system to stabilize |
-| `cooldown_time` | Rest time between bands | `"5s"` | Prevents interference |
-
-### Scaling Strategies
-
-#### Linear Strategy (Default)
-Creates every combination of worker/connection values within the specified ranges.
-
-```yaml
-strategy: "linear"
-min_workers: 10
-max_workers: 30
-step_workers: 10
-min_connections: 20
-max_connections: 40
-step_connections: 10
-```
-
-**Bands created:** (10,20), (10,30), (10,40), (20,20), (20,30), (20,40), (30,20), (30,30), (30,40)
-
-#### Exponential Strategy
-Doubles values each step (respecting minimum increments).
+**1. Linear Scaling (`strategy: "linear"`)**
+- **Best For**: Initial exploration, understanding baseline behavior
+- **Pattern**: Equal increments between min and max values
+- **Example**: 10→20→30→40→50→60 workers
+- **Use Case**: Simple workloads, first-time testing
 
 ```yaml
-strategy: "exponential"
-min_workers: 5
-max_workers: 80
+progressive:
+  strategy: "linear"
+  min_workers: 10
+  max_workers: 60
+  bands: 6
+  # Generates: [10, 20, 30, 40, 50, 60] workers
 ```
 
-**Bands created:** 5→10→20→40→80 workers
-
-#### Fibonacci Strategy
-Uses fibonacci sequence for organic scaling patterns.
+**2. Exponential Scaling (`strategy: "exponential"`)**
+- **Best For**: Wide-range exploration, finding scaling limits
+- **Pattern**: Exponential growth from min to max
+- **Example**: 10→14→20→28→40→60 workers (approximately)
+- **Use Case**: Complex systems, unknown performance characteristics
 
 ```yaml
-strategy: "fibonacci"
-min_workers: 1
-max_workers: 55
+progressive:
+  strategy: "exponential"
+  min_workers: 5
+  max_workers: 80
+  bands: 8
+  # Generates exponential distribution between 5 and 80
 ```
 
-**Bands created:** 1→1→2→3→5→8→13→21→34→55 workers
+**3. Fibonacci Scaling (`strategy: "fibonacci"`)**
+- **Best For**: Natural scaling patterns, production optimization
+- **Pattern**: Fibonacci-like progression
+- **Example**: 10→16→26→42→68 workers (scaled to fit range)
+- **Use Case**: Fine-tuning, natural load distribution
 
-### Export Configuration
+```yaml
+progressive:
+  strategy: "fibonacci"
+  min_workers: 8
+  max_workers: 100
+  bands: 7
+  # Generates fibonacci-like progression scaled to range
+```
 
-| Parameter | Description | Options |
-|-----------|-------------|---------|
-| `export_format` | Output format | `"csv"`, `"json"`, `"both"` |
-| `export_path` | Output directory | `"./progressive_results"` |
+### Advanced Configuration Examples
 
-## Mathematical Analysis Features
+**Production E-commerce Testing (3-hour comprehensive)**
+```yaml
+progressive:
+  enabled: true
+  strategy: "exponential"
+  min_workers: 20
+  max_workers: 200
+  min_connections: 40
+  max_connections: 400
+  test_duration: "30m"              # 30 minutes per band
+  warmup_duration: "120s"           # 2-minute warmup
+  cooldown_duration: "60s"          # 1-minute cooldown
+  bands: 8                          # 8 configurations total
+  export_csv: true
+  export_json: true
+  enable_analysis: true
+```
+
+**Quick Development Testing (30-minute rapid)**
+```yaml
+progressive:
+  enabled: true
+  strategy: "linear"
+  min_workers: 5
+  max_workers: 25
+  min_connections: 10
+  max_connections: 50
+  test_duration: "3m"               # 3 minutes per band
+  warmup_duration: "30s"            # 30-second warmup
+  cooldown_duration: "15s"          # 15-second cooldown
+  bands: 5                          # 5 configurations
+  export_csv: true
+  export_json: false                # Skip JSON for speed
+  enable_analysis: true
+```
+
+**High-Precision Research (6-hour scientific)**
+```yaml
+progressive:
+  enabled: true
+  strategy: "fibonacci"
+  min_workers: 10
+  max_workers: 150
+  min_connections: 25
+  max_connections: 300
+  test_duration: "45m"              # 45 minutes per band
+  warmup_duration: "180s"           # 3-minute warmup
+  cooldown_duration: "120s"         # 2-minute cooldown
+  bands: 12                         # 12 configurations
+  export_csv: true
+  export_json: true
+  enable_analysis: true
+```
+
+## Mathematical Analysis Features v0.2
+
+Progressive scaling v0.2 includes enhanced mathematical analysis with NaN/Inf protection and scientific rigor:
 
 ### Statistical Metrics (Per Band)
 
-- **Basic Performance:** TPS, QPS, latency (avg, P50, P95, P99)
-- **Variability:** Standard deviation, variance, coefficient of variation
-- **Confidence:** 95% confidence intervals around mean latency
-- **Efficiency:** TPS per worker, connection utilization rates
+- **Core Performance**: TPS, QPS, latency (avg, P50, P95, P99)
+- **Variability Analysis**: Standard deviation, variance, coefficient of variation
+- **Confidence Intervals**: 95% confidence around mean latency
+- **Efficiency Metrics**: TPS per worker, connection utilization rates
+- **Cost Analysis**: Performance per resource unit
 
-### Advanced Analysis
+### Advanced Analysis (New in v0.2)
 
-#### 1. Marginal Gains (Discrete Derivatives)
-Calculates the performance gain per additional worker/connection:
+#### 1. Marginal Gains Analysis (Enhanced Discrete Derivatives)
+Calculates the performance gain per additional worker/connection with NaN protection:
 
 ```
 ΔTPS/ΔWorkers = (TPS₂ - TPS₁) / (Workers₂ - Workers₁)
 ```
+
+**v0.2 Improvements**:
+- NaN/Inf sanitization for all calculations
+- Protected division by zero
+- Enhanced marginal efficiency analysis
+- Real-time marginal gains tracking
+
+#### 2. Inflection Point Detection (Second Derivatives)
+Identifies critical scaling points where adding resources becomes counterproductive:
+
+```
+d²TPS/dWorkers² = (Δ₂TPS - Δ₁TPS) / ΔWorkers
+```
+
+**Interpretation**:
+- **Positive**: Accelerating returns (good scaling)
+- **Negative**: Diminishing returns (approaching saturation)
+- **Zero**: Inflection point (optimal scaling region)
+
+#### 3. Enhanced Curve Fitting
+Fits mathematical models to predict performance at untested configurations:
+
+- **Linear Model**: `TPS = a × Workers + b`
+- **Logarithmic Model**: `TPS = a × log(Workers) + b`
+- **Exponential Model**: `TPS = a × e^(b × Workers)`
+- **Logistic Model**: `TPS = L / (1 + e^(-k(Workers-x₀)))`
+
+**v0.2 Improvements**:
+- R² correlation coefficients for model quality
+- NaN-safe mathematical operations
+- Enhanced model selection algorithms
+- Predictive confidence intervals
+
+#### 4. Queueing Theory Analysis (M/M/c Modeling)
+Applies Little's Law and queueing theory to classify system bottlenecks:
+
+```
+Utilization = ArrivalRate / (ServiceRate × Servers)
+QueueLength = λ × W (Little's Law)
+```
+
+**Classifications**:
+- **CPU-bound**: `ρ > 0.8`, low queue variance
+- **I/O-bound**: High latency variance, moderate utilization
+- **Memory-bound**: Degrading performance despite low CPU
+- **Queue-bound**: High queue lengths, variable service times
+
+#### 5. Performance Region Classification
+Automatically categorizes scaling behavior:
+
+- **Linear Scaling**: Consistent marginal gains
+- **Diminishing Returns**: Decreasing marginal gains
+- **Saturation**: Near-zero marginal gains
+- **Degradation**: Negative marginal gains
+
+### Bottleneck Identification System
+
+Progressive scaling v0.2 includes enhanced bottleneck detection:
+
+```go
+type BottleneckAnalysis struct {
+    PrimaryBottleneck   string   // CPU, Memory, I/O, Network, Queue
+    ConfidenceLevel     float64  // 0.0 - 1.0 confidence in classification
+    UtilizationMetrics  map[string]float64
+    Recommendations     []string
+    OptimalConfiguration Band
+}
+```
+
+**Detection Algorithms**:
+1. **CPU Analysis**: CPU utilization, context switches, load average
+2. **Memory Analysis**: Memory usage patterns, GC frequency
+3. **I/O Analysis**: Disk I/O patterns, wait times
+4. **Network Analysis**: Network latency, bandwidth utilization
+5. **Queue Analysis**: Connection pool utilization, lock contention
 
 **Use case:** Identify when adding resources provides diminishing returns.
 
@@ -220,26 +457,166 @@ progressive:
   export_format: "both"
 ```
 
-## Output & Results
+## Output & Results v0.2
 
-### Real-time Output
+### Real-time Console Output
 ```
-🎯 Starting progressive scaling test with 25 bands
-📊 Strategy: linear, Band Duration: 30s, Warmup: 10s, Cooldown: 5s
+🎯 Starting Progressive Scaling v0.2 Analysis
+📊 Strategy: exponential | Test Duration: 30m | Bands: 6
+📈 Range: 10→60 workers, 20→120 connections
 
-🔄 Band 1/25: 10 workers, 20 connections
-🔥 Warming up for 10s...
-📊 Band 1 completed: 1,234 TPS, 45.2ms avg latency
+═══════════════════════════════════════════════════════════════════
+🔄 Band 1/6: 10 workers, 20 connections
+🔥 Warming up for 60s...
+📊 Running test for 30m00s...
+✅ Band 1 Complete: 1,234 TPS | 45.2ms avg | 62.1ms P95
+   📈 Marginal Gain: N/A (baseline)
+   🎯 Efficiency: 123.4 TPS/worker
 
-🔄 Band 2/25: 10 workers, 30 connections
-📊 Band 2 completed: 1,456 TPS, 42.1ms avg latency
-...
+🔄 Band 2/6: 14 workers, 28 connections  
+🔥 Warming up for 60s...
+📊 Running test for 30m00s...
+✅ Band 2 Complete: 1,678 TPS | 41.8ms avg | 58.3ms P95
+   📈 Marginal Gain: +111.0 TPS/worker (excellent scaling)
+   🎯 Efficiency: 119.9 TPS/worker
 
-✅ Progressive scaling completed successfully
-📊 Tested 25 bands, optimal config: 40 workers, 60 connections (2,341 TPS)
+🔄 Band 3/6: 20 workers, 40 connections
+📊 Band 3 Complete: 2,156 TPS | 39.4ms avg | 55.7ms P95
+   📈 Marginal Gain: +79.7 TPS/worker (good scaling)
+   🎯 Efficiency: 107.8 TPS/worker
+
+🔄 Band 4/6: 28 workers, 56 connections
+📊 Band 4 Complete: 2,534 TPS | 42.1ms avg | 61.2ms P95
+   📈 Marginal Gain: +47.3 TPS/worker (diminishing returns)
+   🎯 Efficiency: 90.5 TPS/worker
+   ⚠️  Potential bottleneck detected: I/O bound
+
+🔄 Band 5/6: 40 workers, 80 connections
+📊 Band 5 Complete: 2,623 TPS | 48.9ms avg | 69.4ms P95
+   📈 Marginal Gain: +7.4 TPS/worker (approaching saturation)
+   🎯 Efficiency: 65.6 TPS/worker
+
+🔄 Band 6/6: 60 workers, 120 connections
+📊 Band 6 Complete: 2,591 TPS | 54.2ms avg | 78.1ms P95
+   📈 Marginal Gain: -1.6 TPS/worker (performance degradation)
+   🎯 Efficiency: 43.2 TPS/worker
+   🚨 Degradation detected: over-provisioned
+
+═══════════════════════════════════════════════════════════════════
+✅ Progressive Scaling Analysis Complete
+
+🏆 OPTIMAL CONFIGURATION DETECTED:
+   Workers: 28 | Connections: 56 | Performance: 2,534 TPS
+   Efficiency: 90.5 TPS/worker | Avg Latency: 42.1ms
+
+📊 SCALING ANALYSIS:
+   • Linear Scaling Region: Bands 1-2 (excellent performance gains)
+   • Diminishing Returns: Bands 3-4 (moderate gains, I/O bottleneck)
+   • Saturation Point: Band 5 (minimal gains)
+   • Degradation Region: Band 6 (performance loss)
+
+🔬 MATHEMATICAL MODELS:
+   • Best Fit: Logistic Model (R²=0.94)
+   • Predicted Peak: 2,640 TPS at 32 workers
+   • Saturation Threshold: 35 workers
+
+🎯 BOTTLENECK CLASSIFICATION:
+   Primary: I/O-bound (confidence: 87%)
+   Secondary: Connection pool contention
+   
+📂 Results exported to:
+   • progressive_scaling_results_20241215_143022.csv
+   • progressive_scaling_results_20241215_143022.json
 ```
 
-### CSV Export
+### CSV Export Format v0.2
+```csv
+band,workers,connections,duration_seconds,tps,avg_latency_ms,p50_latency_ms,p95_latency_ms,p99_latency_ms,std_dev_latency,errors,efficiency_tps_per_worker,marginal_gain_tps_per_worker,scaling_region,bottleneck_type
+1,10,20,1800,1234.5,45.2,43.1,62.1,89.4,12.3,0,123.45,0.00,baseline,none
+2,14,28,1800,1678.3,41.8,39.7,58.3,84.2,11.1,0,119.88,111.00,linear,none
+3,20,40,1800,2156.7,39.4,37.2,55.7,79.8,10.8,0,107.84,79.70,linear,none
+4,28,56,1800,2534.2,42.1,40.3,61.2,87.5,13.2,0,90.51,47.25,diminishing,io_bound
+5,40,80,1800,2623.1,48.9,46.8,69.4,95.3,15.7,2,65.58,7.43,saturation,io_bound
+6,60,120,1800,2591.4,54.2,52.1,78.1,108.7,18.9,8,43.19,-1.59,degradation,over_provisioned
+```
+
+### JSON Export Format v0.2
+```json
+{
+  "metadata": {
+    "test_name": "progressive_scaling_analysis",
+    "version": "v0.2-alpha",
+    "timestamp": "2024-12-15T14:30:22Z",
+    "duration_total_seconds": 11700,
+    "strategy": "exponential",
+    "bands_tested": 6,
+    "workload_type": "imdb_plugin"
+  },
+  "configuration": {
+    "min_workers": 10,
+    "max_workers": 60,
+    "min_connections": 20,
+    "max_connections": 120,
+    "test_duration": "30m",
+    "warmup_duration": "60s",
+    "cooldown_duration": "30s"
+  },
+  "bands": [
+    {
+      "band_number": 1,
+      "workers": 10,
+      "connections": 20,
+      "duration_seconds": 1800,
+      "performance": {
+        "tps": 1234.5,
+        "avg_latency_ms": 45.2,
+        "p50_latency_ms": 43.1,
+        "p95_latency_ms": 62.1,
+        "p99_latency_ms": 89.4,
+        "std_dev_latency": 12.3,
+        "errors": 0
+      },
+      "analysis": {
+        "efficiency_tps_per_worker": 123.45,
+        "marginal_gain_tps_per_worker": 0.0,
+        "scaling_region": "baseline",
+        "bottleneck_type": "none"
+      }
+    }
+  ],
+  "analysis": {
+    "optimal_configuration": {
+      "workers": 28,
+      "connections": 56,
+      "tps": 2534.2,
+      "efficiency": 90.51,
+      "confidence": 0.94
+    },
+    "mathematical_models": {
+      "best_fit": "logistic",
+      "r_squared": 0.94,
+      "predicted_peak_tps": 2640.0,
+      "predicted_peak_workers": 32
+    },
+    "bottleneck_analysis": {
+      "primary_bottleneck": "io_bound",
+      "confidence": 0.87,
+      "secondary_factors": ["connection_pool_contention"],
+      "recommendations": [
+        "Optimize I/O subsystem",
+        "Consider connection pooling tuning",
+        "Monitor disk utilization"
+      ]
+    },
+    "scaling_regions": {
+      "linear_scaling": {"bands": [1, 2], "description": "Excellent scaling"},
+      "diminishing_returns": {"bands": [3, 4], "description": "Moderate gains"},
+      "saturation": {"bands": [5], "description": "Minimal gains"},
+      "degradation": {"bands": [6], "description": "Performance loss"}
+    }
+  }
+}
+```
 ```csv
 band_id,workers,connections,total_tps,avg_latency_ms,p95_latency_ms,error_rate,...
 1,10,20,1234.50,45.20,89.30,0.02,...
