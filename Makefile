@@ -15,6 +15,9 @@ PLUGIN_DIR := $(BUILD_DIR)/plugins
 DOCS_DIR := docs
 PROFILES_DIR := profiles
 
+# FPM binary location (try common locations)
+FPM := $(shell command -v fpm 2>/dev/null || command -v /opt/homebrew/opt/ruby/bin/fpm 2>/dev/null || echo "fpm")
+
 # Version and build info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -524,56 +527,112 @@ release-docker-push: release-docker ## Build and push Docker images to registry
 	@docker push $(REGISTRY)/$(BINARY_NAME):latest
 	@echo "✅ Docker images pushed successfully"
 
-release-package-deb: ## Create DEB package (requires fpm)
+release-package-deb: ## Create DEB package with proper Linux filesystem layout
 	@echo "📦 Creating DEB package..."
-	@command -v fpm >/dev/null 2>&1 || { echo "❌ fpm not found. Install with: gem install fpm"; exit 1; }
+	@command -v fpm >/dev/null 2>&1 || command -v /opt/homebrew/opt/ruby/bin/fpm >/dev/null 2>&1 || { echo "❌ fpm not found. Install with: gem install fpm"; exit 1; }
 	@$(MAKE) release-build
-	@mkdir -p $(BUILD_DIR)/packages/deb/usr/local/bin
-	@mkdir -p $(BUILD_DIR)/packages/deb/usr/local/lib/stormdb/plugins
-	@mkdir -p $(BUILD_DIR)/packages/deb/etc/stormdb
-	@mkdir -p $(BUILD_DIR)/packages/deb/etc/systemd/system
-	@mkdir -p $(BUILD_DIR)/packages/deb/var/lib/stormdb/config
-	@mkdir -p $(BUILD_DIR)/packages/deb/var/lib/stormdb/logs
-	@mkdir -p $(BUILD_DIR)/packages/deb/var/lib/stormdb/plugins
+	@echo "Setting up DEB package directory structure..."
+	
+	# Create directory structure
+	@mkdir -p $(BUILD_DIR)/packages/deb/usr/bin
+	@mkdir -p $(BUILD_DIR)/packages/deb/usr/lib/stormdb/plugins
+	@mkdir -p $(BUILD_DIR)/packages/deb/etc/stormdb/examples
+	@mkdir -p $(BUILD_DIR)/packages/deb/usr/share/man/man1
 	@mkdir -p $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb
-	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(BUILD_DIR)/packages/deb/usr/local/bin/
-	@cp -r $(BUILD_DIR)/plugins/*.so $(BUILD_DIR)/packages/deb/usr/local/lib/stormdb/plugins/ 2>/dev/null || true
-	@cp -r config/* $(BUILD_DIR)/packages/deb/etc/stormdb/
-	@cp scripts/stormdb.service $(BUILD_DIR)/packages/deb/etc/systemd/system/
-	@cp README.md CHANGELOG.md $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb/
-	@fpm -s dir -t deb \
+	@mkdir -p $(BUILD_DIR)/packages/deb/usr/share/stormdb
+	
+	# Install binary to /usr/bin/stormdb
+	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(BUILD_DIR)/packages/deb/usr/bin/
+	
+	# Install plugins to /usr/lib/stormdb/plugins/
+	@if [ -d "$(BUILD_DIR)/plugins" ]; then \
+		cp $(BUILD_DIR)/plugins/*.so $(BUILD_DIR)/packages/deb/usr/lib/stormdb/plugins/ 2>/dev/null || true; \
+	fi
+	
+	# Install configuration files to /etc/stormdb/examples/
+	@cp config/*.yaml $(BUILD_DIR)/packages/deb/etc/stormdb/examples/
+	
+	# Install config_tpcc.yaml to /etc/stormdb/config_tpcc.yaml
+	@cp config/config_tpcc.yaml $(BUILD_DIR)/packages/deb/etc/stormdb/
+	
+	# Install man page to /usr/share/man/man1/
+	@cp stormdb.1 $(BUILD_DIR)/packages/deb/usr/share/man/man1/
+	@gzip -9 $(BUILD_DIR)/packages/deb/usr/share/man/man1/stormdb.1
+	
+	# Install documentation to /usr/share/doc/stormdb/
+	@cp README.md CHANGELOG.md ARCHITECTURE.md $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb/
+	@cp -r docs/* $(BUILD_DIR)/packages/deb/usr/share/doc/stormdb/
+	
+	# Install static data to /usr/share/stormdb/
+	@cp imdb.sql $(BUILD_DIR)/packages/deb/usr/share/stormdb/ 2>/dev/null || true
+	@cp -r config $(BUILD_DIR)/packages/deb/usr/share/stormdb/templates
+	
+	@$(FPM) -s dir -t deb \
 		--name $(BINARY_NAME) \
 		--version $(VERSION:v%=%) \
-		--maintainer "StormDB Team" \
-		--description "PostgreSQL performance testing and benchmarking tool" \
+		--maintainer "StormDB Team <team@stormdb.org>" \
+		--description "PostgreSQL performance testing and benchmarking tool with plugin-based workload architecture" \
 		--url "https://github.com/elchinoo/stormdb" \
 		--license "MIT" \
 		--architecture amd64 \
 		--depends postgresql-client \
+		--category database \
 		--after-install scripts/postinstall.sh \
 		--after-remove scripts/postremove.sh \
-		--deb-systemd scripts/stormdb.service \
 		-C $(BUILD_DIR)/packages/deb \
 		--package $(BUILD_DIR)/packages/
 	@echo "✅ DEB package created in $(BUILD_DIR)/packages/"
 
-release-package-rpm: ## Create RPM package (requires fpm)
+release-package-rpm: ## Create RPM package with proper Linux filesystem layout
 	@echo "📦 Creating RPM package..."
-	@command -v fpm >/dev/null 2>&1 || { echo "❌ fpm not found. Install with: gem install fpm"; exit 1; }
+	@command -v fpm >/dev/null 2>&1 || command -v /opt/homebrew/opt/ruby/bin/fpm >/dev/null 2>&1 || { echo "❌ fpm not found. Install with: gem install fpm"; exit 1; }
 	@$(MAKE) release-build
-	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/local/bin
-	@mkdir -p $(BUILD_DIR)/packages/rpm/etc/stormdb
+	@echo "Setting up RPM package directory structure..."
+	
+	# Create directory structure
+	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/bin
+	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/lib/stormdb/plugins
+	@mkdir -p $(BUILD_DIR)/packages/rpm/etc/stormdb/examples
+	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/share/man/man1
 	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/share/doc/stormdb
-	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(BUILD_DIR)/packages/rpm/usr/local/bin/
-	@cp -r config/* $(BUILD_DIR)/packages/rpm/etc/stormdb/
-	@cp README.md CHANGELOG.md $(BUILD_DIR)/packages/rpm/usr/share/doc/stormdb/
-	@fpm -s dir -t rpm \
+	@mkdir -p $(BUILD_DIR)/packages/rpm/usr/share/stormdb
+	
+	# Install binary to /usr/bin/stormdb
+	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(BUILD_DIR)/packages/rpm/usr/bin/
+	
+	# Install plugins to /usr/lib/stormdb/plugins/
+	@if [ -d "$(BUILD_DIR)/plugins" ]; then \
+		cp $(BUILD_DIR)/plugins/*.so $(BUILD_DIR)/packages/rpm/usr/lib/stormdb/plugins/ 2>/dev/null || true; \
+	fi
+	
+	# Install configuration files to /etc/stormdb/examples/
+	@cp config/*.yaml $(BUILD_DIR)/packages/rpm/etc/stormdb/examples/
+	
+	# Install config_tpcc.yaml to /etc/stormdb/config_tpcc.yaml
+	@cp config/config_tpcc.yaml $(BUILD_DIR)/packages/rpm/etc/stormdb/
+	
+	# Install man page to /usr/share/man/man1/
+	@cp stormdb.1 $(BUILD_DIR)/packages/rpm/usr/share/man/man1/
+	@gzip -9 $(BUILD_DIR)/packages/rpm/usr/share/man/man1/stormdb.1
+	
+	# Install documentation to /usr/share/doc/stormdb/
+	@cp README.md CHANGELOG.md ARCHITECTURE.md $(BUILD_DIR)/packages/rpm/usr/share/doc/stormdb/
+	@cp -r docs/* $(BUILD_DIR)/packages/rpm/usr/share/doc/stormdb/
+	
+	# Install static data to /usr/share/stormdb/
+	@cp imdb.sql $(BUILD_DIR)/packages/rpm/usr/share/stormdb/ 2>/dev/null || true
+	@cp -r config $(BUILD_DIR)/packages/rpm/usr/share/stormdb/templates
+	
+	@$(FPM) -s dir -t rpm \
 		--name $(BINARY_NAME) \
 		--version $(VERSION:v%=%) \
-		--maintainer "StormDB Team" \
-		--description "PostgreSQL performance testing and benchmarking tool" \
+		--maintainer "StormDB Team <team@stormdb.org>" \
+		--description "PostgreSQL performance testing and benchmarking tool with plugin-based workload architecture" \
 		--url "https://github.com/elchinoo/stormdb" \
 		--license "MIT" \
+		--architecture x86_64 \
+		--depends postgresql \
+		--category "Applications/Databases" \
 		--after-install scripts/postinstall.sh \
 		--after-remove scripts/postremove.sh \
 		-C $(BUILD_DIR)/packages/rpm \

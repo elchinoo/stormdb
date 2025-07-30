@@ -3,74 +3,53 @@
 
 set -e
 
-# Create stormdb user if it doesn't exist
-if ! id "stormdb" &>/dev/null; then
-    useradd --system --home-dir /var/lib/stormdb --create-home --shell /bin/false --user-group stormdb
-fi
+echo "Installing StormDB..."
 
-# Create necessary directories
-mkdir -p /var/lib/stormdb/{config,logs,plugins}
-mkdir -p /var/log/stormdb
-
-# Set proper permissions
-chown -R stormdb:stormdb /var/lib/stormdb
-chown -R stormdb:stormdb /var/log/stormdb
-chmod 755 /var/lib/stormdb
-chmod 755 /var/log/stormdb
-
-# Set permissions on binary
-chmod +x /usr/local/bin/stormdb
+# Set proper permissions on binary
+chmod +x /usr/bin/stormdb
 
 # Set permissions on plugins
-if [ -d /usr/local/lib/stormdb/plugins ]; then
-    chmod -R 755 /usr/local/lib/stormdb/plugins
+if [ -d /usr/lib/stormdb/plugins ]; then
+    chmod -R 755 /usr/lib/stormdb/plugins
+    echo "Plugins installed to /usr/lib/stormdb/plugins/"
 fi
 
-# Create symlink for plugins in user directory
-if [ -d /usr/local/lib/stormdb/plugins ]; then
-    ln -sf /usr/local/lib/stormdb/plugins /var/lib/stormdb/plugins/system
+# Set permissions on configuration files
+if [ -d /etc/stormdb ]; then
+    chmod -R 644 /etc/stormdb/*.yaml
+    chmod 755 /etc/stormdb
+    echo "Configuration files installed to /etc/stormdb/"
 fi
 
-# Copy default config if it doesn't exist
-if [ ! -f /var/lib/stormdb/config/stormdb.yaml ] && [ -d /etc/stormdb ]; then
-    cp /etc/stormdb/config_simple_connection.yaml /var/lib/stormdb/config/stormdb.yaml
-    chown stormdb:stormdb /var/lib/stormdb/config/stormdb.yaml
-elif [ ! -f /var/lib/stormdb/config/stormdb.yaml ]; then
-    # Create a basic config if none exists
-    cat > /var/lib/stormdb/config/stormdb.yaml << 'EOF'
-database:
-  host: "localhost"
-  port: 5432
-  user: "postgres"
-  password: ""
-  dbname: "postgres"
-  sslmode: "disable"
-
-workload:
-  type: "basic"
-  duration: "30s"
-  workers: 4
-
-metrics:
-  enabled: true
-  interval: "5s"
-EOF
-    chown stormdb:stormdb /var/lib/stormdb/config/stormdb.yaml
-    chmod 640 /var/lib/stormdb/config/stormdb.yaml
+# Set permissions on example configurations
+if [ -d /etc/stormdb/examples ]; then
+    chmod -R 644 /etc/stormdb/examples/*.yaml
+    chmod 755 /etc/stormdb/examples
+    echo "Example configurations available in /etc/stormdb/examples/"
 fi
 
-# Enable systemd service if systemd is available
-if command -v systemctl >/dev/null 2>&1; then
-    systemctl daemon-reload
-    systemctl enable stormdb.service || true
-    echo "StormDB service enabled. Use 'systemctl start stormdb' to start."
+# Update man database
+if command -v mandb >/dev/null 2>&1; then
+    mandb -q 2>/dev/null || true
+elif command -v makewhatis >/dev/null 2>&1; then
+    makewhatis /usr/share/man 2>/dev/null || true
 fi
 
+# Display installation summary
+echo ""
 echo "StormDB installation completed successfully!"
 echo ""
-echo "Quick start:"
-echo "  1. Edit configuration: /var/lib/stormdb/config/stormdb.yaml"
-echo "  2. Run benchmark: stormdb -c /var/lib/stormdb/config/stormdb.yaml"
-echo "  3. View help: stormdb --help"
+echo "Usage:"
+echo "  stormdb --help                                   # Show help"
+echo "  stormdb -c /etc/stormdb/config_tpcc.yaml        # Run TPC-C workload"
+echo "  stormdb --workload ecommerce_mixed --duration 30s # Run e-commerce workload"
+echo ""
+echo "Files installed:"
+echo "  Binary:        /usr/bin/stormdb"
+echo "  Configuration: /etc/stormdb/config_tpcc.yaml"
+echo "  Examples:      /etc/stormdb/examples/"
+echo "  Plugins:       /usr/lib/stormdb/plugins/"
+echo "  Documentation: /usr/share/doc/stormdb/"
+echo "  Manual:        man stormdb"
 echo ""
 echo "Documentation: https://github.com/elchinoo/stormdb"

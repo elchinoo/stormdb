@@ -3,33 +3,29 @@
 
 set -e
 
-# Stop and disable service if systemd is available
-if command -v systemctl >/dev/null 2>&1; then
-    systemctl stop stormdb.service || true
-    systemctl disable stormdb.service || true
-    systemctl daemon-reload || true
+echo "Removing StormDB..."
+
+# Update man database
+if command -v mandb >/dev/null 2>&1; then
+    mandb -q 2>/dev/null || true
+elif command -v makewhatis >/dev/null 2>&1; then
+    makewhatis /usr/share/man 2>/dev/null || true
 fi
 
-# Remove symlinks
-rm -f /var/lib/stormdb/plugins/system
-
-# Ask user if they want to remove data (interactive removal)
+# Ask user if they want to remove configuration files (interactive removal)
 if [[ -t 0 ]]; then  # Check if running interactively
-    echo "Do you want to remove StormDB data and logs? (y/N)"
+    echo "Do you want to remove StormDB configuration files from /etc/stormdb? (y/N)"
     read -r response
     if [[ "$response" =~ ^[Yy]$ ]]; then
-        rm -rf /var/lib/stormdb
-        rm -rf /var/log/stormdb
-        echo "StormDB data and logs removed."
+        rm -rf /etc/stormdb
+        echo "StormDB configuration files removed."
     else
-        echo "StormDB data and logs preserved in /var/lib/stormdb and /var/log/stormdb"
+        echo "StormDB configuration files preserved in /etc/stormdb"
     fi
 else
-    # Non-interactive removal - preserve data
-    echo "StormDB data and logs preserved in /var/lib/stormdb and /var/log/stormdb"
-    echo "Remove manually if no longer needed."
+    # Non-interactive removal - preserve configuration
+    echo "StormDB configuration files preserved in /etc/stormdb"
+    echo "Remove manually if no longer needed: rm -rf /etc/stormdb"
 fi
 
-# Note: We don't remove the stormdb user as it might be used by other processes
 echo "StormDB package removed successfully!"
-echo "Note: The 'stormdb' system user was preserved for safety."
