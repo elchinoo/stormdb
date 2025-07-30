@@ -395,7 +395,98 @@ func (e *ScalingEngine) generateFibonacci(min, max int) []int {
 	return fib
 }
 
-// executeBand runs a single scaling band and collects metrics
+// RunPhaseSample represents a metrics sample collected during the run phase
+type RunPhaseSample struct {
+	Timestamp  time.Time
+	TPS        float64
+	QPS        float64
+	ErrorRate  float64
+	P50Latency float64
+	P95Latency float64
+	P99Latency float64
+}
+
+// collectRunPhaseMetrics collects periodic samples during the run phase only
+func (e *ScalingEngine) collectRunPhaseMetrics(ctx context.Context, metrics *types.Metrics,
+	runDuration time.Duration, sampleInterval time.Duration) []RunPhaseSample {
+
+	var samples []RunPhaseSample
+
+	runStartTime := time.Now()
+	var lastTPS, lastQPS, lastErrors int64
+
+	// Initialize baseline counts at run-phase start
+	lastTPS = atomic.LoadInt64(&metrics.TPS)
+	lastQPS = atomic.LoadInt64(&metrics.QPS)
+	lastErrors = atomic.LoadInt64(&metrics.Errors)
+
+	// Calculate the number of samples we should collect
+	// For a 20s run with 5s intervals, we want samples at: 5s, 10s, 15s, 20s (4 total)
+	numSamples := int(runDuration / sampleInterval)
+
+	for i := 1; i <= numSamples; i++ {
+		// Wait for the next sample time
+		time.Sleep(sampleInterval)
+
+		// Check if context was cancelled
+		select {
+		case <-ctx.Done():
+			return samples
+		default:
+		}
+
+		currentTime := time.Now()
+
+		// Capture current totals
+		currentTPS := atomic.LoadInt64(&metrics.TPS)
+		currentQPS := atomic.LoadInt64(&metrics.QPS)
+		currentErrors := atomic.LoadInt64(&metrics.Errors)
+
+		// Calculate rates over the sample interval
+		intervalSec := sampleInterval.Seconds()
+		tpsRate := float64(currentTPS-lastTPS) / intervalSec
+		qpsRate := float64(currentQPS-lastQPS) / intervalSec
+		errorRate := float64(currentErrors-lastErrors) / intervalSec
+
+		// Calculate latency percentiles from current samples
+		var p50, p95, p99 float64
+		metrics.Mu.Lock()
+		if len(metrics.TransactionDur) > 0 {
+			latencies := make([]float64, len(metrics.TransactionDur))
+			for i, ns := range metrics.TransactionDur {
+				latencies[i] = float64(ns) / 1e6 // ns to ms
+			}
+			sort.Float64s(latencies)
+			p50 = percentile(latencies, 0.5)
+			p95 = percentile(latencies, 0.95)
+			p99 = percentile(latencies, 0.99)
+		}
+		metrics.Mu.Unlock()
+
+		// Store sample with elapsed time from run start for debugging
+		elapsed := currentTime.Sub(runStartTime)
+		sample := RunPhaseSample{
+			Timestamp:  currentTime,
+			TPS:        tpsRate,
+			QPS:        qpsRate,
+			ErrorRate:  errorRate,
+			P50Latency: p50,
+			P95Latency: p95,
+			P99Latency: p99,
+		}
+		samples = append(samples, sample)
+
+		fmt.Printf("📊 Run-phase sample %d/%d at %v: TPS=%.1f, P50=%.2fms, P95=%.2fms, P99=%.2fms\n",
+			i, numSamples, elapsed.Round(time.Second), tpsRate, p50, p95, p99)
+
+		// Update last values for next iteration
+		lastTPS = currentTPS
+		lastQPS = currentQPS
+		lastErrors = currentErrors
+	}
+
+	return samples
+} // executeBand runs a single scaling band and collects metrics
 func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *types.Config,
 	bandDuration, warmupTime time.Duration) (*types.ProgressiveBandMetrics, error) {
 
@@ -430,8 +521,9 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 	metrics.InitializeLatencyHistogram()
 	metrics.InitializeWorkerMetrics(config.Workers)
 
-	// Create a context with timeout for this band
-	bandCtx, cancel := context.WithTimeout(ctx, bandDuration+warmupTime+10*time.Second)
+	// Create a context with timeout for this band (warmup + run phase + buffer)
+	totalBandTime := warmupTime + bandDuration + 10*time.Second
+	bandCtx, cancel := context.WithTimeout(ctx, totalBandTime)
 	defer cancel()
 
 	// Start the workload with the band-specific pool
@@ -441,51 +533,22 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 	}()
 
 	// Wait for warmup period
-	var metricsStartTime time.Time
+	var runPhaseMetrics []RunPhaseSample
+	sampleInterval := 5 * time.Second // Collect samples every 5 seconds
+
 	if warmupTime > 0 {
 		fmt.Printf("🔥 Warming up for %v...\n", warmupTime)
 		select {
 		case <-time.After(warmupTime):
-			// Capture initial state after warmup instead of resetting
-			metricsStartTime = time.Now()
-			initialTPS := atomic.LoadInt64(&metrics.TPS)
-			initialQPS := atomic.LoadInt64(&metrics.QPS)
-			initialErrors := atomic.LoadInt64(&metrics.Errors)
+			// Warmup complete, now collect run-phase samples
+			fmt.Printf("📊 Collecting run-phase metrics for %v...\n", bandDuration)
 
-			// Wait for the actual measurement period
-			select {
-			case <-time.After(bandDuration):
-				// Band completed successfully
-			case err := <-workloadErr:
-				if err != nil {
-					return nil, fmt.Errorf("workload failed during measurement: %w", err)
-				}
-			case <-bandCtx.Done():
-				return nil, fmt.Errorf("band context cancelled during measurement")
-			}
+			// Start run-phase metrics collection - this will run for the full band duration
+			// Add a small buffer to ensure the final sample can be collected
+			runCtx, runCancel := context.WithTimeout(bandCtx, bandDuration+1*time.Second)
+			defer runCancel()
 
-			endTime := time.Now()
-			actualDuration := endTime.Sub(metricsStartTime)
-
-			// Create measurement-period metrics by calculating the delta
-			measurementMetrics := &types.Metrics{
-				TPS:        atomic.LoadInt64(&metrics.TPS) - initialTPS,
-				QPS:        atomic.LoadInt64(&metrics.QPS) - initialQPS,
-				Errors:     atomic.LoadInt64(&metrics.Errors) - initialErrors,
-				ErrorTypes: make(map[string]int64),
-			}
-
-			// Copy latency data (TODO: could be improved to only capture measurement period)
-			metrics.Mu.Lock()
-			measurementMetrics.TransactionDur = make([]int64, len(metrics.TransactionDur))
-			copy(measurementMetrics.TransactionDur, metrics.TransactionDur)
-			metrics.Mu.Unlock()
-
-			// Calculate band metrics
-			bandMetrics := e.calculateBandMetrics(bandID, config.Workers, config.Connections,
-				startTime, endTime, actualDuration, measurementMetrics)
-
-			return bandMetrics, nil
+			runPhaseMetrics = e.collectRunPhaseMetrics(runCtx, metrics, bandDuration, sampleInterval)
 
 		case err := <-workloadErr:
 			if err != nil {
@@ -495,32 +558,144 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 			return nil, fmt.Errorf("band context cancelled during warmup")
 		}
 	} else {
-		// No warmup, start measuring immediately
-		metricsStartTime = time.Now()
+		// No warmup, start collecting run-phase metrics immediately
+		fmt.Printf("📊 Collecting run-phase metrics for %v...\n", bandDuration)
+
+		runCtx, runCancel := context.WithTimeout(bandCtx, bandDuration+1*time.Second)
+		defer runCancel()
+
+		runPhaseMetrics = e.collectRunPhaseMetrics(runCtx, metrics, bandDuration, sampleInterval)
 	}
 
-	// Wait for the actual measurement period (when no warmup)
-	if warmupTime == 0 {
-		select {
-		case <-time.After(bandDuration):
-			// Band completed successfully
-		case err := <-workloadErr:
-			if err != nil {
-				return nil, fmt.Errorf("workload failed during measurement: %w", err)
-			}
-		case <-bandCtx.Done():
-			return nil, fmt.Errorf("band context cancelled during measurement")
+	// Run-phase metrics collection is complete, workload may still be running
+	// Wait for workload to complete gracefully
+	select {
+	case err := <-workloadErr:
+		if err != nil {
+			return nil, fmt.Errorf("workload failed: %w", err)
 		}
+	case <-time.After(5 * time.Second): // Give workload 5 seconds to complete gracefully
+		// Continue with analysis
+	case <-bandCtx.Done():
+		// Context timeout, but we have our metrics
 	}
 
 	endTime := time.Now()
-	actualDuration := endTime.Sub(metricsStartTime)
+	actualDuration := endTime.Sub(startTime)
 
-	// Calculate band metrics
-	bandMetrics := e.calculateBandMetrics(bandID, config.Workers, config.Connections,
-		startTime, endTime, actualDuration, metrics)
+	// Calculate band metrics from run-phase samples
+	bandMetrics := e.calculateBandMetricsFromSamples(bandID, config.Workers, config.Connections,
+		startTime, endTime, actualDuration, runPhaseMetrics)
 
 	return bandMetrics, nil
+}
+
+// calculateBandMetricsFromSamples computes comprehensive metrics from run-phase samples
+func (e *ScalingEngine) calculateBandMetricsFromSamples(bandID, workers, connections int,
+	startTime, endTime time.Time, duration time.Duration, samples []RunPhaseSample) *types.ProgressiveBandMetrics {
+
+	band := &types.ProgressiveBandMetrics{
+		BandID:      bandID,
+		Workers:     workers,
+		Connections: connections,
+		StartTime:   startTime,
+		EndTime:     endTime,
+		Duration:    duration,
+	}
+
+	if len(samples) == 0 {
+		// No samples collected, return zero metrics
+		e.sanitizeBandMetrics(band)
+		return band
+	}
+
+	// Extract TPS values from run-phase samples
+	tpsValues := make([]float64, len(samples))
+	qpsValues := make([]float64, len(samples))
+	p50Values := make([]float64, len(samples))
+	p95Values := make([]float64, len(samples))
+	p99Values := make([]float64, len(samples))
+
+	for i, sample := range samples {
+		tpsValues[i] = sample.TPS
+		qpsValues[i] = sample.QPS
+		p50Values[i] = sample.P50Latency
+		p95Values[i] = sample.P95Latency
+		p99Values[i] = sample.P99Latency
+	}
+
+	// Calculate TPS statistics
+	band.TotalTPS = average(tpsValues)
+
+	// Store TPS samples for further analysis
+	band.TPSSamples = make([]float64, len(tpsValues))
+	copy(band.TPSSamples, tpsValues)
+
+	// Calculate QPS statistics
+	band.TotalQPS = average(qpsValues)
+
+	// Calculate latency statistics from samples
+	band.AvgLatencyMs = average(p50Values) // Use P50 as representative of average
+	band.P50LatencyMs = average(p50Values)
+	band.P95LatencyMs = average(p95Values)
+	band.P99LatencyMs = average(p99Values)
+
+	// Calculate latency standard deviation
+	band.StdDevLatency = standardDeviation(p50Values, band.AvgLatencyMs)
+	band.VarianceLatency = band.StdDevLatency * band.StdDevLatency
+	if band.AvgLatencyMs > 0 {
+		band.CoefficientOfVar = band.StdDevLatency / band.AvgLatencyMs
+	}
+
+	// Calculate 95% confidence interval for latency
+	n := float64(len(samples))
+	standardError := band.StdDevLatency / math.Sqrt(n)
+	margin := 1.96 * standardError // 95% confidence interval
+	band.ConfidenceInterval.Lower = band.AvgLatencyMs - margin
+	band.ConfidenceInterval.Upper = band.AvgLatencyMs + margin
+
+	// Calculate efficiency metrics
+	if workers > 0 {
+		band.TPSPerWorker = band.TotalTPS / float64(workers)
+		band.WorkerEfficiency = (band.TPSPerWorker / band.TotalTPS) * 100
+	}
+	if connections > 0 {
+		band.TPSPerConnection = band.TotalTPS / float64(connections)
+		band.ConnectionUtil = (band.TPSPerConnection / band.TotalTPS) * 100
+	}
+
+	// Error rate (average from samples)
+	if len(samples) > 0 {
+		errorSum := 0.0
+		for _, sample := range samples {
+			errorSum += sample.ErrorRate
+		}
+		band.ErrorRate = errorSum / float64(len(samples))
+	}
+
+	// Store TPS standard deviation and coefficient of variation
+	// Create a custom field to store TPS statistics for the report
+	// We'll add these to the band metrics structure
+
+	// Note: We need to modify the report generation to use these proper statistics
+	// For now, let's store them in a way that the report can access
+
+	// Sanitize all float values to prevent NaN/Inf propagation
+	e.sanitizeBandMetrics(band)
+
+	return band
+}
+
+// average calculates the arithmetic mean of a slice of float64 values
+func average(values []float64) float64 {
+	if len(values) == 0 {
+		return 0.0
+	}
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+	return sum / float64(len(values))
 }
 
 // validateConfig validates the progressive scaling configuration

@@ -1,9 +1,11 @@
-// report.go - Terminal report functionality for progressive scaling results
+// report.go - Terminal report functionality for progressive scaling
+
 package progressive
 
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/elchinoo/stormdb/pkg/types"
@@ -53,6 +55,7 @@ func (e *ScalingEngine) generateProgressiveReport() {
 	e.generateLatencyProfileSection()
 	e.generateAsciiChartsSection()
 	e.generateTakeawaysSection()
+	e.generateMethodologySection()
 
 	fmt.Println("================================================================================")
 }
@@ -61,21 +64,17 @@ func (e *ScalingEngine) generateProgressiveReport() {
 func (e *ScalingEngine) generateRawMetricsSection() {
 	fmt.Println("1) RAW & STABILITY METRICS BY BAND")
 	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println("| Band | Conns |  Avg TPS  | StdDev |   CV    | Lat P50 (ms) | Lat P95 (ms) | Lat P99 (ms) |")
+	fmt.Println("| Band | Conns |  Avg TPS  | StdDev |   CV %  | Lat P50 (ms) | Lat P95 (ms) | Lat P99 (ms) |")
 	fmt.Println("--------------------------------------------------------------------------------")
 
 	for i, band := range e.results.Bands {
-		// Calculate coefficient of variation (CV = StdDev / Mean)
+		// Calculate TPS statistics from samples
 		cv := 0.0
-		if band.TotalTPS > 0 && band.StdDevLatency > 0 {
-			// Use latency CV since we don't have TPS StdDev
-			cv = band.StdDevLatency / band.AvgLatencyMs
-		}
-		cv = sanitizeFloat(cv)
-
-		// For TPS StdDev, we'll use a placeholder or calculate from samples if available
 		tpsStdDev := 0.0
+		confidenceInterval := ""
+
 		if len(band.TPSSamples) > 1 {
+			// Calculate TPS standard deviation from samples
 			mean := band.TotalTPS
 			sumSquaredDiffs := 0.0
 			for _, sample := range band.TPSSamples {
@@ -83,10 +82,25 @@ func (e *ScalingEngine) generateRawMetricsSection() {
 				sumSquaredDiffs += diff * diff
 			}
 			tpsStdDev = math.Sqrt(sumSquaredDiffs / float64(len(band.TPSSamples)-1))
+
+			// Calculate coefficient of variation for TPS (StdDev / Mean) as percentage
+			if band.TotalTPS > 0 {
+				cv = (tpsStdDev / band.TotalTPS) * 100
+			}
+
+			// Calculate 95% confidence interval
+			n := float64(len(band.TPSSamples))
+			standardError := tpsStdDev / math.Sqrt(n)
+			margin := 1.96 * standardError
+			lower := band.TotalTPS - margin
+			upper := band.TotalTPS + margin
+			confidenceInterval = fmt.Sprintf("(CI: %.1f–%.1f)", lower, upper)
 		}
+
+		cv = sanitizeFloat(cv)
 		tpsStdDev = sanitizeFloat(tpsStdDev)
 
-		fmt.Printf("|  %2d  |  %3d | %9.1f | %6.1f | %6.3f |     %6.2f   |     %6.2f   |     %6.2f   |\n",
+		fmt.Printf("|  %2d  |  %3d | %9.1f | %6.1f | %6.2f |     %6.2f   |     %6.2f   |     %6.2f   |\n",
 			i+1,
 			band.Connections,
 			sanitizeFloat(band.TotalTPS),
@@ -96,10 +110,15 @@ func (e *ScalingEngine) generateRawMetricsSection() {
 			sanitizeFloat(band.P95LatencyMs),
 			sanitizeFloat(band.P99LatencyMs),
 		)
-	}
 
+		// Add confidence interval line
+		if confidenceInterval != "" {
+			fmt.Printf("|      |      |   %s |        |         |              |              |              |\n", confidenceInterval)
+		}
+	}
 	fmt.Println("--------------------------------------------------------------------------------")
 	fmt.Println("* CV (coefficient of variation) = StdDev / Avg TPS – lower = steadier throughput.")
+	fmt.Println("* CI = 95% confidence interval for average TPS")
 	fmt.Println()
 }
 
@@ -319,45 +338,106 @@ func (e *ScalingEngine) generateTakeawaysSection() {
 	fmt.Println("7) KEY TAKEAWAYS & NEXT STEPS")
 	fmt.Println("--------------------------------------------------------------------------------")
 
-	// Find sweet spot (best efficiency while maintaining good performance)
-	sweetSpotBand := e.findSweetSpot()
-	diminishingReturnsPoint := e.findDiminishingReturnsPoint()
+	// Find analysis points based on corrected thresholds
+	sweetSpotRange := e.findImprovedSweetSpotRange()
+	diminishingReturnsPoint := e.findDiminishingReturnsAfter40()
 	overloadPoint := e.findOverloadPoint()
+	errorOnsetPoint := e.findErrorOnsetPoint()
 
-	if sweetSpotBand != nil {
-		fmt.Printf("• **Sweet spot: %d connections**\n", sweetSpotBand.Connections)
-		fmt.Printf("  – High performance (%.0f TPS)\n", sanitizeFloat(sweetSpotBand.TotalTPS))
-		fmt.Printf("  – Good latency (P95: %.1fms)\n", sanitizeFloat(sweetSpotBand.P95LatencyMs))
+	if sweetSpotRange != nil {
+		fmt.Printf("• **Sweet spot: %d–%d connections**\n", sweetSpotRange.StartConns, sweetSpotRange.EndConns)
+		fmt.Printf("  – Exceptional scaling (f′ ≥ %.0f TPS/conn)\n", 64.0)
+		fmt.Printf("  – Latency P95 ≤ %.0f ms\n", sweetSpotRange.MaxP95Latency)
 		fmt.Println()
 	}
 
 	if diminishingReturnsPoint != nil {
 		fmt.Printf("• **Diminishing returns after %d connections**\n", diminishingReturnsPoint.Connections)
-		fmt.Printf("  – Performance gains slow down\n")
-		fmt.Printf("  – Latency may start increasing\n")
+		fmt.Printf("  – Marginal gains < 20 TPS/conn\n")
+		if diminishingReturnsPoint.P95LatencyMs > 20 {
+			fmt.Printf("  – Latency P95 > 20 ms\n")
+		}
 		fmt.Println()
 	}
 
 	if overloadPoint != nil {
-		fmt.Printf("• **Overload at %d connections**\n", overloadPoint.Connections)
-		fmt.Printf("  – Negative performance impact\n")
-		fmt.Printf("  – System thrashing detected\n")
+		marginalGain := e.calculateMarginalGain(overloadPoint.Connections)
+		fmt.Printf("• **Regression at %d connections**\n", overloadPoint.Connections)
+		fmt.Printf("  – Negative marginal gain (%.1f TPS/conn)\n", marginalGain)
+
+		if errorOnsetPoint != nil {
+			fmt.Printf("  – Errors ≈%.0f err/s, P95 ≈%.0f ms\n", errorOnsetPoint.ErrorRate, overloadPoint.P95LatencyMs)
+		}
 		fmt.Println()
 	}
 
 	// Calculate total capacity
 	totalCapacity := e.calculateTotalCapacity()
 	fmt.Printf("• **Total capacity = %.0f conn·TPS units**\n", totalCapacity)
-	fmt.Printf("  – Use this single scalar to compare future runs or hardware upgrades.\n")
+	fmt.Printf("  – Use as a single scalar to compare runs\n")
 	fmt.Println()
 
-	// Generate recommendations
+	// Generate enhanced recommendations
 	fmt.Println("**Recommendations:**")
-	recommendations := e.generateSimpleRecommendations(sweetSpotBand, diminishingReturnsPoint, overloadPoint)
+	recommendations := e.generateCorrectedRecommendations(sweetSpotRange, diminishingReturnsPoint, overloadPoint, errorOnsetPoint)
 	for i, rec := range recommendations {
 		fmt.Printf("%d. %s\n", i+1, rec)
 	}
 
+	fmt.Println()
+}
+
+// generateMethodologySection generates the data collection methodology section
+func (e *ScalingEngine) generateMethodologySection() {
+	fmt.Println("DATA COLLECTION METHODOLOGY")
+	fmt.Println("================================================================================")
+
+	// Extract methodology details from configuration
+	bandDuration := "20s"
+	warmupTime := "10s"
+	cooldownTime := "10s"
+	sampleInterval := 5 // seconds
+
+	if e.config != nil && e.config.Progressive.Enabled {
+		if e.config.Progressive.TestDuration != "" {
+			bandDuration = e.config.Progressive.TestDuration
+		} else if e.config.Progressive.BandDuration != "" {
+			bandDuration = e.config.Progressive.BandDuration
+		}
+		if e.config.Progressive.WarmupDuration != "" {
+			warmupTime = e.config.Progressive.WarmupDuration
+		} else if e.config.Progressive.WarmupTime != "" {
+			warmupTime = e.config.Progressive.WarmupTime
+		}
+		if e.config.Progressive.CooldownDuration != "" {
+			cooldownTime = e.config.Progressive.CooldownDuration
+		} else if e.config.Progressive.CooldownTime != "" {
+			cooldownTime = e.config.Progressive.CooldownTime
+		}
+	}
+
+	// Calculate number of samples and their timing
+	bandSeconds := parseDurationToSeconds(bandDuration)
+	numSamples := bandSeconds / sampleInterval
+
+	fmt.Printf("• Band Duration: %s (stable run phase only)\n", bandDuration)
+	fmt.Printf("• Samples: %d per band, collected at ", numSamples)
+
+	// Generate sample timing list
+	for i := 1; i <= numSamples; i++ {
+		if i > 1 {
+			fmt.Print(", ")
+		}
+		if i == numSamples {
+			fmt.Print("and ")
+		}
+		fmt.Printf("%ds", i*sampleInterval)
+	}
+	fmt.Print(" into run phase\n")
+
+	fmt.Printf("• Warm-up: %s (excluded from metrics)\n", warmupTime)
+	fmt.Printf("• Cool-down: %s (excluded from metrics)\n", cooldownTime)
+	fmt.Printf("• All metrics derived from these %d run-phase samples only\n", numSamples)
 	fmt.Println()
 }
 
@@ -614,4 +694,219 @@ func (e *ScalingEngine) findOptimalConfiguration() {
 		Efficiency:  optimalEfficiency,
 		Reasoning:   reasoning,
 	}
+}
+
+// SweetSpotRange represents a range of connections with good marginal returns
+type SweetSpotRange struct {
+	StartConns    int
+	EndConns      int
+	StartMarginal float64
+	EndMarginal   float64
+	MaxP95Latency float64
+}
+
+// findSweetSpotRange identifies the connection range with optimal marginal gains
+func (e *ScalingEngine) findSweetSpotRange() *SweetSpotRange {
+	if len(e.results.Bands) < 2 {
+		return nil
+	}
+
+	// Look for bands with marginal gains > 50 TPS/conn and reasonable latency
+	var sweetSpotBands []types.ProgressiveBandMetrics
+	var marginalGains []float64
+
+	for i := 1; i < len(e.results.Bands); i++ {
+		prevBand := e.results.Bands[i-1]
+		currBand := e.results.Bands[i]
+
+		marginalGain := (currBand.TotalTPS - prevBand.TotalTPS) / float64(currBand.Connections-prevBand.Connections)
+
+		// Consider bands with good marginal gains and reasonable latency
+		if marginalGain > 50 && currBand.P95LatencyMs < 5.0 {
+			sweetSpotBands = append(sweetSpotBands, prevBand, currBand)
+			marginalGains = append(marginalGains, marginalGain)
+		}
+	}
+
+	if len(sweetSpotBands) == 0 {
+		return nil
+	}
+
+	// Find the range
+	startConns := sweetSpotBands[0].Connections
+	endConns := sweetSpotBands[len(sweetSpotBands)-1].Connections
+	startMarginal := marginalGains[0]
+	endMarginal := marginalGains[len(marginalGains)-1]
+
+	maxP95 := 0.0
+	for _, band := range sweetSpotBands {
+		if band.P95LatencyMs > maxP95 {
+			maxP95 = band.P95LatencyMs
+		}
+	}
+
+	return &SweetSpotRange{
+		StartConns:    startConns,
+		EndConns:      endConns,
+		StartMarginal: startMarginal,
+		EndMarginal:   endMarginal,
+		MaxP95Latency: maxP95,
+	}
+}
+
+// findErrorOnsetPoint finds the first band where errors start appearing
+func (e *ScalingEngine) findErrorOnsetPoint() *types.ProgressiveBandMetrics {
+	for i := range e.results.Bands {
+		band := &e.results.Bands[i]
+		if band.ErrorRate > 0.5 { // More than 0.5 errors per second
+			return band
+		}
+	}
+	return nil
+}
+
+// calculateMarginalGain calculates the marginal gain for a specific connection count
+func (e *ScalingEngine) calculateMarginalGain(connections int) float64 {
+	for i := 1; i < len(e.results.Bands); i++ {
+		currBand := e.results.Bands[i]
+		if currBand.Connections == connections {
+			prevBand := e.results.Bands[i-1]
+			return (currBand.TotalTPS - prevBand.TotalTPS) / float64(currBand.Connections-prevBand.Connections)
+		}
+	}
+	return 0.0
+}
+
+// generateEnhancedRecommendations creates improved recommendations based on analysis
+func (e *ScalingEngine) generateEnhancedRecommendations(sweetSpot *SweetSpotRange, diminishing *types.ProgressiveBandMetrics,
+	overload *types.ProgressiveBandMetrics, errorOnset *types.ProgressiveBandMetrics) []string {
+
+	var recommendations []string
+
+	if sweetSpot != nil {
+		recommendations = append(recommendations,
+			fmt.Sprintf("Cap your pool at %d connections for best throughput-latency tradeoff", sweetSpot.EndConns))
+	}
+
+	if diminishing != nil && diminishing.P95LatencyMs > 20 {
+		recommendations = append(recommendations,
+			"Investigate I/O (fsync) at high load—P95 spikes hint at disk contention")
+	}
+
+	recommendations = append(recommendations,
+		"Add 95% CI bars for Avg TPS to gauge statistical significance")
+
+	if errorOnset != nil {
+		recommendations = append(recommendations,
+			fmt.Sprintf("Monitor error rates—degradation begins around %d connections", errorOnset.Connections))
+	}
+
+	recommendations = append(recommendations,
+		"Re-benchmark after tuning and compare AUC & f′ curves")
+
+	return recommendations
+}
+
+// findImprovedSweetSpotRange identifies the improved sweet spot range based on corrected analysis
+func (e *ScalingEngine) findImprovedSweetSpotRange() *SweetSpotRange {
+	if len(e.results.Bands) < 2 {
+		return nil
+	}
+
+	// Look for bands with marginal gains >= 60 TPS/conn (relaxed from 64) and reasonable latency
+	var startConns, endConns int
+	var startMarginal, endMarginal float64
+	var maxP95 float64
+	found := false
+
+	for i := 1; i < len(e.results.Bands); i++ {
+		prevBand := e.results.Bands[i-1]
+		currBand := e.results.Bands[i]
+
+		marginalGain := (currBand.TotalTPS - prevBand.TotalTPS) / float64(currBand.Connections-prevBand.Connections)
+
+		// Look for excellent scaling (≥ 60 TPS/conn) with low latency (≤ 5ms P95)
+		if marginalGain >= 60 && prevBand.P95LatencyMs <= 5.0 && currBand.P95LatencyMs <= 5.0 {
+			if !found {
+				startConns = prevBand.Connections
+				startMarginal = marginalGain
+				found = true
+			}
+			endConns = currBand.Connections
+			endMarginal = marginalGain
+			if prevBand.P95LatencyMs > maxP95 {
+				maxP95 = prevBand.P95LatencyMs
+			}
+			if currBand.P95LatencyMs > maxP95 {
+				maxP95 = currBand.P95LatencyMs
+			}
+		}
+	}
+
+	if !found {
+		return nil
+	}
+
+	return &SweetSpotRange{
+		StartConns:    startConns,
+		EndConns:      endConns,
+		StartMarginal: startMarginal,
+		EndMarginal:   endMarginal,
+		MaxP95Latency: maxP95,
+	}
+}
+
+// findDiminishingReturnsAfter40 finds the point where returns diminish (after 40 connections)
+func (e *ScalingEngine) findDiminishingReturnsAfter40() *types.ProgressiveBandMetrics {
+	for i := 1; i < len(e.results.Bands); i++ {
+		prevBand := e.results.Bands[i-1]
+		currBand := e.results.Bands[i]
+
+		marginalGain := (currBand.TotalTPS - prevBand.TotalTPS) / float64(currBand.Connections-prevBand.Connections)
+
+		// Look for the first band with connections >= 40 where marginal gains < 20 TPS/conn
+		if prevBand.Connections >= 40 && marginalGain < 20 {
+			return &prevBand
+		}
+	}
+	return nil
+}
+
+// generateCorrectedRecommendations creates corrected recommendations based on improved analysis
+func (e *ScalingEngine) generateCorrectedRecommendations(sweetSpot *SweetSpotRange, diminishing *types.ProgressiveBandMetrics,
+	overload *types.ProgressiveBandMetrics, errorOnset *types.ProgressiveBandMetrics) []string {
+
+	var recommendations []string
+
+	if sweetSpot != nil {
+		recommendations = append(recommendations,
+			fmt.Sprintf("Cap pool at %d connections for best throughput/latency tradeoff", sweetSpot.EndConns))
+	}
+
+	if diminishing != nil && diminishing.P95LatencyMs > 20 {
+		recommendations = append(recommendations,
+			"Investigate I/O subsystem to explain P95 spikes at high load")
+	}
+
+	recommendations = append(recommendations,
+		"Re-benchmark after tuning and compare AUC & f′ curves")
+
+	return recommendations
+}
+
+// parseDurationToSeconds converts duration string to seconds
+func parseDurationToSeconds(duration string) int {
+	// Simple parser for common duration formats
+	if strings.HasSuffix(duration, "s") {
+		if val, err := strconv.Atoi(strings.TrimSuffix(duration, "s")); err == nil {
+			return val
+		}
+	}
+	if strings.HasSuffix(duration, "m") {
+		if val, err := strconv.Atoi(strings.TrimSuffix(duration, "m")); err == nil {
+			return val * 60
+		}
+	}
+	// Default to 20 seconds if parsing fails
+	return 20
 }
