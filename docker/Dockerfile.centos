@@ -6,11 +6,10 @@ RUN cd /etc/yum.repos.d/ && \
     sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
     sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
 
-# Install build dependencies and testing tools
+# Install build dependencies and testing tools (without golang)
 RUN yum update -y && yum groupinstall -y "Development Tools" && \
     yum install -y \
     git \
-    golang \
     ruby \
     ruby-devel \
     rubygems \
@@ -21,7 +20,19 @@ RUN yum update -y && yum groupinstall -y "Development Tools" && \
     curl \
     gzip \
     man-db \
+    wget \
+    tar \
     && yum clean all
+
+# Install Go 1.22 from official source
+RUN wget https://go.dev/dl/go1.22.10.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.22.10.linux-amd64.tar.gz && \
+    rm go1.22.10.linux-amd64.tar.gz
+
+# Add Go to PATH
+ENV PATH="/usr/local/go/bin:$PATH"
+ENV GOPATH="/root/go"
+ENV PATH="$GOPATH/bin:$PATH"
 
 # Install FPM for package building
 RUN gem install fpm

@@ -8,18 +8,27 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
-    golang-go \
     ruby \
     ruby-dev \
     rubygems \
+    curl \
     dpkg-dev \
     lintian \
     postgresql-client \
     make \
-    curl \
     gzip \
     man-db \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Go 1.22 from official source
+RUN wget https://go.dev/dl/go1.22.10.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.22.10.linux-amd64.tar.gz && \
+    rm go1.22.10.linux-amd64.tar.gz
+
+# Add Go to PATH
+ENV PATH="/usr/local/go/bin:$PATH"
+ENV GOPATH="/root/go"
+ENV PATH="$GOPATH/bin:$PATH"
 
 # Install FPM for package building
 RUN gem install fpm
