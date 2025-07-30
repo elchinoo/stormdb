@@ -63,9 +63,9 @@ func (e *ScalingEngine) generateProgressiveReport() {
 // generateRawMetricsSection generates section 1: Raw & Stability Metrics
 func (e *ScalingEngine) generateRawMetricsSection() {
 	fmt.Println("1) RAW & STABILITY METRICS BY BAND")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println("| Band | Conns |  Avg TPS  | StdDev |   CV %  | Lat P50 (ms) | Lat P95 (ms) | Lat P99 (ms) |")
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------------------------------------")
+	fmt.Println("| Band | Conns |   Avg TPS   | StdDev |  CV %  | P50 (ms) | P95 (ms)  | P99 (ms)  |")
+	fmt.Println("-------------------------------------------------------------------------------------------")
 
 	for i, band := range e.results.Bands {
 		// Calculate TPS statistics from samples
@@ -94,13 +94,13 @@ func (e *ScalingEngine) generateRawMetricsSection() {
 			margin := 1.96 * standardError
 			lower := band.TotalTPS - margin
 			upper := band.TotalTPS + margin
-			confidenceInterval = fmt.Sprintf("(CI: %.1f–%.1f)", lower, upper)
+			confidenceInterval = fmt.Sprintf("CI: %.1f–%.1f", lower, upper)
 		}
 
 		cv = sanitizeFloat(cv)
 		tpsStdDev = sanitizeFloat(tpsStdDev)
 
-		fmt.Printf("|  %2d  |  %3d | %9.1f | %6.1f | %6.2f |     %6.2f   |     %6.2f   |     %6.2f   |\n",
+		fmt.Printf("|  %2d  |  %3d | %11.1f | %6.1f | %5.2f |   %6.2f |  %8.2f | %9.2f |\n",
 			i+1,
 			band.Connections,
 			sanitizeFloat(band.TotalTPS),
@@ -111,12 +111,12 @@ func (e *ScalingEngine) generateRawMetricsSection() {
 			sanitizeFloat(band.P99LatencyMs),
 		)
 
-		// Add confidence interval line
+		// Add confidence interval line with better formatting
 		if confidenceInterval != "" {
-			fmt.Printf("|      |      |   %s |        |         |              |              |              |\n", confidenceInterval)
+			fmt.Printf("|      |      | %11s |        |       |          |           |           |\n", confidenceInterval)
 		}
 	}
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------------------------------------")
 	fmt.Println("* CV (coefficient of variation) = StdDev / Avg TPS – lower = steadier throughput.")
 	fmt.Println("* CI = 95% confidence interval for average TPS")
 	fmt.Println()
@@ -125,9 +125,9 @@ func (e *ScalingEngine) generateRawMetricsSection() {
 // generateMarginalGainsSection generates section 2: Marginal Throughput Gains
 func (e *ScalingEngine) generateMarginalGainsSection() {
 	fmt.Println("2) MARGINAL THROUGHPUT GAINS (1st derivative f′ = ΔTPS/ΔConns)")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println("| Segment   | ΔTPS   | ΔConns |  f′ (TPS/conn) |  Interpretation                   |")
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------------------------------------")
+	fmt.Println("| Segment   |   ΔTPS   | ΔConns | f′ (TPS/conn) | Interpretation                      |")
+	fmt.Println("-------------------------------------------------------------------------------------------")
 
 	for i := 1; i < len(e.results.Bands); i++ {
 		prevBand := e.results.Bands[i-1]
@@ -145,7 +145,7 @@ func (e *ScalingEngine) generateMarginalGainsSection() {
 		// Generate interpretation
 		interpretation := e.interpretMarginalGain(marginalGain)
 
-		fmt.Printf("| %3d → %-3d | %6.1f |    %2d  |     %6.1f     | %-33s |\n",
+		fmt.Printf("| %3d → %-3d | %8.1f |   %2d   |     %8.1f  | %-35s |\n",
 			prevBand.Connections,
 			currBand.Connections,
 			deltaTPS,
@@ -155,20 +155,20 @@ func (e *ScalingEngine) generateMarginalGainsSection() {
 		)
 	}
 
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------------------------------------")
 	fmt.Println()
 }
 
 // generateInflectionSection generates section 3: Inflection of Returns (2nd derivative)
 func (e *ScalingEngine) generateInflectionSection() {
 	fmt.Println("3) INFLECTION OF RETURNS (2nd derivative f″)")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println("| Transition       | Δf′   | ΔConns | f″ = Δf′/Δc  | What it means                       |")
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------------------------------------")
+	fmt.Println("| Transition         |  Δf′  | ΔConns | f″ = Δf′/Δc | What it means                     |")
+	fmt.Println("-------------------------------------------------------------------------------------------")
 
 	if len(e.results.Bands) < 3 {
-		fmt.Println("| Need at least 3 bands for second derivative analysis                          |")
-		fmt.Println("--------------------------------------------------------------------------------")
+		fmt.Println("| Need at least 3 bands for second derivative analysis                                   |")
+		fmt.Println("-------------------------------------------------------------------------------------------")
 		fmt.Println()
 		return
 	}
@@ -206,21 +206,21 @@ func (e *ScalingEngine) generateInflectionSection() {
 
 		interpretation := e.interpretSecondDerivative(secondDerivative)
 
-		fmt.Printf("| (%d→%d)→(%d→%d) | %5.1f |   %2d   |   %6.2f     | %-35s |\n",
+		fmt.Printf("| (%d→%d)→(%d→%d)   | %5.1f |   %2d   |   %8.2f  | %-33s |\n",
 			band1.Connections, band2.Connections, band2.Connections, band3.Connections,
 			deltaF, deltaConns, secondDerivative, interpretation)
 	}
 
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------------------------------------")
 	fmt.Println()
 }
 
 // generateCumulativeCapacitySection generates section 4: Cumulative Capacity (AUC)
 func (e *ScalingEngine) generateCumulativeCapacitySection() {
 	fmt.Println("4) CUMULATIVE CAPACITY (AUC via trapezoidal rule)")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println("| Segment   | Avg TPS  | ΔConns | Area (TPS·conns) |")
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("---------------------------------------------------------------------------------")
+	fmt.Println("| Segment   |  Avg TPS  | ΔConns |   Area (TPS·conns)   |")
+	fmt.Println("---------------------------------------------------------------------------------")
 
 	totalArea := 0.0
 
@@ -234,7 +234,7 @@ func (e *ScalingEngine) generateCumulativeCapacitySection() {
 
 		totalArea += area
 
-		fmt.Printf("| %3d – %-3d | %8.1f |   %2d   |     %8.0f     |\n",
+		fmt.Printf("| %3d – %-3d | %9.1f |   %2d   |       %10.0f     |\n",
 			prevBand.Connections,
 			currBand.Connections,
 			avgTPS,
@@ -243,8 +243,8 @@ func (e *ScalingEngine) generateCumulativeCapacitySection() {
 		)
 	}
 
-	fmt.Printf("| **Total** |          |        |  **%8.0f**     |\n", totalArea)
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Printf("| **Total** |           |        |    **%10.0f**     |\n", totalArea)
+	fmt.Println("---------------------------------------------------------------------------------")
 	fmt.Println("* AUC = total \"connection·TPS units\" over tested range. Use this to compare systems.")
 	fmt.Println()
 }
@@ -252,12 +252,12 @@ func (e *ScalingEngine) generateCumulativeCapacitySection() {
 // generateLatencyProfileSection generates section 5: Latency Profile
 func (e *ScalingEngine) generateLatencyProfileSection() {
 	fmt.Println("5) LATENCY PROFILE")
-	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Println("| Conns | Lat P50 (ms) | Lat P95 (ms) | Lat P99 (ms) |")
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------")
+	fmt.Println("| Conns | P50 (ms) | P95 (ms)  | P99 (ms)  |")
+	fmt.Println("-------------------------------------------------------------")
 
 	for _, band := range e.results.Bands {
-		fmt.Printf("| %5d |    %6.2f   |    %6.2f   |    %6.2f   |\n",
+		fmt.Printf("| %5d |  %7.2f |  %8.2f | %9.2f |\n",
 			band.Connections,
 			sanitizeFloat(band.P50LatencyMs),
 			sanitizeFloat(band.P95LatencyMs),
@@ -265,7 +265,7 @@ func (e *ScalingEngine) generateLatencyProfileSection() {
 		)
 	}
 
-	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------")
 	fmt.Println("* Notice how latency patterns change - watch for spikes indicating bottlenecks.")
 	fmt.Println()
 }
