@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IMDB Plugin**: Movie database workload with complex queries and realistic data patterns
 - **Vector Plugin**: High-dimensional vector similarity search testing (requires pgvector)
 - **E-commerce Plugin**: Modern retail platform with inventory, orders, and analytics
-- **RealWorld Plugin**: Enterprise application workloads with business logic patterns
+- **E-commerce Basic Plugin**: Basic e-commerce workloads with standard OLTP patterns
 
 #### Core Features
 - **Dynamic Plugin Loading**: Load workload plugins at runtime without recompilation

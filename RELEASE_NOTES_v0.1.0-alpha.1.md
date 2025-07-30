@@ -32,7 +32,7 @@ We're excited to announce the **first alpha release** of StormDB, a comprehensiv
 - **IMDB Plugin**: Movie database workload with complex queries and realistic data patterns
 - **Vector Plugin**: High-dimensional vector similarity search testing (requires pgvector)
 - **E-commerce Plugin**: Modern retail platform with inventory, orders, and analytics
-- **RealWorld Plugin**: Enterprise application workloads with business logic patterns
+- **E-commerce Basic Plugin**: Basic e-commerce workloads with standard OLTP patterns
 
 #### **Advanced Metrics & Analysis**
 - **Transaction Performance**: TPS, latency percentiles, success rates
@@ -148,7 +148,7 @@ EOF
 | **IMDB** | Movie database with complex queries | `imdb_read`, `imdb_write`, `imdb_mixed`, `imdb_sql` | PostgreSQL 12+ |
 | **Vector** | High-dimensional vector operations | `pgvector_*`, `vector_cosine`, `vector_inner` | pgvector extension |
 | **E-commerce** | Retail platform simulation | `ecommerce_read`, `ecommerce_write`, `ecommerce_mixed` | PostgreSQL 12+ |
-| **RealWorld** | Enterprise business logic | `realworld` | PostgreSQL 12+ |
+| **E-commerce Basic** | Basic e-commerce patterns | `ecommerce_basic` | PostgreSQL 12+ |
 
 ### **Building Plugins**
 ```bash

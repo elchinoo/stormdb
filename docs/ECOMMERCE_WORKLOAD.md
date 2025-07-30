@@ -330,9 +330,9 @@ ORDER BY similarity ASC
 LIMIT 10;
 ```
 
-## Migration from RealWorld
+## Migration from E-commerce Basic
 
-The E-Commerce workload is a complete replacement for the previous "realworld" workload with the following improvements:
+The E-Commerce workload is a complete replacement for the previous "ecommerce_basic" workload with the following improvements:
 
 ### Enhanced Features
 - **Vendor Management**: Complete supplier relationship tracking
@@ -347,7 +347,7 @@ The E-Commerce workload is a complete replacement for the previous "realworld" w
 - **Triggers**: Automated stock control and pricing triggers
 
 ### Backward Compatibility
-- All existing "realworld" configurations continue to work
+- All existing "ecommerce_basic" configurations continue to work
 - New "ecommerce" configurations provide enhanced functionality
 - Gradual migration path available through configuration updates
 

@@ -79,7 +79,7 @@ StormDB uses a modular plugin architecture that separates core functionality fro
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
 │                                                                 │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │ RealWorld       │  │   Custom        │  │    Future       │  │
+│  │ E-commerce Basic│  │   Custom        │  │    Future       │  │
 │  │  Plugin         │  │   Plugins       │  │   Plugins       │  │
 │  │  • Enterprise   │  │  • User-defined │  │  • Community    │  │
 │  │  • OLTP/OLAP    │  │  • Specific     │  │  • Extensions   │  │
@@ -261,7 +261,7 @@ plugins:
 | **IMDB** | Movie database with complex queries | `imdb_read`, `imdb_write`, `imdb_mixed`, `imdb_sql` |
 | **Vector** | High-dimensional vector operations | `pgvector_*`, `vector_cosine`, `vector_inner` |
 | **E-commerce** | Retail platform simulation | `ecommerce_read`, `ecommerce_write`, `ecommerce_mixed` |
-| **RealWorld** | Enterprise business logic | `realworld` |
+| **E-commerce Basic** | Basic e-commerce patterns | `ecommerce_basic` |
 
 ### Building Plugins
 
@@ -660,7 +660,7 @@ StormDB now supports a plugin architecture for extended workloads. The following
 |--------|-----------|-------------|---------------|
 | **IMDB Plugin** | `imdb_read`, `imdb_write`, `imdb_mixed` | Movie database workloads with complex queries | PostgreSQL 12+ |
 | **Vector Plugin** | `vector_1024`, `vector_1024_cosine`, `vector_1024_inner` | High-dimensional vector similarity search | pgvector extension |
-| **RealWorld Plugin** | `realworld`, `realworld_read`, `realworld_write`, `realworld_mixed`, `realworld_oltp`, `realworld_analytics` | Enterprise application patterns | PostgreSQL 12+ |
+| **E-commerce Basic Plugin** | `ecommerce_basic`, `ecommerce_basic_read`, `ecommerce_basic_write`, `ecommerce_basic_mixed`, `ecommerce_basic_oltp`, `ecommerce_basic_analytics` | Basic e-commerce patterns | PostgreSQL 12+ |
 | **E-commerce Plugin** | `ecommerce`, `ecommerce_read`, `ecommerce_write`, `ecommerce_mixed`, `ecommerce_oltp`, `ecommerce_analytics` | Modern e-commerce platform simulation | pgvector extension |
 
 ### Building and Using Plugins

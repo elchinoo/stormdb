@@ -4,7 +4,7 @@
 
 ## 🚀 Highlights
 
-- **🔌 Plugin Architecture**: Dynamic workload loading with 4 built-in plugins (IMDB, Vector, E-commerce, RealWorld)
+- **🔌 Plugin Architecture**: Dynamic workload loading with 4 built-in plugins (IMDB, Vector, E-commerce, E-commerce Basic)
 - **📊 Built-in Workloads**: TPC-C, Simple operations, Connection overhead testing
 - **🧪 Comprehensive Testing**: 26 passing unit tests + integration/load tests
 - **🐳 Production Ready**: Docker support with CGO plugin compilation
@@ -46,7 +46,7 @@ docker run --rm elchinoo/stormdb:v0.1.0-alpha.1 --help
 - `imdb_mixed` - Movie database with complex queries
 - `vector_cosine` - pgvector similarity search (requires pgvector)
 - `ecommerce_mixed` - Modern retail platform simulation
-- `realworld` - Enterprise business logic patterns
+- `ecommerce_basic` - Basic e-commerce OLTP patterns
 
 ## 📊 What You Get
 

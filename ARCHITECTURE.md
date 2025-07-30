@@ -58,7 +58,7 @@
     │                            🔌 Dynamically Loaded                           │
     │                                                                             │
     │ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────┐ │
-    │ │  🎬 IMDB        │ │  🔍 Vector      │ │  🛒 E-commerce  │ │ 🏢 RealWorld│ │
+    │ │  🎬 IMDB        │ │  🔍 Vector      │ │  🛒 E-commerce  │ │ 🛍️ Ecom Basic│ │
     │ │  Plugin         │ │  Plugin         │ │  Plugin         │ │  Plugin     │ │ 
     │ │                 │ │                 │ │                 │ │             │ │
     │ │• Movie DB       │ │• pgvector       │ │• Orders         │ │• Enterprise │ │
@@ -66,7 +66,8 @@
     │ │  Queries        │ │  Search         │ │• Analytics      │ │• Business   │ │
     │ │• Analytics      │ │• High-dim       │ │• Vendors        │ │  Logic      │ │
     │ │                 │ │  Vectors        │ │• Reviews        │ │             │ │
-    │ │📁 imdb_plugin   │ │📁 vector_plugin │ │📁 ecommerce_    │ │📁 realworld_│ │
+    │ │📁 imdb_plugin   │ │📁 vector_plugin │ │📁 ecommerce_    │ │📁 ecommerce_│ │
+    │ │                │ │                │ │   plugin       │ │   basic_    │ │
     │ │   .so           │ │   .so           │ │   plugin.so     │ │   plugin.so │ │
     │ └─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────┘ │
     │                                                                             │
@@ -101,7 +102,7 @@
   📋 Key Features:
   • Modular plugin architecture with dynamic loading
   • Built-in workloads (TPCC, Simple, Connection Overhead) 
-  • Plugin workloads (IMDB, Vector, E-commerce, RealWorld)
+  • Plugin workloads (IMDB, Vector, E-commerce, E-commerce Basic)
   • Comprehensive PostgreSQL monitoring and metrics
   • Easy extensibility through custom plugin development
   • Production-ready performance testing capabilities

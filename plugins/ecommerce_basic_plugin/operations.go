@@ -1,4 +1,4 @@
-// internal/workload/realworld/operations.go
+// internal/workload/ecommerce_basic/operations.go
 package main
 
 import (
@@ -14,7 +14,7 @@ import (
 // READ OPERATIONS - Mix of indexed and non-indexed queries
 
 // executeReadOperation performs various read operations
-func (w *RealWorldWorkload) executeReadOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) (string, error) {
+func (w *ECommerceBasicWorkload) executeReadOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) (string, error) {
 	operations := []func(context.Context, *pgxpool.Pool, *rand.Rand) error{
 		// Simple indexed queries (40% of reads)
 		w.getUserByEmail,        // Uses unique index on email
@@ -79,7 +79,7 @@ func (w *RealWorldWorkload) executeReadOperation(ctx context.Context, db *pgxpoo
 // Simple indexed queries
 
 // getUserByEmail retrieves user by email (uses unique index)
-func (w *RealWorldWorkload) getUserByEmail(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getUserByEmail(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 	email := fmt.Sprintf("user%d@example.com", userID)
 
@@ -99,7 +99,7 @@ func (w *RealWorldWorkload) getUserByEmail(ctx context.Context, db *pgxpool.Pool
 }
 
 // getProductBySKU retrieves product by SKU (uses unique index)
-func (w *RealWorldWorkload) getProductBySKU(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getProductBySKU(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	productID := rng.Intn(500) + 1
 	sku := fmt.Sprintf("SKU-%06d", productID)
 
@@ -120,7 +120,7 @@ func (w *RealWorldWorkload) getProductBySKU(ctx context.Context, db *pgxpool.Poo
 }
 
 // getProductsByCategory retrieves products by category (uses index)
-func (w *RealWorldWorkload) getProductsByCategory(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getProductsByCategory(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	categories := []string{"Electronics", "Books", "Clothing", "Home & Garden", "Sports", "Beauty"}
 	category := categories[rng.Intn(len(categories))]
 
@@ -151,7 +151,7 @@ func (w *RealWorldWorkload) getProductsByCategory(ctx context.Context, db *pgxpo
 // Complex join queries
 
 // getOrderDetailsWithItems retrieves order with all items (multi-table join)
-func (w *RealWorldWorkload) getOrderDetailsWithItems(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getOrderDetailsWithItems(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	orderID := rng.Intn(2000) + 1
 
 	rows, err := db.Query(ctx, `
@@ -191,7 +191,7 @@ func (w *RealWorldWorkload) getOrderDetailsWithItems(ctx context.Context, db *pg
 }
 
 // getUserActivitySummary gets comprehensive user activity (complex join)
-func (w *RealWorldWorkload) getUserActivitySummary(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getUserActivitySummary(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 
 	var firstName, lastName string
@@ -247,7 +247,7 @@ func (w *RealWorldWorkload) getUserActivitySummary(ctx context.Context, db *pgxp
 // Full table scan / non-indexed queries
 
 // getUserOrders retrieves user's recent orders (uses index on user_id)
-func (w *RealWorldWorkload) getUserOrders(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getUserOrders(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 
 	rows, err := db.Query(ctx, `
@@ -275,7 +275,7 @@ func (w *RealWorldWorkload) getUserOrders(ctx context.Context, db *pgxpool.Pool,
 }
 
 // getProductReviews retrieves reviews for a product (uses index on product_id)
-func (w *RealWorldWorkload) getProductReviews(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getProductReviews(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	productID := rng.Intn(500) + 1
 
 	rows, err := db.Query(ctx, `
@@ -310,7 +310,7 @@ func (w *RealWorldWorkload) getProductReviews(ctx context.Context, db *pgxpool.P
 }
 
 // getProductAnalytics retrieves product analytics data (join with analytics data)
-func (w *RealWorldWorkload) getProductAnalytics(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getProductAnalytics(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	productID := rng.Intn(500) + 1
 
 	rows, err := db.Query(ctx, `
@@ -342,7 +342,7 @@ func (w *RealWorldWorkload) getProductAnalytics(ctx context.Context, db *pgxpool
 }
 
 // getRecentActivity retrieves recent platform activity (date range query)
-func (w *RealWorldWorkload) getRecentActivity(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getRecentActivity(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	hoursBack := rng.Intn(72) + 1 // 1-72 hours back
 
 	query := fmt.Sprintf(`
@@ -389,7 +389,7 @@ func (w *RealWorldWorkload) getRecentActivity(ctx context.Context, db *pgxpool.P
 }
 
 // getInventoryAnalysis performs complex CTE analysis on inventory
-func (w *RealWorldWorkload) getInventoryAnalysis(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getInventoryAnalysis(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	rows, err := db.Query(ctx, `
 		WITH inventory_summary AS (
 			SELECT 
@@ -444,7 +444,7 @@ func (w *RealWorldWorkload) getInventoryAnalysis(ctx context.Context, db *pgxpoo
 }
 
 // searchProductsByName performs full-text search on product names
-func (w *RealWorldWorkload) searchProductsByName(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) searchProductsByName(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	searchTerms := []string{"smartphone", "laptop", "camera", "headphones", "watch", "shoes", "jacket", "table", "chair"}
 	searchTerm := searchTerms[rng.Intn(len(searchTerms))]
 
@@ -473,7 +473,7 @@ func (w *RealWorldWorkload) searchProductsByName(ctx context.Context, db *pgxpoo
 }
 
 // findSimilarUsers finds users with similar preferences (complex non-indexed query)
-func (w *RealWorldWorkload) findSimilarUsers(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) findSimilarUsers(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 
 	rows, err := db.Query(ctx, `
@@ -511,7 +511,7 @@ func (w *RealWorldWorkload) findSimilarUsers(ctx context.Context, db *pgxpool.Po
 // Window functions and CTE queries
 
 // getTopProductsByCategory uses window functions for ranking
-func (w *RealWorldWorkload) getTopProductsByCategory(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getTopProductsByCategory(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	rows, err := db.Query(ctx, `
 		SELECT 
 			category,
@@ -544,7 +544,7 @@ func (w *RealWorldWorkload) getTopProductsByCategory(ctx context.Context, db *pg
 }
 
 // getUserSpendingTrends uses CTEs with window functions for trend analysis
-func (w *RealWorldWorkload) getUserSpendingTrends(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) getUserSpendingTrends(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 
 	rows, err := db.Query(ctx, `
@@ -591,7 +591,7 @@ func (w *RealWorldWorkload) getUserSpendingTrends(ctx context.Context, db *pgxpo
 // Write Operations for OLTP workloads
 
 // executeWriteOperation performs various write operations
-func (w *RealWorldWorkload) executeWriteOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) executeWriteOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	operations := []func(context.Context, *pgxpool.Pool, *rand.Rand) error{
 		w.createUser,
 		w.createProduct,
@@ -608,7 +608,7 @@ func (w *RealWorldWorkload) executeWriteOperation(ctx context.Context, db *pgxpo
 }
 
 // executeOLTPReadOperation performs OLTP-style read operations (fast, indexed queries)
-func (w *RealWorldWorkload) executeOLTPReadOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) executeOLTPReadOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	operations := []func(context.Context, *pgxpool.Pool, *rand.Rand) error{
 		w.getUserByEmail,
 		w.getProductBySKU,
@@ -622,7 +622,7 @@ func (w *RealWorldWorkload) executeOLTPReadOperation(ctx context.Context, db *pg
 }
 
 // executeOLTPWriteOperation performs OLTP-style write operations
-func (w *RealWorldWorkload) executeOLTPWriteOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) executeOLTPWriteOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	operations := []func(context.Context, *pgxpool.Pool, *rand.Rand) error{
 		w.createOrder,
 		w.updateInventory,
@@ -635,7 +635,7 @@ func (w *RealWorldWorkload) executeOLTPWriteOperation(ctx context.Context, db *p
 }
 
 // executeAnalyticsOperation performs analytics-style queries (complex, resource-intensive)
-func (w *RealWorldWorkload) executeAnalyticsOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) executeAnalyticsOperation(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	operations := []func(context.Context, *pgxpool.Pool, *rand.Rand) error{
 		w.getUserSpendingTrends,
 		w.getTopProductsByCategory,
@@ -651,23 +651,24 @@ func (w *RealWorldWorkload) executeAnalyticsOperation(ctx context.Context, db *p
 // Individual write operations
 
 // createUser creates a new user account
-func (w *RealWorldWorkload) createUser(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) createUser(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	firstName := fmt.Sprintf("User%d", rng.Intn(10000))
 	lastName := fmt.Sprintf("Test%d", rng.Intn(10000))
 	email := fmt.Sprintf("user%d@example.com", rng.Intn(100000))
+	username := fmt.Sprintf("user%d", rng.Intn(100000))
 	countries := []string{"US", "CA", "GB", "DE", "FR", "JP", "AU"}
 	country := countries[rng.Intn(len(countries))]
 
 	_, err := db.Exec(ctx, `
-		INSERT INTO users (first_name, last_name, email, country, date_of_birth, account_status, created_at)
-		VALUES ($1, $2, $3, $4, $5, 'active', NOW())`,
-		firstName, lastName, email, country, time.Now().AddDate(-rng.Intn(50)-18, 0, 0))
+		INSERT INTO users (username, first_name, last_name, email, country, date_of_birth, account_status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW())`,
+		username, firstName, lastName, email, country, time.Now().AddDate(-rng.Intn(50)-18, 0, 0))
 
 	return err
 }
 
 // createProduct adds a new product
-func (w *RealWorldWorkload) createProduct(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) createProduct(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	categories := []string{"Electronics", "Books", "Clothing", "Home & Garden", "Sports", "Beauty"}
 	brands := []string{"BrandA", "BrandB", "BrandC", "BrandD", "BrandE"}
 
@@ -686,7 +687,7 @@ func (w *RealWorldWorkload) createProduct(ctx context.Context, db *pgxpool.Pool,
 }
 
 // createOrder creates a new order with items
-func (w *RealWorldWorkload) createOrder(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) createOrder(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		return err
@@ -739,7 +740,7 @@ func (w *RealWorldWorkload) createOrder(ctx context.Context, db *pgxpool.Pool, r
 }
 
 // updateUserInfo updates user information
-func (w *RealWorldWorkload) updateUserInfo(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) updateUserInfo(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 	spentAmount := float64(rng.Intn(1000))
 
@@ -753,7 +754,7 @@ func (w *RealWorldWorkload) updateUserInfo(ctx context.Context, db *pgxpool.Pool
 }
 
 // updateProductRating updates product average rating
-func (w *RealWorldWorkload) updateProductRating(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) updateProductRating(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	productID := rng.Intn(500) + 1
 	newRating := float64(rng.Intn(5)) + 1.0 + (float64(rng.Intn(10)) / 10.0)
 
@@ -768,14 +769,14 @@ func (w *RealWorldWorkload) updateProductRating(ctx context.Context, db *pgxpool
 }
 
 // updateInventory updates product inventory
-func (w *RealWorldWorkload) updateInventory(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) updateInventory(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	productID := rng.Intn(500) + 1
 	quantityChange := rng.Intn(20) - 10 // -10 to +9
 
 	_, err := db.Exec(ctx, `
 		UPDATE inventory 
 		SET quantity_available = GREATEST(0, quantity_available + $1),
-		    last_updated = NOW()
+		    updated_at = NOW()
 		WHERE product_id = $2`,
 		quantityChange, productID)
 
@@ -783,7 +784,7 @@ func (w *RealWorldWorkload) updateInventory(ctx context.Context, db *pgxpool.Poo
 }
 
 // createReview creates a product review
-func (w *RealWorldWorkload) createReview(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) createReview(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 	productID := rng.Intn(500) + 1
 	rating := rng.Intn(5) + 1
@@ -799,7 +800,7 @@ func (w *RealWorldWorkload) createReview(ctx context.Context, db *pgxpool.Pool, 
 }
 
 // logProductView logs a product view event for analytics
-func (w *RealWorldWorkload) logProductView(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+func (w *ECommerceBasicWorkload) logProductView(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
 	userID := rng.Intn(1000) + 1
 	productID := rng.Intn(500) + 1
 	eventTypes := []string{"view", "add_to_cart", "purchase", "wishlist_add"}

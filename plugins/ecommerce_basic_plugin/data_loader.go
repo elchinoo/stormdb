@@ -1,4 +1,4 @@
-// internal/workload/realworld/data_loader.go
+// internal/workload/ecommerce_basic/data_loader.go
 package main
 
 import (
@@ -12,7 +12,7 @@ import (
 )
 
 // loadSampleData generates realistic sample data for the e-commerce platform
-func (w *RealWorldWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, scale int) error {
+func (w *ECommerceBasicWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, scale int) error {
 	if scale <= 0 {
 		scale = 1000 // Default scale
 	}
@@ -63,7 +63,7 @@ func (w *RealWorldWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool
 }
 
 // loadUsers creates realistic user data
-func (w *RealWorldWorkload) loadUsers(ctx context.Context, db *pgxpool.Pool, count int) error {
+func (w *ECommerceBasicWorkload) loadUsers(ctx context.Context, db *pgxpool.Pool, count int) error {
 	firstNames := []string{"John", "Jane", "Michael", "Sarah", "David", "Lisa", "Robert", "Mary", "James", "Jennifer",
 		"William", "Elizabeth", "Richard", "Maria", "Joseph", "Susan", "Thomas", "Jessica", "Christopher", "Karen"}
 	lastNames := []string{"Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez",
@@ -126,7 +126,7 @@ func (w *RealWorldWorkload) loadUsers(ctx context.Context, db *pgxpool.Pool, cou
 }
 
 // loadProducts creates realistic product data
-func (w *RealWorldWorkload) loadProducts(ctx context.Context, db *pgxpool.Pool, count int) error {
+func (w *ECommerceBasicWorkload) loadProducts(ctx context.Context, db *pgxpool.Pool, count int) error {
 	categories := []string{"Electronics", "Books", "Clothing", "Home & Garden", "Sports", "Beauty", "Toys", "Automotive"}
 	brands := []string{"Samsung", "Apple", "Nike", "Adidas", "Sony", "Dell", "HP", "Canon", "KitchenAid", "IKEA"}
 	adjectives := []string{"Premium", "Ultimate", "Professional", "Deluxe", "Classic", "Modern", "Vintage", "Advanced", "Smart", "Eco-Friendly"}
@@ -193,7 +193,7 @@ func (w *RealWorldWorkload) loadProducts(ctx context.Context, db *pgxpool.Pool, 
 }
 
 // loadInventory creates inventory records for products
-func (w *RealWorldWorkload) loadInventory(ctx context.Context, db *pgxpool.Pool, productCount int) error {
+func (w *ECommerceBasicWorkload) loadInventory(ctx context.Context, db *pgxpool.Pool, productCount int) error {
 	warehouses := []string{"North America - East", "North America - West", "Europe - Central", "Asia Pacific", "South America"}
 
 	batch := 100
@@ -237,7 +237,7 @@ func (w *RealWorldWorkload) loadInventory(ctx context.Context, db *pgxpool.Pool,
 // Additional loading methods would go here (loadOrders, loadReviews, etc.)
 // For brevity, I'll implement the key ones and you can extend as needed
 
-func (w *RealWorldWorkload) loadOrders(ctx context.Context, db *pgxpool.Pool, orderCount, userCount, productCount int) error {
+func (w *ECommerceBasicWorkload) loadOrders(ctx context.Context, db *pgxpool.Pool, orderCount, userCount, productCount int) error {
 	statuses := []string{"pending", "processing", "shipped", "delivered", "cancelled", "returned"}
 
 	batch := 50
@@ -320,7 +320,7 @@ func (w *RealWorldWorkload) loadOrders(ctx context.Context, db *pgxpool.Pool, or
 	return nil
 }
 
-func (w *RealWorldWorkload) loadReviews(ctx context.Context, db *pgxpool.Pool, reviewCount, userCount, productCount int) error {
+func (w *ECommerceBasicWorkload) loadReviews(ctx context.Context, db *pgxpool.Pool, reviewCount, userCount, productCount int) error {
 	titles := []string{
 		"Great product!", "Not what I expected", "Amazing quality", "Could be better",
 		"Excellent value", "Perfect for my needs", "Would recommend", "Disappointed",
@@ -366,7 +366,7 @@ func (w *RealWorldWorkload) loadReviews(ctx context.Context, db *pgxpool.Pool, r
 	return nil
 }
 
-func (w *RealWorldWorkload) loadUserSessions(ctx context.Context, db *pgxpool.Pool, sessionCount, userCount int) error {
+func (w *ECommerceBasicWorkload) loadUserSessions(ctx context.Context, db *pgxpool.Pool, sessionCount, userCount int) error {
 	devices := []string{"desktop", "mobile", "tablet"}
 	browsers := []string{"Chrome", "Firefox", "Safari", "Edge", "Opera"}
 	operatingSystems := []string{"Windows", "macOS", "Linux", "iOS", "Android"}
@@ -412,7 +412,7 @@ func (w *RealWorldWorkload) loadUserSessions(ctx context.Context, db *pgxpool.Po
 	return nil
 }
 
-func (w *RealWorldWorkload) loadProductAnalytics(ctx context.Context, db *pgxpool.Pool, eventCount, userCount, productCount int) error {
+func (w *ECommerceBasicWorkload) loadProductAnalytics(ctx context.Context, db *pgxpool.Pool, eventCount, userCount, productCount int) error {
 	eventTypes := []string{"view", "add_to_cart", "remove_from_cart", "purchase", "wishlist_add", "wishlist_remove", "compare", "share"}
 
 	batch := 200

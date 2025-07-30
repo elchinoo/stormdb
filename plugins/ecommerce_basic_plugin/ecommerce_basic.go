@@ -1,4 +1,4 @@
-// internal/workload/realworld/realworld.go
+// internal/workload/ecommerce_basic/ecommerce_basic.go
 package main
 
 import (
@@ -15,20 +15,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// RealWorldWorkload simulates a modern e-commerce platform with social features
-// This includes: users, products, orders, inventory, reviews, recommendations, analytics
-type RealWorldWorkload struct {
+// ECommerceBasicWorkload simulates a basic e-commerce platform with standard OLTP patterns
+// This includes: users, products, orders, inventory, reviews, user sessions, product analytics
+type ECommerceBasicWorkload struct {
 	Mode string
 }
 
 // GetName returns the workload name
-func (w *RealWorldWorkload) GetName() string {
-	return "realworld_" + w.Mode
+func (w *ECommerceBasicWorkload) GetName() string {
+	return "ecommerce_basic_" + w.Mode
 }
 
-// Setup creates the real-world e-commerce schema and loads sample data
-func (w *RealWorldWorkload) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
-	log.Printf("🌍 Setting up Real-World E-Commerce workload...")
+// Setup creates the basic e-commerce schema and loads sample data
+func (w *ECommerceBasicWorkload) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
+	log.Printf("🛍️ Setting up Basic E-Commerce workload...")
 
 	// Check if schema already exists
 	var tableCount int
@@ -42,13 +42,13 @@ func (w *RealWorldWorkload) Setup(ctx context.Context, db *pgxpool.Pool, cfg *ty
 	}
 
 	if tableCount == 7 {
-		log.Printf("✅ Real-World schema already exists")
+		log.Printf("✅ Basic E-Commerce schema already exists")
 	} else {
-		log.Printf("📊 Creating Real-World E-Commerce schema...")
+		log.Printf("📊 Creating Basic E-Commerce schema...")
 		if err := w.createSchema(ctx, db); err != nil {
 			return fmt.Errorf("failed to create schema: %w", err)
 		}
-		log.Printf("✅ Real-World schema created successfully")
+		log.Printf("✅ Basic E-Commerce schema created successfully")
 	}
 
 	// Load sample data if tables are empty
@@ -59,19 +59,19 @@ func (w *RealWorldWorkload) Setup(ctx context.Context, db *pgxpool.Pool, cfg *ty
 	}
 
 	if userCount == 0 {
-		log.Printf("📊 Generating Real-World sample data...")
+		log.Printf("📊 Generating Basic E-Commerce sample data...")
 		if err := w.loadSampleData(ctx, db, cfg.Scale); err != nil {
 			return fmt.Errorf("failed to load sample data: %w", err)
 		}
 	} else {
-		log.Printf("✅ Real-World data already exists (%d users)", userCount)
+		log.Printf("✅ Basic E-Commerce data already exists (%d users)", userCount)
 	}
 
 	return nil
 }
 
-// createSchema creates all the tables for the real-world workload
-func (w *RealWorldWorkload) createSchema(ctx context.Context, db *pgxpool.Pool) error {
+// createSchema creates all the tables for the basic e-commerce workload
+func (w *ECommerceBasicWorkload) createSchema(ctx context.Context, db *pgxpool.Pool) error {
 	schemas := []string{
 		// Users table - customer data with demographics and preferences
 		`CREATE TABLE users (
@@ -276,7 +276,7 @@ func (w *RealWorldWorkload) createSchema(ctx context.Context, db *pgxpool.Pool) 
 }
 
 // Cleanup drops all real-world tables
-func (w *RealWorldWorkload) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
+func (w *ECommerceBasicWorkload) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
 	log.Printf("🧹 Cleaning up Real-World workload...")
 
 	tables := []string{
@@ -302,7 +302,7 @@ func (w *RealWorldWorkload) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *
 }
 
 // Run executes the real-world workload based on the configured mode
-func (w *RealWorldWorkload) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics) error {
+func (w *ECommerceBasicWorkload) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics) error {
 	log.Printf("🌍 Starting Real-World %s workload...", w.Mode)
 
 	// Initialize worker-specific metrics tracking
@@ -335,7 +335,7 @@ func (w *RealWorldWorkload) Run(ctx context.Context, db *pgxpool.Pool, cfg *type
 }
 
 // worker executes database operations based on the workload mode
-func (w *RealWorldWorkload) worker(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics, workerID int) {
+func (w *ECommerceBasicWorkload) worker(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics, workerID int) {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
 
 	for {

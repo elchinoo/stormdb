@@ -12,7 +12,7 @@ database:
   sslmode: "disable"
 
 # Load settings
-workload: "realworld"     # Real-world e-commerce workload
+workload: "ecommerce_basic"     # Real-world e-commerce workload
 scale: 1000               # Number of users to generate (also scales other data)
 duration: "30s"           # Duration of the test (5 minutes)
 workers: 10               # Number of concurrent worker threads

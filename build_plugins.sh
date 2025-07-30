@@ -14,7 +14,7 @@ mkdir -p build/plugins
 PLUGINS=(
     "imdb_plugin"
     "vector_plugin" 
-    "realworld_plugin"
+    "ecommerce_basic_plugin"
     "ecommerce_plugin"
 )
 
