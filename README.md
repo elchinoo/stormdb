@@ -26,7 +26,7 @@ StormDB is a comprehensive PostgreSQL benchmarking and load testing tool designe
 - **IMDB**: Movie database workload with complex queries and realistic data patterns
 - **Vector Operations**: High-dimensional vector similarity search testing (requires pgvector)
 - **E-commerce**: Modern retail platform with inventory, orders, and analytics
-- **Real-world**: Enterprise application workloads with business logic patterns
+- **E-commerce Basic**: Simplified retail platform with standard OLTP patterns
 
 ### 📊 Advanced Metrics & Analysis
 - **Transaction Performance**: TPS, latency percentiles, success rates
@@ -271,7 +271,7 @@ plugins:
 | **IMDB** | Movie database with complex queries | `imdb_read`, `imdb_write`, `imdb_mixed`, `imdb_sql` |
 | **Vector** | High-dimensional vector operations | `pgvector_*`, `vector_cosine`, `vector_inner` |
 | **E-commerce** | Retail platform simulation | `ecommerce_read`, `ecommerce_write`, `ecommerce_mixed` |
-| **E-commerce Basic** | Basic e-commerce patterns | `ecommerce_basic` |
+| **E-commerce Basic** | Basic e-commerce patterns | `ecommerce_basic_mixed`, `ecommerce_basic_read`, `ecommerce_basic_write` |
 
 ### Building Plugins
 
@@ -574,7 +574,7 @@ make plugins
 ./stormdb --config config/config_ecommerce_mixed.yaml
 
 # Test connection overhead (built-in)
-./stormdb --config config/config_connection_overhead.yaml
+./stormdb --config config/config_simple_connection.yaml
 ```
 
 ### Setup Options
@@ -1567,43 +1567,49 @@ progressive:
 
 **Example Progressive Output:**
 ```
-🎯 Starting progressive scaling test with 6 bands (3 hours total)
-📊 Strategy: linear, Band Duration: 30m, Warmup: 1m, Cooldown: 30s
+▲ PROGRESSIVE CONNECTION SCALING RESULTS
+================================================================================
+Database: PostgreSQL 15.2 (localhost:5432/test)
+Workload: tpcc (Scale: 10)
+Strategy: linear  |  Bands: 6  |  Duration: 3h 0m  |  Started: 2025-07-30 14:30:22
 
-🔄 Band 1/6: 10 workers, 20 connections
-🔥 Warming up for 60s...
-� REALTIME [30m] TPS: 1,234.5 | Latency: P50=15.2ms P95=45.3ms
-�📊 Band 1 completed: 1,234 TPS, 45.2ms avg latency, 0.0% errors
+1) PERFORMANCE PROGRESSION
+-------------------------------------------------------------
+| Bd | Conn |     TPS     | LatP95 | Err% |   MG/C   |  f'(x)   |   f''(x)  |
+-------------------------------------------------------------
+|  1 |   10 |      1234.5 |  25.1 | 0.00 |       -- |       -- |        -- |
+|  2 |   20 |      2346.8 |  28.4 | 0.00 |   111.23 |   111.23 |        -- |
+|  3 |   30 |      3257.2 |  35.2 | 0.10 |    91.04 |    91.04 |    -20.19 |
+|  4 |   40 |      3847.6 |  45.8 | 0.30 |    59.04 |    59.04 |    -32.00 |
+|  5 |   50 |      4123.8 |  67.2 | 1.20 |    27.62 |    27.62 |    -31.42 |
+|  6 |   60 |      4234.1 |  89.4 | 2.30 |    11.03 |    11.03 |    -16.59 |
+-------------------------------------------------------------
+* MG/C = Marginal Gain per Connection, f'(x) = First Derivative, f''(x) = Second Derivative
 
-🔄 Band 3/6: 30 workers, 60 connections  
-📈 REALTIME [30m] TPS: 3,456.7 | Latency: P50=25.1ms P95=67.8ms
-📊 Band 3 completed: 3,457 TPS, 67.1ms avg latency, 0.1% errors
+2) BOTTLENECK CLASSIFICATION
+-------------------------------------------------------------
+• Sweet spot: 20–30 connections
+  – Exceptional scaling (f′ ≥ 64 TPS/conn)
+  – Latency P95 ≤ 35 ms
 
-🔄 Band 6/6: 60 workers, 120 connections
-📈 REALTIME [30m] TPS: 4,123.8 | Latency: P50=89.4ms P95=234.5ms
-📊 Band 6 completed: 4,124 TPS, 189.1ms avg latency, 2.3% errors
+• Diminishing returns after 40 connections
+  – Marginal gains < 20 TPS/conn
+  – Latency P95 > 20 ms
 
-✅ Progressive scaling completed successfully
+• Regression at 60 connections
+  – Negative second derivative (-16.59 TPS/conn²)
+  – Errors ≈2.3 err/s, P95 ≈89 ms
 
-📊 Mathematical Analysis Results:
-┌─────────────────────────────────────────────────────────────────┐
-│                    Performance Summary                          │
-├─────────────────────────────────────────────────────────────────┤
-│ Optimal Configuration: 40 workers, 80 connections              │
-│ Peak TPS: 4,124 (60W/120C)                                     │ 
-│ Optimal TPS: 3,789 (40W/80C) - Best efficiency                 │
-│ Scaling Efficiency: Linear until band 4, then diminishing      │
-│ Bottleneck Type: Queue saturation at high connection counts    │
-│ Inflection Points: Band 4 (deceleration), Band 5 (saturation) │
-│ Curve Fit: Logarithmic (R²=0.94)                               │
-│ Utilization Factor: 0.73 (optimal), 0.91 (peak)               │
-└─────────────────────────────────────────────────────────────────┘
+• Total capacity = 242,046 conn·TPS units
+  – Use as a single scalar to compare runs
 
-🎯 Recommendations:
-• Use 40-50 workers for optimal efficiency (TPS per worker)
-• Connection pool size: 80-100 connections recommended
-• Beyond 50 workers: diminishing returns due to queue contention
-• Consider partitioning workload if higher TPS needed
+3) KEY TAKEAWAYS & NEXT STEPS
+--------------------------------------------------------------------------------
+**Recommendations:**
+1. Use 30 connections for production (optimal efficiency)
+2. Set connection pool size to 35-40 (safety margin)  
+3. Beyond 40 connections: diminishing returns due to queue contention
+4. Consider horizontal scaling if higher TPS needed
 
 📁 Results exported to: ./progressive_results/progressive_scaling_tpcc_20250730_143022.csv
 📁 JSON analysis exported to: ./progressive_results/progressive_scaling_tpcc_20250730_143022.json
@@ -2826,7 +2832,7 @@ grep -i "connection" stormdb.log | grep -i "fail"
 - [Progressive Scaling v0.2 Fixes](docs/PROGRESSIVE_SCALING_V2_FIXES.md) - Issue resolution and improvements
 - [E-Commerce Workload Guide](docs/ECOMMERCE_WORKLOAD.md) - Comprehensive e-commerce testing
 - [IMDB Workload Guide](docs/IMDB_WORKLOAD.md) - Movie database testing scenarios
-- [Vector Search Guide](docs/VECTOR_WORKLOAD.md) - pgvector integration and testing
+- [Vector Search Guide](docs/PGVECTOR_TESTING.md) - pgvector integration and testing
 - [Signal Handling Guide](docs/SIGNAL_HANDLING.md) - Graceful shutdown and monitoring
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
