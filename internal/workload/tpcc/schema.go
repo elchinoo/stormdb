@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/elchinoo/stormdb/internal/progress"
 	"github.com/elchinoo/stormdb/pkg/types"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -115,6 +116,16 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 
 	log.Printf("🏗️  Seeding TPCC data with scale = %d warehouses", scale)
 
+	// Calculate total operations for progress tracking
+	totalWarehouses := scale
+	totalDistricts := scale * 10
+	totalCustomers := scale * 10 * customersPerDistrict
+
+	// Create progress trackers
+	warehouseProgress := progress.NewTracker("📦 Loading warehouses", totalWarehouses)
+	districtProgress := progress.NewTracker("🏢 Loading districts", totalDistricts)
+	customerProgress := progress.NewTracker("👥 Loading customers", totalCustomers)
+
 	for w := 1; w <= scale; w++ {
 		// Insert warehouse
 		_, err := db.Exec(ctx, "INSERT INTO warehouse (w_id, w_name, w_tax, w_ytd) VALUES ($1, $2, 0.1, 300000) ON CONFLICT (w_id) DO NOTHING",
@@ -122,6 +133,7 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 		if err != nil {
 			return fmt.Errorf("failed to insert warehouse %d: %v", w, err)
 		}
+		warehouseProgress.Update(w)
 
 		// Each warehouse has 10 districts
 		for d := 1; d <= 10; d++ {
@@ -130,6 +142,7 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 			if err != nil {
 				return fmt.Errorf("failed to insert district %d for warehouse %d: %v", d, w, err)
 			}
+			districtProgress.Update((w-1)*10 + d)
 
 			// Each district has customers (30000 for production, 100 for small scale testing)
 			for c := 1; c <= customersPerDistrict; c++ {
@@ -142,6 +155,7 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 				if err != nil {
 					return fmt.Errorf("failed to insert customer %d in district %d, warehouse %d: %v", c, d, w, err)
 				}
+				customerProgress.Update(((w-1)*10+(d-1))*customersPerDistrict + c)
 			}
 		}
 	}

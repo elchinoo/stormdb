@@ -1,0 +1,38 @@
+# Progress Tracking Demo Configuration
+# This configuration demonstrates the new progress tracking features during data seeding
+
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  auto_load: true
+
+# TPC-C workload with small scale for demo
+workload: "tpcc"
+scale: 5                    # 5 warehouses for demo (shows progress bars)
+duration: "10s"             # Short duration
+workers: 2                  # Minimal workers
+connections: 4              # Minimal connections
+summary_interval: "2s"      # Frequent summaries
+
+# TPC-C specific configuration
+workload_config:
+  transaction_mix:
+    new_order: 45
+    payment: 43
+    order_status: 4
+    delivery: 4
+    stock_level: 4
+  
+  think_time: 0
+  ramp_up_time: 5
