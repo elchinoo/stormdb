@@ -207,8 +207,11 @@ func (t *TPCC) loadDistrictsBatch(ctx context.Context, db *pgxpool.Pool, scale i
 
 // loadCustomersBatch loads customers using COPY protocol for maximum performance
 func (t *TPCC) loadCustomersBatch(ctx context.Context, db *pgxpool.Pool, scale int, customersPerDistrict int, progress *progress.Tracker) error {
+	totalCustomers := scale * 10 * customersPerDistrict
+	log.Printf("🔄 Preparing %d customer records for bulk loading...", totalCustomers)
+
 	// Prepare data for COPY protocol
-	rows := make([][]interface{}, 0, scale*10*customersPerDistrict)
+	rows := make([][]interface{}, 0, totalCustomers)
 	now := time.Now() // Use actual timestamp instead of "NOW()"
 
 	for w := 1; w <= scale; w++ {
@@ -227,6 +230,8 @@ func (t *TPCC) loadCustomersBatch(ctx context.Context, db *pgxpool.Pool, scale i
 			}
 		}
 	}
+
+	log.Printf("📊 Prepared %d customer records, starting COPY operation...", len(rows))
 
 	// Get a connection from the pool for COPY
 	conn, err := db.Acquire(ctx)
