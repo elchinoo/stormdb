@@ -28,7 +28,7 @@ func NewDataGenerator(seed int64) *DataGenerator {
 
 // GenerateRecord creates a single test record with realistic data
 func (dg *DataGenerator) GenerateRecord() DataRecord {
-	return DataRecord{
+	record := DataRecord{
 		ShortText:    dg.generateShortText(),
 		MediumText:   dg.generateMediumText(),
 		LongText:     dg.generateLongText(),
@@ -47,6 +47,13 @@ func (dg *DataGenerator) GenerateRecord() DataRecord {
 		LocationX:    dg.rng.Float64()*180 - 90,  // Latitude -90 to 90
 		LocationY:    dg.rng.Float64()*360 - 180, // Longitude -180 to 180
 	}
+	
+	// Validate the generated enum value
+	if !dg.isValidStatusEnum(record.StatusEnum) {
+		record.StatusEnum = "pending" // Fallback to safe default
+	}
+	
+	return record
 }
 
 // GenerateBatch creates multiple records efficiently
@@ -161,25 +168,24 @@ func (dg *DataGenerator) generateBlob() []byte {
 	return blob
 }
 
-// generateStatusEnum returns a random status value
-func (dg *DataGenerator) generateStatusEnum() string {
-	statuses := []string{"pending", "processing", "completed", "failed", "cancelled"}
-	weights := []int{30, 20, 40, 8, 2} // Weighted distribution
+// Valid enum values that match the database schema
+var validStatusEnums = []string{"pending", "processing", "completed", "failed", "cancelled"}
 
-	total := 0
-	for _, w := range weights {
-		total += w
-	}
-
-	r := dg.rng.Intn(total)
-	cumulative := 0
-	for i, w := range weights {
-		cumulative += w
-		if r < cumulative {
-			return statuses[i]
+// isValidStatusEnum checks if the given status is valid
+func (dg *DataGenerator) isValidStatusEnum(status string) bool {
+	for _, valid := range validStatusEnums {
+		if status == valid {
+			return true
 		}
 	}
-	return statuses[0] // Fallback
+	return false
+}
+
+// generateStatusEnum returns a random status value
+func (dg *DataGenerator) generateStatusEnum() string {
+	// Use simple random selection to avoid any potential issues with weighted distribution
+	idx := dg.rng.Intn(len(validStatusEnums))
+	return validStatusEnums[idx]
 }
 
 // generateTags creates an array of tag strings
