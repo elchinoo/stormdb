@@ -12,6 +12,14 @@ import (
 // Schema for bulk insert performance testing with diverse data types
 // Designed to stress different PostgreSQL subsystems and storage patterns
 const createTableSQL = `
+-- Custom enum type for status testing (must be created before table)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'bulk_status') THEN
+        CREATE TYPE bulk_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled');
+    END IF;
+END $$;
+
 -- Table designed for bulk insert performance testing
 -- Includes various data types to test different storage and indexing scenarios
 CREATE TABLE IF NOT EXISTS bulk_insert_test (
@@ -59,9 +67,6 @@ CREATE TABLE IF NOT EXISTS bulk_insert_test (
     location POINT
 );
 
--- Custom enum type for status testing
-CREATE TYPE IF NOT EXISTS bulk_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled');
-
 -- Indexes for different access patterns
 -- B-tree indexes for range queries
 CREATE INDEX IF NOT EXISTS idx_bulk_created_timestamp ON bulk_insert_test(created_timestamp);
@@ -89,12 +94,12 @@ DROP TYPE IF EXISTS bulk_status CASCADE;
 // setupSchema creates the table and indexes for bulk insert testing
 func setupSchema(ctx context.Context, db *pgxpool.Pool) error {
 	log.Printf("🔧 Setting up bulk insert test schema...")
-	
+
 	_, err := db.Exec(ctx, createTableSQL)
 	if err != nil {
 		return fmt.Errorf("failed to create bulk insert schema: %w", err)
 	}
-	
+
 	log.Printf("✅ Bulk insert test schema created successfully")
 	return nil
 }
@@ -102,12 +107,12 @@ func setupSchema(ctx context.Context, db *pgxpool.Pool) error {
 // cleanupSchema drops the table and related objects
 func cleanupSchema(ctx context.Context, db *pgxpool.Pool) error {
 	log.Printf("🗑️  Dropping bulk insert test schema...")
-	
+
 	_, err := db.Exec(ctx, dropTableSQL)
 	if err != nil {
 		return fmt.Errorf("failed to drop bulk insert schema: %w", err)
 	}
-	
+
 	log.Printf("✅ Bulk insert test schema dropped successfully")
 	return nil
 }
@@ -125,12 +130,12 @@ func getTableStats(ctx context.Context, db *pgxpool.Pool) (int64, error) {
 // truncateTable removes all data from the table without dropping schema
 func truncateTable(ctx context.Context, db *pgxpool.Pool) error {
 	log.Printf("🔄 Truncating bulk insert test table...")
-	
+
 	_, err := db.Exec(ctx, "TRUNCATE TABLE bulk_insert_test RESTART IDENTITY")
 	if err != nil {
 		return fmt.Errorf("failed to truncate bulk insert table: %w", err)
 	}
-	
+
 	log.Printf("✅ Bulk insert test table truncated successfully")
 	return nil
 }

@@ -78,7 +78,7 @@ func (dg *DataGenerator) generateMediumText() string {
 		"Query optimization is essential for large-scale applications",
 		"Monitoring and alerting help maintain system reliability",
 	}
-	
+
 	// Combine 2-4 phrases with some variation
 	numPhrases := 2 + dg.rng.Intn(3)
 	result := ""
@@ -98,7 +98,7 @@ func (dg *DataGenerator) generateLongText() string {
 		"Enterprise data warehouse systems frequently encounter scenarios requiring the insertion of millions or billions of records within specific time windows. These operations must be optimized not only for raw throughput but also for minimal impact on concurrent read operations and system stability. Factors such as write-ahead logging, checkpoint frequency, vacuum operations, and memory buffer management all play critical roles in determining the overall performance profile. Additionally, the choice between different insertion methods - including individual INSERTs, batch INSERTs, and COPY operations - can dramatically affect performance outcomes.",
 		"The evolution of storage technology, from traditional spinning disks to modern NVMe SSDs, has fundamentally changed the performance characteristics of bulk data operations. While sequential write performance has improved dramatically, the relationship between different PostgreSQL configuration parameters and optimal performance has also evolved. Modern systems must balance factors such as shared_buffers, work_mem, maintenance_work_mem, and wal_buffers to achieve optimal bulk insert performance. Understanding these relationships is essential for database administrators and application developers working with large-scale data operations.",
 	}
-	
+
 	return templates[dg.rng.Intn(len(templates))]
 }
 
@@ -127,16 +127,16 @@ func (dg *DataGenerator) generateEventTime() time.Time {
 // generateMetadata creates realistic JSON metadata
 func (dg *DataGenerator) generateMetadata() map[string]interface{} {
 	metadata := make(map[string]interface{})
-	
+
 	// Add some common metadata fields
 	metadata["version"] = fmt.Sprintf("1.%d.%d", dg.rng.Intn(10), dg.rng.Intn(100))
 	metadata["priority"] = []string{"low", "medium", "high", "critical"}[dg.rng.Intn(4)]
 	metadata["source"] = []string{"web", "mobile", "api", "batch"}[dg.rng.Intn(4)]
-	
+
 	// Add some numeric data
 	metadata["score"] = dg.rng.Float64() * 100
 	metadata["attempts"] = dg.rng.Intn(10)
-	
+
 	// Occasionally add nested objects
 	if dg.rng.Float32() < 0.3 {
 		nested := make(map[string]interface{})
@@ -144,7 +144,7 @@ func (dg *DataGenerator) generateMetadata() map[string]interface{} {
 		nested["user_agent"] = "Mozilla/5.0 (compatible; TestBot/1.0)"
 		metadata["details"] = nested
 	}
-	
+
 	return metadata
 }
 
@@ -155,7 +155,7 @@ func (dg *DataGenerator) generateBlob() []byte {
 	if size == 0 {
 		return nil
 	}
-	
+
 	blob := make([]byte, size)
 	rand.Read(blob) // Use crypto/rand for better randomness
 	return blob
@@ -165,12 +165,12 @@ func (dg *DataGenerator) generateBlob() []byte {
 func (dg *DataGenerator) generateStatusEnum() string {
 	statuses := []string{"pending", "processing", "completed", "failed", "cancelled"}
 	weights := []int{30, 20, 40, 8, 2} // Weighted distribution
-	
+
 	total := 0
 	for _, w := range weights {
 		total += w
 	}
-	
+
 	r := dg.rng.Intn(total)
 	cumulative := 0
 	for i, w := range weights {
@@ -189,16 +189,16 @@ func (dg *DataGenerator) generateTags() []string {
 		"analytics", "reporting", "etl", "monitoring", "backup", "archive",
 		"customer", "internal", "external", "automated", "manual", "scheduled",
 	}
-	
+
 	// Generate 0-5 tags
 	numTags := dg.rng.Intn(6)
 	if numTags == 0 {
-		return nil
+		return []string{} // Return empty slice instead of nil
 	}
-	
+
 	tags := make([]string, numTags)
 	used := make(map[int]bool)
-	
+
 	for i := 0; i < numTags; i++ {
 		for {
 			idx := dg.rng.Intn(len(allTags))
@@ -209,7 +209,7 @@ func (dg *DataGenerator) generateTags() []string {
 			}
 		}
 	}
-	
+
 	return tags
 }
 
