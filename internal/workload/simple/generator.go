@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elchinoo/stormdb/internal/progress"
 	"github.com/elchinoo/stormdb/pkg/types"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -50,6 +51,10 @@ func (g *Generator) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 	if scale <= 0 {
 		scale = 1000
 	}
+
+	// Create progress tracker
+	seedProgress := progress.NewTracker("🌱 Seeding loadtest data", scale)
+
 	for i := 1; i <= scale; i++ {
 		_, err := db.Exec(ctx,
 			"INSERT INTO loadtest (id, val, updated) VALUES ($1, $2, NOW()) ON CONFLICT (id) DO NOTHING",
@@ -57,8 +62,8 @@ func (g *Generator) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 		if err != nil {
 			return fmt.Errorf("failed to insert row %d: %w", i, err)
 		}
+		seedProgress.Update(i)
 	}
-	log.Printf("🌱 Seeded %d rows into loadtest", scale)
 	return nil
 }
 

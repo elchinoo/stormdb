@@ -1,0 +1,38 @@
+# Scale 50 Test Configuration
+# This configuration tests scale 50 to replicate user's issue
+
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  auto_load: true
+
+# TPC-C workload with scale 50
+workload: "tpcc"
+scale: 50                   # 50 warehouses (15M customers)
+duration: "10s"             # Short duration
+workers: 2                  # Minimal workers
+connections: 4              # Minimal connections
+summary_interval: "2s"      # Frequent summaries
+
+# TPC-C specific configuration
+workload_config:
+  transaction_mix:
+    new_order: 45
+    payment: 43
+    order_status: 4
+    delivery: 4
+    stock_level: 4
+  
+  think_time: 0
+  ramp_up_time: 5

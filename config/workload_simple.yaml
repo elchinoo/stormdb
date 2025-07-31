@@ -1,0 +1,191 @@
+# Simple Workload Configuration Template
+# Basic connection and simple query workloads for testing database connectivity,
+# connection management, and basic performance validation
+# This file contains multiple configuration examples for different testing scenarios
+
+# =============================================================================
+# DATABASE CONNECTION CONFIGURATION
+# =============================================================================
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "postgres"
+  username: "postgres"
+  password: "postgres"
+  sslmode: "disable"
+
+# =============================================================================
+# RESULTS BACKEND CONFIGURATION (Optional - for analytics)
+# =============================================================================
+# Uncomment and configure to store test results in a separate database
+# results_backend:
+#   enabled: true
+#   host: "localhost"
+#   port: 5432
+#   database: "stormdb_results"
+#   username: "postgres"
+#   password: "postgres"
+#   sslmode: "disable"
+#   retention_days: 30
+#   store_raw_metrics: false
+#   store_pg_stats: true
+#   metrics_batch_size: 1000
+#   table_prefix: "stormdb_"
+
+# =============================================================================
+# TEST METADATA (Optional - for result tracking)
+# =============================================================================
+# test_metadata:
+#   test_name: "simple_connection_test"
+#   environment: "local_dev"
+#   database_target: "PostgreSQL 16"
+#   tags: ["simple", "connection", "basic"]
+#   notes: "Basic connectivity and performance testing"
+
+# =============================================================================
+# PLUGIN CONFIGURATION
+# =============================================================================
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  files: []
+  auto_load: true
+
+# =============================================================================
+# EXAMPLE 1: BASIC CONNECTION TEST (Default - Active Configuration)
+# =============================================================================
+# Simple workload for basic connectivity testing
+workload: "simple"
+scale: 1                    # Minimal scale for basic testing
+duration: "2m"              # Short duration for quick validation
+workers: 2                  # Minimal workers
+connections: 4              # Small connection pool
+summary_interval: "30s"     # Frequent updates for monitoring
+
+# =============================================================================
+# EXAMPLE 2: CONNECTION OVERHEAD TEST (Commented)
+# =============================================================================
+# Uncomment to test connection overhead and management
+# workload: "connection"
+# scale: 10                   # Focus on connection management
+# duration: "5m"
+# workers: 1                  # Single worker to isolate connection behavior
+# connections: 20             # Larger pool to test overhead
+# summary_interval: "1m"
+
+# =============================================================================
+# EXAMPLE 3: TRANSIENT CONNECTIONS TEST (Commented)
+# =============================================================================
+# Uncomment to test frequent connection creation/destruction
+# workload: "simple"
+# scale: 5
+# duration: "10m"
+# workers: 4
+# connections: 8
+# summary_interval: "1m"
+# 
+# # Special configuration for transient connections
+# connection_config:
+#   pool_type: "transient"     # Create new connections per transaction
+#   max_lifetime: "30s"        # Short connection lifetime
+#   idle_timeout: "5s"         # Quick idle timeout
+
+# =============================================================================
+# EXAMPLE 4: SYNCHRONIZED LOAD TEST (Commented)
+# =============================================================================
+# Uncomment for synchronized load testing
+# workload: "simple"
+# scale: 50
+# duration: "15m"
+# workers: 10
+# connections: 20
+# summary_interval: "2m"
+# 
+# # Synchronized execution
+# synchronization:
+#   enabled: true
+#   barrier_timeout: "30s"     # Wait time for worker synchronization
+#   coordination_interval: "5s" # How often workers coordinate
+
+# =============================================================================
+# EXAMPLE 5: MINIMAL RESOURCE TEST (Commented)
+# =============================================================================
+# Uncomment for testing with minimal resources
+# workload: "simple"
+# scale: 1
+# duration: "1m"
+# workers: 1
+# connections: 1
+# summary_interval: "15s"
+
+# =============================================================================
+# EXAMPLE 6: PROGRESSIVE SCALING SIMPLE (Commented)
+# =============================================================================
+# Uncomment for progressive scaling with simple workload
+# workload: "simple"
+# scale: 100
+# duration: "2h"
+# workers: 2
+# connections: 4
+# summary_interval: "5m"
+# 
+# progressive:
+#   enabled: true
+#   strategy: "linear"
+#   min_workers: 2
+#   max_workers: 20
+#   min_connections: 4
+#   max_connections: 40
+#   test_duration: "15m"
+#   warmup_duration: "1m"
+#   cooldown_duration: "30s"
+#   bands: 8
+#   enable_analysis: true
+#   
+#   # Memory management for progressive scaling
+#   max_latency_samples: 25000  # Lower limit for simple workloads
+#   memory_limit_mb: 256
+
+# =============================================================================
+# PostgreSQL MONITORING (Optional)
+# =============================================================================
+# Uncomment to collect PostgreSQL statistics
+# collect_pg_stats: true
+# pg_stats_statements: true
+
+# =============================================================================
+# SIMPLE WORKLOAD SPECIFIC CONFIGURATION
+# =============================================================================
+workload_config:
+  # Query configuration
+  query_type: "select_1"      # select_1, select_now, select_version, ping
+  query_complexity: "minimal" # minimal, basic, moderate
+  
+  # Timing configuration
+  think_time: 0               # No think time for maximum throughput
+  query_timeout: "5s"         # Timeout for individual queries
+  connection_timeout: "10s"   # Timeout for connection establishment
+  
+  # Error handling
+  retry_count: 3              # Number of retries on failure
+  retry_delay: "1s"           # Delay between retries
+  
+  # Performance settings
+  prepare_statements: false   # Use prepared statements
+  autocommit: true           # Enable autocommit mode
+  isolation_level: "read_committed" # Transaction isolation level
+
+# =============================================================================
+# METRICS CONFIGURATION
+# =============================================================================
+metrics:
+  enabled: true
+  interval: "1s"              # More frequent for simple workloads
+  latency_percentiles: [50, 90, 95, 99]
+  
+  # Connection metrics
+  track_connections: true
+  track_connection_pool: true
+  track_query_counts: true
