@@ -173,21 +173,21 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 			log.Printf("📊 Access profiling at: http://localhost:%s/debug/pprof/", cliOpts.ProfilingPort)
 			log.Printf("💾 Memory profile: http://localhost:%s/debug/pprof/heap", cliOpts.ProfilingPort)
 			log.Printf("⚡ CPU profile: http://localhost:%s/debug/pprof/profile", cliOpts.ProfilingPort)
-			
+
 			// Force garbage collection and print memory stats periodically
 			ticker := time.NewTicker(10 * time.Second)
 			defer ticker.Stop()
-			
+
 			go func() {
 				for range ticker.C {
 					runtime.GC()
 					var m runtime.MemStats
 					runtime.ReadMemStats(&m)
-					log.Printf("📈 Memory: Alloc=%dMB, TotalAlloc=%dMB, Sys=%dMB, NumGC=%d", 
+					log.Printf("📈 Memory: Alloc=%dMB, TotalAlloc=%dMB, Sys=%dMB, NumGC=%d",
 						bToMb(m.Alloc), bToMb(m.TotalAlloc), bToMb(m.Sys), m.NumGC)
 				}
 			}()
-			
+
 			if err := http.ListenAndServe(":"+cliOpts.ProfilingPort, nil); err != nil {
 				log.Printf("Warning: Failed to start profiling server: %v", err)
 			}
