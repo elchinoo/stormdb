@@ -107,7 +107,7 @@ func (t *TPCC) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) e
 	// Only load data if tables are empty
 	if warehouseCount == 0 {
 		log.Printf("Seeding TPCC data with scale factor %d...", cfg.Scale)
-		if err := t.loadInitialData(ctx, db, cfg.Scale); err != nil {
+		if err := t.loadInitialData(ctx, db, cfg.Scale, cfg); err != nil {
 			return fmt.Errorf("failed to load initial data: %v", err)
 		}
 	} else {
@@ -117,7 +117,7 @@ func (t *TPCC) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) e
 	return nil
 }
 
-func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int) error {
+func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int, cfg *types.Config) error {
 	if scale <= 0 {
 		scale = 1
 	}
@@ -157,7 +157,7 @@ func (t *TPCC) loadInitialData(ctx context.Context, db *pgxpool.Pool, scale int)
 	}
 
 	// Load customers using COPY protocol for maximum speed
-	if err := t.loadCustomersBatch(ctx, db, scale, customersPerDistrict, customerProgress); err != nil {
+	if err := t.loadCustomersBatch(ctx, db, scale, customersPerDistrict, customerProgress, cfg); err != nil {
 		return fmt.Errorf("failed to load customers: %v", err)
 	}
 
@@ -205,34 +205,78 @@ func (t *TPCC) loadDistrictsBatch(ctx context.Context, db *pgxpool.Pool, scale i
 	return nil
 }
 
-// loadCustomersBatch loads customers using COPY protocol for maximum performance
-func (t *TPCC) loadCustomersBatch(ctx context.Context, db *pgxpool.Pool, scale int, customersPerDistrict int, progress *progress.Tracker) error {
+// loadCustomersBatch loads customers using COPY protocol with memory-efficient batching
+func (t *TPCC) loadCustomersBatch(ctx context.Context, db *pgxpool.Pool, scale int, customersPerDistrict int, progress *progress.Tracker, cfg *types.Config) error {
 	totalCustomers := scale * 10 * customersPerDistrict
 	log.Printf("🔄 Preparing %d customer records for bulk loading...", totalCustomers)
 
-	// Prepare data for COPY protocol
-	rows := make([][]interface{}, 0, totalCustomers)
-	now := time.Now() // Use actual timestamp instead of "NOW()"
+	// Configure memory-efficient batching
+	batchSize := 100000 // Default batch size
+	if cfg.DataLoading.BatchSize > 0 {
+		batchSize = cfg.DataLoading.BatchSize
+	}
 
+	// Estimate memory usage per record (~200 bytes) and adjust batch size if max memory is specified
+	if cfg.DataLoading.MaxMemoryMB > 0 {
+		estimatedBytesPerRecord := 200
+		maxRecordsForMemory := (cfg.DataLoading.MaxMemoryMB * 1024 * 1024) / estimatedBytesPerRecord
+		if maxRecordsForMemory < batchSize {
+			batchSize = maxRecordsForMemory
+			log.Printf("📊 Adjusted batch size to %d records to stay within %dMB memory limit", batchSize, cfg.DataLoading.MaxMemoryMB)
+		}
+	}
+
+	if totalCustomers < batchSize {
+		batchSize = totalCustomers
+	}
+
+	log.Printf("📊 Using batch size: %d records per batch (%d batches total)", batchSize, (totalCustomers+batchSize-1)/batchSize)
+
+	now := time.Now() // Use actual timestamp instead of "NOW()"
+	totalProcessed := 0
+
+	// Process customers in batches to avoid OOM
 	for w := 1; w <= scale; w++ {
 		for d := 1; d <= 10; d++ {
-			for c := 1; c <= customersPerDistrict; c++ {
-				rows = append(rows, []interface{}{
-					c,                         // c_id
-					d,                         // c_d_id
-					w,                         // c_w_id
-					fmt.Sprintf("First%d", c), // c_first
-					"CUSTOMER",                // c_last
-					now,                       // c_since - use actual timestamp
-					"GC",                      // c_credit
-					0,                         // c_balance
-				})
+			// Process customers in this district in batches
+			for startCustomer := 1; startCustomer <= customersPerDistrict; startCustomer += batchSize {
+				endCustomer := startCustomer + batchSize - 1
+				if endCustomer > customersPerDistrict {
+					endCustomer = customersPerDistrict
+				}
+
+				// Prepare batch data
+				batchRows := make([][]interface{}, 0, endCustomer-startCustomer+1)
+				for c := startCustomer; c <= endCustomer; c++ {
+					batchRows = append(batchRows, []interface{}{
+						c,                         // c_id
+						d,                         // c_d_id
+						w,                         // c_w_id
+						fmt.Sprintf("First%d", c), // c_first
+						"CUSTOMER",                // c_last
+						now,                       // c_since - use actual timestamp
+						"GC",                      // c_credit
+						0,                         // c_balance
+					})
+				}
+
+				// Insert batch using COPY
+				if err := t.insertCustomerBatch(ctx, db, batchRows); err != nil {
+					return fmt.Errorf("failed to insert customer batch (w:%d, d:%d, customers:%d-%d): %v", w, d, startCustomer, endCustomer, err)
+				}
+
+				totalProcessed += len(batchRows)
+				progress.Update(totalProcessed)
 			}
 		}
 	}
 
-	log.Printf("📊 Prepared %d customer records, starting COPY operation...", len(rows))
+	log.Printf("� Successfully loaded %d customer records using batched COPY operations", totalProcessed)
+	return nil
+}
 
+// insertCustomerBatch performs a single COPY operation for a batch of customers
+func (t *TPCC) insertCustomerBatch(ctx context.Context, db *pgxpool.Pool, rows [][]interface{}) error {
 	// Get a connection from the pool for COPY
 	conn, err := db.Acquire(ctx)
 	if err != nil {
@@ -250,8 +294,11 @@ func (t *TPCC) loadCustomersBatch(ctx context.Context, db *pgxpool.Pool, scale i
 		return fmt.Errorf("failed to COPY customers: %v", err)
 	}
 
-	progress.Update(len(rows))
-	log.Printf("📈 COPY inserted %d customer rows", rowsAffected)
+	// Log batch completion (optional, can be removed for less verbose output)
+	// Only log for very large batches to reduce verbosity
+	if rowsAffected > 100000 {
+		log.Printf("📈 COPY inserted %d customer rows in batch", rowsAffected)
+	}
 
 	return nil
 }

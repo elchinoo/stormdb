@@ -44,8 +44,10 @@ type Config struct {
 	// This is primarily used by the IMDB workload which supports multiple
 	// data loading strategies including generated data, SQL dumps, and SQL scripts.
 	DataLoading struct {
-		Mode     string `mapstructure:"mode"`     // Loading mode: "generate", "dump", or "sql"
-		FilePath string `mapstructure:"filepath"` // Path to dump/sql file when mode is "dump" or "sql"
+		Mode        string `mapstructure:"mode"`          // Loading mode: "generate", "dump", or "sql"
+		FilePath    string `mapstructure:"filepath"`      // Path to dump/sql file when mode is "dump" or "sql"
+		BatchSize   int    `mapstructure:"batch_size"`    // Memory buffer size for bulk operations (records per batch)
+		MaxMemoryMB int    `mapstructure:"max_memory_mb"` // Maximum memory usage in MB for data loading operations
 	} `mapstructure:"data_loading"`
 
 	// Core benchmark configuration
