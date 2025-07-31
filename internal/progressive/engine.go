@@ -237,13 +237,53 @@ func (e *ScalingEngine) generateScalingSequence() ([]ScalingBand, error) {
 func (e *ScalingEngine) generateLinearSequence() []ScalingBand {
 	var sequence []ScalingBand
 
+	// Use bands configuration to limit the total number of bands generated
+	maxBands := e.config.Progressive.Bands
+	if maxBands <= 0 {
+		maxBands = 64 // Default limit to prevent excessive band generation
+	}
+
+	// Use StepWorkers and StepConns if available, otherwise calculate based on bands
+	stepWorkers := e.config.Progressive.StepWorkers
+	stepConns := e.config.Progressive.StepConns
+
+	if stepWorkers <= 0 || stepConns <= 0 {
+		// Calculate steps to generate approximately maxBands combinations
+		workerRange := e.config.Progressive.MaxWorkers - e.config.Progressive.MinWorkers
+		connRange := e.config.Progressive.MaxConns - e.config.Progressive.MinConns
+
+		// Try to balance worker and connection steps to get reasonable band count
+		targetWorkerSteps := int(math.Sqrt(float64(maxBands)))
+		targetConnSteps := maxBands / targetWorkerSteps
+
+		if targetWorkerSteps > 0 && workerRange > 0 {
+			stepWorkers = workerRange / targetWorkerSteps
+			if stepWorkers <= 0 {
+				stepWorkers = 1
+			}
+		} else {
+			stepWorkers = 1
+		}
+
+		if targetConnSteps > 0 && connRange > 0 {
+			stepConns = connRange / targetConnSteps
+			if stepConns <= 0 {
+				stepConns = 1
+			}
+		} else {
+			stepConns = 1
+		}
+	}
+
+	bandCount := 0
 	// Use separate loops for workers and connections to create all combinations
-	for workers := e.config.Progressive.MinWorkers; workers <= e.config.Progressive.MaxWorkers; workers += e.config.Progressive.StepWorkers {
-		for conns := e.config.Progressive.MinConns; conns <= e.config.Progressive.MaxConns; conns += e.config.Progressive.StepConns {
+	for workers := e.config.Progressive.MinWorkers; workers <= e.config.Progressive.MaxWorkers && bandCount < maxBands; workers += stepWorkers {
+		for conns := e.config.Progressive.MinConns; conns <= e.config.Progressive.MaxConns && bandCount < maxBands; conns += stepConns {
 			sequence = append(sequence, ScalingBand{
 				Workers:     workers,
 				Connections: conns,
 			})
+			bandCount++
 		}
 	}
 
@@ -254,24 +294,28 @@ func (e *ScalingEngine) generateLinearSequence() []ScalingBand {
 func (e *ScalingEngine) generateBalancedSequence() []ScalingBand {
 	var sequence []ScalingBand
 
-	// For balanced scaling, we scale workers and connections proportionally
-	// Use the worker range as the primary guide and calculate proportional connections
-	workerRange := e.config.Progressive.MaxWorkers - e.config.Progressive.MinWorkers
-	connRange := e.config.Progressive.MaxConns - e.config.Progressive.MinConns
-	stepWorkers := e.config.Progressive.StepWorkers
-	if stepWorkers <= 0 {
-		stepWorkers = 1 // Default step
+	// Use bands configuration to determine number of steps
+	bands := e.config.Progressive.Bands
+	if bands <= 0 {
+		bands = 8 // Default to 8 bands if not specified
 	}
 
-	for workers := e.config.Progressive.MinWorkers; workers <= e.config.Progressive.MaxWorkers; workers += stepWorkers {
-		// Calculate proportional connections
-		workerProgress := float64(workers-e.config.Progressive.MinWorkers) / float64(workerRange)
-		if workerRange == 0 {
-			workerProgress = 0 // Handle case where min == max
-		}
-		conns := e.config.Progressive.MinConns + int(workerProgress*float64(connRange))
+	// For balanced scaling, we scale workers and connections proportionally
+	workerRange := e.config.Progressive.MaxWorkers - e.config.Progressive.MinWorkers
+	connRange := e.config.Progressive.MaxConns - e.config.Progressive.MinConns
 
-		// Ensure connections don't exceed maximum
+	// Calculate step sizes based on number of bands
+	workerStep := float64(workerRange) / float64(bands-1)
+	connStep := float64(connRange) / float64(bands-1)
+
+	for i := 0; i < bands; i++ {
+		workers := e.config.Progressive.MinWorkers + int(float64(i)*workerStep)
+		conns := e.config.Progressive.MinConns + int(float64(i)*connStep)
+
+		// Ensure we don't exceed maximums
+		if workers > e.config.Progressive.MaxWorkers {
+			workers = e.config.Progressive.MaxWorkers
+		}
 		if conns > e.config.Progressive.MaxConns {
 			conns = e.config.Progressive.MaxConns
 		}
@@ -512,12 +556,24 @@ func (e *ScalingEngine) executeBand(ctx context.Context, bandID int, config *typ
 		return nil, fmt.Errorf("failed to ping database with band pool: %w", err)
 	}
 
-	// Create metrics for this band
+	// Create metrics for this band with memory limits
 	metrics := &types.Metrics{
 		ErrorTypes:    make(map[string]int64),
 		WorkerMetrics: make(map[int]*types.WorkerStats),
 		Mu:            sync.Mutex{},
 	}
+
+	// Apply memory limits from progressive configuration
+	if e.config.Progressive.MaxLatencySamples > 0 {
+		metrics.MaxLatencySamples = e.config.Progressive.MaxLatencySamples
+		fmt.Printf("💾 Memory limit: %d latency samples per band\n", metrics.MaxLatencySamples)
+	} else {
+		// Default memory-safe limit for 8GB systems: 50,000 samples = ~400KB per worker
+		defaultLimit := 50000
+		metrics.MaxLatencySamples = defaultLimit
+		fmt.Printf("💾 Using default memory limit: %d latency samples per band\n", defaultLimit)
+	}
+
 	metrics.InitializeLatencyHistogram()
 	metrics.InitializeWorkerMetrics(config.Workers)
 

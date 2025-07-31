@@ -75,6 +75,10 @@ type Config struct {
 		ExportJSON       bool   `mapstructure:"export_json"`       // Export results to JSON
 		EnableAnalysis   bool   `mapstructure:"enable_analysis"`   // Enable mathematical analysis
 
+		// Memory management for progressive scaling
+		MaxLatencySamples int `mapstructure:"max_latency_samples"` // Maximum latency samples per band (0 = unlimited)
+		MemoryLimitMB     int `mapstructure:"memory_limit_mb"`     // Total memory limit for metrics collection (0 = unlimited)
+
 		// Legacy fields for backward compatibility (deprecated in v0.2)
 		StepWorkers  int    `mapstructure:"step_workers"`     // Deprecated: use bands instead
 		StepConns    int    `mapstructure:"step_connections"` // Deprecated: use bands instead
@@ -209,6 +213,10 @@ type Metrics struct {
 	Errors         int64
 	ErrorTypes     map[string]int64
 	TransactionDur []int64 // in nanoseconds
+
+	// Memory management for metrics collection
+	MaxLatencySamples  int   // Maximum number of latency samples to keep (0 = unlimited)
+	LatencySampleCount int64 // Current number of latency samples stored
 
 	// Optional: per-transaction counters
 	NewOrderCount    int64
@@ -392,10 +400,8 @@ func (m *Metrics) RecordWorkerTransaction(workerID int, success bool, latencyNs 
 	// Also record in global metrics
 	m.RecordTransaction(success)
 
-	// Record latency globally
-	m.Mu.Lock()
-	m.TransactionDur = append(m.TransactionDur, latencyNs)
-	m.Mu.Unlock()
+	// Record latency globally with memory limits
+	m.RecordLatencyWithLimit(latencyNs)
 	m.RecordLatency(latencyNs)
 
 	// Record per-worker metrics
@@ -408,7 +414,33 @@ func (m *Metrics) RecordWorkerTransaction(workerID int, success bool, latencyNs 
 		} else {
 			atomic.AddInt64(&worker.TPSAborted, 1)
 		}
-		worker.TransactionDur = append(worker.TransactionDur, latencyNs)
+
+		// Memory-limited latency recording for workers
+		if m.MaxLatencySamples == 0 || len(worker.TransactionDur) < m.MaxLatencySamples {
+			worker.TransactionDur = append(worker.TransactionDur, latencyNs)
+		} else {
+			// Replace oldest sample with newest (ring buffer approach)
+			oldestIndex := int(atomic.AddInt64(&m.LatencySampleCount, 1)) % m.MaxLatencySamples
+			worker.TransactionDur[oldestIndex] = latencyNs
+		}
+	}
+}
+
+// RecordLatencyWithLimit records latency with memory limits
+func (m *Metrics) RecordLatencyWithLimit(latencyNs int64) {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
+	// Check memory limits
+	if m.MaxLatencySamples == 0 || len(m.TransactionDur) < m.MaxLatencySamples {
+		// Still within limits, add normally
+		m.TransactionDur = append(m.TransactionDur, latencyNs)
+		atomic.AddInt64(&m.LatencySampleCount, 1)
+	} else {
+		// At limit, replace oldest sample (ring buffer)
+		oldestIndex := int(atomic.LoadInt64(&m.LatencySampleCount)) % m.MaxLatencySamples
+		m.TransactionDur[oldestIndex] = latencyNs
+		atomic.AddInt64(&m.LatencySampleCount, 1)
 	}
 }
 
