@@ -40,7 +40,7 @@ func (t *TPCC) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) e
             PRIMARY KEY (d_w_id, d_id)
         )`,
 		`CREATE TABLE IF NOT EXISTS customer (
-            c_id SERIAL,
+            c_id INT,
             c_d_id SMALLINT,
             c_w_id INT,
             c_first TEXT,

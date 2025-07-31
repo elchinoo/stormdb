@@ -80,9 +80,17 @@ func (p *Tracker) Display() {
 	elapsed := time.Since(p.startTime)
 	var eta string
 	if p.showETA && p.current > 0 && p.current < p.total {
-		totalTime := elapsed * time.Duration(p.total) / time.Duration(p.current)
-		remaining := totalTime - elapsed
-		eta = fmt.Sprintf(" ETA: %s", formatDuration(remaining))
+		// Use float64 to avoid integer overflow and improve precision
+		progress := float64(p.current) / float64(p.total)
+		if progress > 0 && progress < 1 {
+			estimatedTotalTime := time.Duration(float64(elapsed) / progress)
+			remaining := estimatedTotalTime - elapsed
+
+			// Only show ETA if it's positive and reasonable (less than 1000 hours)
+			if remaining > 0 && remaining < 1000*time.Hour {
+				eta = fmt.Sprintf(" ETA: %s", formatDuration(remaining))
+			}
+		}
 	}
 
 	// Rate calculation
@@ -115,6 +123,11 @@ func (p *Tracker) Finish() {
 
 // formatDuration formats a duration in a human-readable way
 func formatDuration(d time.Duration) string {
+	// Handle negative durations
+	if d < 0 {
+		return "calculating..."
+	}
+
 	if d < time.Second {
 		return fmt.Sprintf("%.0fms", float64(d.Nanoseconds())/1e6)
 	}

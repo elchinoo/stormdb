@@ -105,6 +105,25 @@ type Config struct {
 		// Auto-load all plugins found in search paths
 		AutoLoad bool `mapstructure:"auto_load"`
 	} `mapstructure:"plugins"`
+
+	// Results backend configuration for storing test results in a database
+	ResultsBackend struct {
+		Enabled          bool   `mapstructure:"enabled"`            // Enable database backend for test results
+		Host             string `mapstructure:"host"`               // PostgreSQL host for results storage
+		Port             int    `mapstructure:"port"`               // PostgreSQL port for results storage
+		Database         string `mapstructure:"database"`           // Database name for results storage
+		Username         string `mapstructure:"username"`           // Username for results database
+		Password         string `mapstructure:"password"`           // Password for results database
+		SSLMode          string `mapstructure:"sslmode"`            // SSL mode for results database connection
+		RetentionDays    int    `mapstructure:"retention_days"`     // Days to retain test results (0 = forever)
+		StoreRawMetrics  bool   `mapstructure:"store_raw_metrics"`  // Store individual transaction/query metrics
+		StorePgStats     bool   `mapstructure:"store_pg_stats"`     // Store PostgreSQL statistics snapshots
+		MetricsBatchSize int    `mapstructure:"metrics_batch_size"` // Batch size for metrics insertion
+		TablePrefix      string `mapstructure:"table_prefix"`       // Prefix for results tables
+	} `mapstructure:"results_backend"`
+
+	// Test metadata for enhanced test tracking and organization
+	TestMetadata map[string]interface{} `mapstructure:"test_metadata"` // Additional metadata for test organization
 }
 
 // PostgreSQLStats contains comprehensive PostgreSQL database statistics
