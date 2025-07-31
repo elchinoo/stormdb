@@ -3,7 +3,6 @@ package bulk_insert
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"sort"
@@ -57,7 +56,6 @@ type WorkloadState struct {
 
 	// Statistics
 	totalInserted int64
-	totalLatency  time.Duration
 
 	// Control
 	stopProducers context.CancelFunc
@@ -234,7 +232,9 @@ func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 	var workerWg sync.WaitGroup
 	for i := 0; i < workers; i++ {
 		workerWg.Add(1)
-		go g.consumer(bandCtx, db, state, method, batchSize, metrics, &workerWg, i)
+		// Pass a separate context for database operations that doesn't expire during the test
+		dbCtx := context.Background()
+		go g.consumer(bandCtx, dbCtx, db, state, method, batchSize, metrics, &workerWg, i)
 	}
 
 	// Wait for test completion
@@ -247,8 +247,25 @@ func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 	// Close ring buffer to signal consumers
 	state.ringBuffer.Close()
 
-	// Wait for consumers to finish
-	workerWg.Wait()
+	// Give consumers a grace period to finish their current operations
+	// Create a separate context with a reasonable timeout for cleanup
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cleanupCancel()
+
+	// Wait for consumers to finish with grace period
+	done := make(chan struct{})
+	go func() {
+		workerWg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// All workers finished gracefully
+	case <-cleanupCtx.Done():
+		// Grace period expired, but this is expected behavior
+		log.Printf("⚠️  Some workers didn't finish within grace period - this is normal")
+	}
 
 	// Log band results
 	produced, consumed, waitTime, utilization := state.ringBuffer.Stats()
@@ -285,7 +302,7 @@ func (g *Generator) producer(ctx context.Context, state *WorkloadState, bulkCfg 
 }
 
 // consumer reads from ring buffer and performs bulk inserts
-func (g *Generator) consumer(ctx context.Context, db *pgxpool.Pool, state *WorkloadState, method string, batchSize int, metrics *types.Metrics, wg *sync.WaitGroup, workerID int) {
+func (g *Generator) consumer(ctx context.Context, dbCtx context.Context, db *pgxpool.Pool, state *WorkloadState, method string, batchSize int, metrics *types.Metrics, wg *sync.WaitGroup, workerID int) {
 	defer wg.Done()
 
 	for {
@@ -304,15 +321,15 @@ func (g *Generator) consumer(ctx context.Context, db *pgxpool.Pool, state *Workl
 			continue
 		}
 
-		// Perform the insert operation
+		// Perform the insert operation using dbCtx which doesn't expire during test
 		start := time.Now()
 		var insertErr error
 
 		switch method {
 		case "insert":
-			insertErr = g.performBatchInsert(ctx, db, records)
+			insertErr = g.performBatchInsert(dbCtx, db, records)
 		case "copy":
-			insertErr = g.performCopyInsert(ctx, db, records)
+			insertErr = g.performCopyInsert(dbCtx, db, records)
 		default:
 			insertErr = fmt.Errorf("unknown insert method: %s", method)
 		}
@@ -415,7 +432,7 @@ func (g *Generator) performCopyInsert(ctx context.Context, db *pgxpool.Pool, rec
 			record.IsActive,
 			record.Metadata,
 			record.DataBlob,
-			sql.NullString{String: record.StatusEnum, Valid: true},
+			record.StatusEnum, // Pass directly like other string fields
 			g.formatStringArray(record.Tags),
 			record.ClientIP,
 			fmt.Sprintf("(%f,%f)", record.LocationX, record.LocationY),

@@ -47,12 +47,12 @@ func (dg *DataGenerator) GenerateRecord() DataRecord {
 		LocationX:    dg.rng.Float64()*180 - 90,  // Latitude -90 to 90
 		LocationY:    dg.rng.Float64()*360 - 180, // Longitude -180 to 180
 	}
-	
+
 	// Validate the generated enum value
 	if !dg.isValidStatusEnum(record.StatusEnum) {
 		record.StatusEnum = "pending" // Fallback to safe default
 	}
-	
+
 	return record
 }
 
