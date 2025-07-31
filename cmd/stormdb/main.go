@@ -18,6 +18,7 @@ import (
 	"github.com/elchinoo/stormdb/internal/database"
 	"github.com/elchinoo/stormdb/internal/metrics"
 	"github.com/elchinoo/stormdb/internal/progressive"
+	"github.com/elchinoo/stormdb/internal/results"
 	"github.com/elchinoo/stormdb/internal/workload"
 	"github.com/elchinoo/stormdb/pkg/types"
 
@@ -375,9 +376,8 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 	// Start periodic summary reporting if interval is configured
 	var summaryTicker *time.Ticker
 	var summaryDone chan bool
-	var startTime time.Time
+	startTime := time.Now() // Always record start time for results storage
 	if summaryInterval > 0 {
-		startTime = time.Now()
 		summaryTicker = time.NewTicker(summaryInterval)
 		summaryDone = make(chan bool)
 		go func() {
@@ -428,7 +428,33 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 	}
 
 	// -------------------------------
-	// Phase 3: Report results
+	// Phase 3: Store results in database backend (if configured)
+	// -------------------------------
+
+	// Record end time for test results storage
+	testEndTime := time.Now()
+
+	// Initialize and store test results in database backend if configured
+	if resultsBackend, err := results.CreateBackendFromConfig(cfg); err != nil {
+		log.Printf("⚠️  Failed to create results backend: %v", err)
+	} else if resultsBackend != nil {
+		defer resultsBackend.Close()
+
+		// Store test results
+		if err := results.StoreTestResults(context.Background(), resultsBackend, cfg, metricsData, startTime, testEndTime); err != nil {
+			log.Printf("⚠️  Failed to store test results: %v", err)
+		} else {
+			log.Printf("💾 Test results stored in database backend")
+		}
+
+		// Perform maintenance (cleanup old results)
+		if err := results.PerformMaintenance(context.Background(), resultsBackend); err != nil {
+			log.Printf("⚠️  Failed to perform backend maintenance: %v", err)
+		}
+	}
+
+	// -------------------------------
+	// Phase 4: Report results
 	// -------------------------------
 
 	if interrupted {

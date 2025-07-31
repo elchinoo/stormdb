@@ -1,0 +1,59 @@
+# StormDB Configuration with Database Backend for Test Results Storage
+# This configuration enables comprehensive test result storage for analytics
+
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Database Backend Configuration for Test Result Storage
+results_backend:
+  enabled: true                    # Enable database storage of test results
+  host: "localhost"                # Database host for results storage
+  port: 5432                       # Database port
+  database: "stormdb_results"      # Dedicated database for test results
+  username: "stormdb_results_user" # User with write access to results DB
+  password: "results_pwd!123"      # Password for results database
+  sslmode: "disable"               # SSL mode for results database
+  
+  # Storage configuration
+  retention_days: 90               # Auto-cleanup results older than 90 days
+  store_raw_metrics: false         # Set to true to store individual latency samples
+  store_pg_stats: true             # Store PostgreSQL statistics
+  metrics_batch_size: 1000         # Batch size for metric inserts
+  table_prefix: "stormdb_"         # Prefix for all result tables
+
+# Plugin system configuration
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  auto_load: true
+
+# Test configuration
+workload: "tpcc"
+scale: 5
+duration: "1m"
+workers: 4
+connections: 8
+summary_interval: "10s"
+
+# Enable comprehensive statistics collection
+collect_pg_stats: true
+pg_stats_statements: true
+
+# Test metadata for results database
+test_metadata:
+  test_name: "TPC-C Performance Baseline"
+  environment: "development"       # development, staging, production
+  database_target: "PostgreSQL 16"
+  version: "1.0.0"
+  tags:
+    - "baseline"
+    - "tpcc"
+    - "performance"
+  notes: "Baseline performance test for TPC-C workload"
