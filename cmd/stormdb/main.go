@@ -5,8 +5,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -51,6 +54,8 @@ func main() {
 		pgStatsStatements bool
 		showVersion       bool
 		progressiveMode   bool
+		enableProfiling   bool
+		profilingPort     string
 	)
 
 	rootCmd := &cobra.Command{
@@ -80,6 +85,8 @@ func main() {
 				CollectPgStats:    collectPgStats,
 				PgStatsStatements: pgStatsStatements,
 				ProgressiveMode:   progressiveMode,
+				EnableProfiling:   enableProfiling,
+				ProfilingPort:     profilingPort,
 			})
 		},
 	}
@@ -121,6 +128,8 @@ func main() {
 	rootCmd.Flags().BoolVar(&pgStatsStatements, "pg-stat-statements", false, "Enable pg_stat_statements collection (requires extension)")
 	rootCmd.Flags().BoolVar(&progressiveMode, "progressive", false, "Enable progressive connection scaling (overrides config)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Show version information and exit")
+	rootCmd.Flags().BoolVar(&enableProfiling, "profile", false, "Enable memory profiling server")
+	rootCmd.Flags().StringVar(&profilingPort, "profile-port", "6060", "Port for profiling server (default: 6060)")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -144,6 +153,8 @@ type CLIOptions struct {
 	CollectPgStats    bool
 	PgStatsStatements bool
 	ProgressiveMode   bool
+	EnableProfiling   bool
+	ProfilingPort     string
 }
 
 func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOptions) error {
@@ -154,6 +165,34 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 
 	// Apply CLI overrides to config
 	applyCliOverrides(cfg, cliOpts)
+
+	// Start profiling server if enabled
+	if cliOpts.EnableProfiling {
+		go func() {
+			log.Printf("🔍 Starting memory profiling server on port %s", cliOpts.ProfilingPort)
+			log.Printf("📊 Access profiling at: http://localhost:%s/debug/pprof/", cliOpts.ProfilingPort)
+			log.Printf("💾 Memory profile: http://localhost:%s/debug/pprof/heap", cliOpts.ProfilingPort)
+			log.Printf("⚡ CPU profile: http://localhost:%s/debug/pprof/profile", cliOpts.ProfilingPort)
+			
+			// Force garbage collection and print memory stats periodically
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+			
+			go func() {
+				for range ticker.C {
+					runtime.GC()
+					var m runtime.MemStats
+					runtime.ReadMemStats(&m)
+					log.Printf("📈 Memory: Alloc=%dMB, TotalAlloc=%dMB, Sys=%dMB, NumGC=%d", 
+						bToMb(m.Alloc), bToMb(m.TotalAlloc), bToMb(m.Sys), m.NumGC)
+				}
+			}()
+			
+			if err := http.ListenAndServe(":"+cliOpts.ProfilingPort, nil); err != nil {
+				log.Printf("Warning: Failed to start profiling server: %v", err)
+			}
+		}()
+	}
 
 	duration, err := time.ParseDuration(cfg.Duration)
 	if err != nil {
@@ -478,4 +517,9 @@ func (w *WorkloadAdapter) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.
 // Cleanup drops tables and reloads data (called only with --rebuild)
 func (w *WorkloadAdapter) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
 	return w.workload.Cleanup(ctx, db, cfg)
+}
+
+// bToMb converts bytes to megabytes
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }
