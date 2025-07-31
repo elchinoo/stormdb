@@ -10,6 +10,7 @@ package plugin
 import (
 	"fmt"
 
+	"github.com/elchinoo/stormdb/internal/workload/bulk_insert"
 	"github.com/elchinoo/stormdb/internal/workload/simple"
 	connection_overhead "github.com/elchinoo/stormdb/internal/workload/simple_connection"
 	"github.com/elchinoo/stormdb/internal/workload/tpcc"
@@ -48,11 +49,11 @@ func (p *BuiltinWorkloadPlugin) GetDescription() string {
 // GetSupportedWorkloads returns the list of workload types this plugin supports
 func (p *BuiltinWorkloadPlugin) GetSupportedWorkloads() []string {
 	// Return all built-in workload types
-	return []string{"tpcc", "simple", "mixed", "read", "write", "simple_connection"}
+	return []string{"tpcc", "simple", "mixed", "read", "write", "simple_connection", "bulk_insert"}
 }
 
 // CreateWorkload creates a workload instance for the specified type
-// Only handles core built-in workloads: TPCC, Simple, and Connection Overhead
+// Only handles core built-in workloads: TPCC, Simple, Connection Overhead, and Bulk Insert
 func (p *BuiltinWorkloadPlugin) CreateWorkload(workloadType string) (Workload, error) {
 	switch workloadType {
 	case "tpcc":
@@ -61,6 +62,8 @@ func (p *BuiltinWorkloadPlugin) CreateWorkload(workloadType string) (Workload, e
 		return &simple.Generator{}, nil
 	case "simple_connection":
 		return &connection_overhead.ConnectionWorkload{}, nil
+	case "bulk_insert":
+		return &bulk_insert.Generator{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported built-in workload type: %s", workloadType)
 	}

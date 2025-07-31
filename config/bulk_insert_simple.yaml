@@ -1,0 +1,49 @@
+# Simple Bulk Insert Test Configuration
+# Quick test for bulk insert workload development and testing
+
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "postgres"
+  username: "postgres"
+  password: "password"
+  sslmode: "disable"
+
+# Test metadata
+test_metadata:
+  test_name: "bulk_insert_simple_test"
+  environment: "development"
+  tags: ["bulk_insert", "test", "development"]
+
+# Bulk Insert workload configuration
+workload: "bulk_insert"
+scale: 100
+
+# Simple progressive test - 4 bands testing different batch sizes
+progressive:
+  enabled: true
+  strategy: "linear"
+  min_workers: 1
+  max_workers: 2
+  min_connections: 2
+  max_connections: 4
+  test_duration: "1m"           # Short 1-minute tests
+  warmup_duration: "10s"
+  cooldown_duration: "5s"
+  bands: 4
+  enable_analysis: true
+
+# Simple batch size progression for testing
+workload_config:
+  ring_buffer_size: 1000        # Small buffer for testing
+  producer_threads: 1           # Single producer for simplicity
+  batch_sizes: [1, 10, 100, 1000]  # Small progression for quick testing
+  test_insert_method: true      # Test both INSERT and COPY
+  data_seed: 42                 # Fixed seed for reproducible tests
+  max_memory_mb: 64
+  collect_metrics: true
+
+# PostgreSQL monitoring
+collect_pg_stats: true
+pg_stats_statements: false      # Disabled for simple test
