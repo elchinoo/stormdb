@@ -9,23 +9,23 @@ import (
 
 // DataRecord represents a single record for bulk insertion
 type DataRecord struct {
-	ShortText     string
-	MediumText    string
-	LongText      string
-	IntValue      int32
-	BigintValue   int64
-	DecimalValue  float64
-	FloatValue    float64
-	EventDate     time.Time
-	EventTime     time.Time
-	IsActive      bool
-	Metadata      map[string]interface{}
-	DataBlob      []byte
-	StatusEnum    string
-	Tags          []string
-	ClientIP      string
-	LocationX     float64
-	LocationY     float64
+	ShortText    string
+	MediumText   string
+	LongText     string
+	IntValue     int32
+	BigintValue  int64
+	DecimalValue float64
+	FloatValue   float64
+	EventDate    time.Time
+	EventTime    time.Time
+	IsActive     bool
+	Metadata     map[string]interface{}
+	DataBlob     []byte
+	StatusEnum   string
+	Tags         []string
+	ClientIP     string
+	LocationX    float64
+	LocationY    float64
 }
 
 // RingBuffer implements a lock-free ring buffer for producer-consumer pattern
@@ -34,16 +34,16 @@ type RingBuffer struct {
 	buffer   []DataRecord
 	capacity int64
 	mask     int64 // capacity - 1, for fast modulo using bitwise AND
-	
+
 	// Atomic counters for lock-free operations
 	writeIndex int64 // Next position to write
 	readIndex  int64 // Next position to read
-	
+
 	// Statistics
-	produced    int64 // Total records produced
-	consumed    int64 // Total records consumed
-	waitTimeNs  int64 // Total nanoseconds spent waiting
-	
+	produced   int64 // Total records produced
+	consumed   int64 // Total records consumed
+	waitTimeNs int64 // Total nanoseconds spent waiting
+
 	// Control flags
 	closed int32 // Set to 1 when no more data will be produced
 }
@@ -60,7 +60,7 @@ func NewRingBuffer(capacity int) *RingBuffer {
 		}
 		capacity = cap
 	}
-	
+
 	return &RingBuffer{
 		buffer:   make([]DataRecord, capacity),
 		capacity: int64(capacity),
@@ -74,12 +74,12 @@ func (rb *RingBuffer) Push(record DataRecord) bool {
 	for {
 		writeIdx := atomic.LoadInt64(&rb.writeIndex)
 		readIdx := atomic.LoadInt64(&rb.readIndex)
-		
+
 		// Check if buffer is full
 		if writeIdx-readIdx >= rb.capacity {
 			return false
 		}
-		
+
 		// Try to claim the write position
 		if atomic.CompareAndSwapInt64(&rb.writeIndex, writeIdx, writeIdx+1) {
 			// Successfully claimed position, write the data
@@ -97,12 +97,12 @@ func (rb *RingBuffer) Pop() (DataRecord, bool) {
 	for {
 		readIdx := atomic.LoadInt64(&rb.readIndex)
 		writeIdx := atomic.LoadInt64(&rb.writeIndex)
-		
+
 		// Check if buffer is empty
 		if readIdx >= writeIdx {
 			return DataRecord{}, false
 		}
-		
+
 		// Try to claim the read position
 		if atomic.CompareAndSwapInt64(&rb.readIndex, readIdx, readIdx+1) {
 			// Successfully claimed position, read the data
@@ -118,7 +118,7 @@ func (rb *RingBuffer) Pop() (DataRecord, bool) {
 // Returns slice of records and the actual count retrieved
 func (rb *RingBuffer) PopBatch(maxRecords int) ([]DataRecord, int) {
 	records := make([]DataRecord, 0, maxRecords)
-	
+
 	for len(records) < maxRecords {
 		record, ok := rb.Pop()
 		if !ok {
@@ -126,7 +126,7 @@ func (rb *RingBuffer) PopBatch(maxRecords int) ([]DataRecord, int) {
 		}
 		records = append(records, record)
 	}
-	
+
 	return records, len(records)
 }
 
@@ -136,30 +136,30 @@ func (rb *RingBuffer) PopBatchBlocking(ctx context.Context, minRecords, maxRecor
 	start := time.Now()
 	deadline := start.Add(timeout)
 	records := make([]DataRecord, 0, maxRecords)
-	
+
 	for len(records) < minRecords {
 		select {
 		case <-ctx.Done():
 			return records, ctx.Err()
 		default:
 		}
-		
+
 		// Check if we've hit the timeout
 		if time.Now().After(deadline) {
 			break
 		}
-		
+
 		// Try to get more records
 		batch, count := rb.PopBatch(maxRecords - len(records))
 		records = append(records, batch...)
-		
+
 		// If we got some records but not enough, sleep briefly before retrying
 		if count == 0 && len(records) < minRecords {
-			time.Sleep(time.Microsecond * 100) // Brief sleep to avoid busy waiting
+			time.Sleep(time.Microsecond * 100)      // Brief sleep to avoid busy waiting
 			atomic.AddInt64(&rb.waitTimeNs, 100000) // 100 microseconds in nanoseconds
 		}
 	}
-	
+
 	return records, nil
 }
 
@@ -190,10 +190,10 @@ func (rb *RingBuffer) Stats() (produced, consumed, waitTimeNs int64, utilization
 	produced = atomic.LoadInt64(&rb.produced)
 	consumed = atomic.LoadInt64(&rb.consumed)
 	waitTimeNs = atomic.LoadInt64(&rb.waitTimeNs)
-	
+
 	currentSize := rb.Size()
 	utilization = float64(currentSize) / float64(rb.capacity)
-	
+
 	return produced, consumed, waitTimeNs, utilization
 }
 
