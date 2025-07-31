@@ -321,15 +321,18 @@ func (g *Generator) consumer(ctx context.Context, dbCtx context.Context, db *pgx
 			continue
 		}
 
+		// Create defensive copies to prevent memory corruption issues
+		safeRecords := g.copyRecords(records)
+
 		// Perform the insert operation using dbCtx which doesn't expire during test
 		start := time.Now()
 		var insertErr error
 
 		switch method {
 		case "insert":
-			insertErr = g.performBatchInsert(dbCtx, db, records)
+			insertErr = g.performBatchInsert(dbCtx, db, safeRecords)
 		case "copy":
-			insertErr = g.performCopyInsert(dbCtx, db, records)
+			insertErr = g.performCopyInsert(dbCtx, db, safeRecords)
 		default:
 			insertErr = fmt.Errorf("unknown insert method: %s", method)
 		}
@@ -349,6 +352,41 @@ func (g *Generator) consumer(ctx context.Context, dbCtx context.Context, db *pgx
 			metrics.RecordLatencyWithLimit(latencyNs)
 		}
 	}
+}
+
+// copyRecords creates defensive copies of DataRecord slice to prevent memory corruption
+func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
+	if len(records) == 0 {
+		return nil
+	}
+	
+	copies := make([]DataRecord, len(records))
+	for i, record := range records {
+		// Create deep copies of slices to prevent corruption
+		tagsCopy := make([]string, len(record.Tags))
+		copy(tagsCopy, record.Tags)
+		
+		copies[i] = DataRecord{
+			ShortText:    record.ShortText,
+			MediumText:   record.MediumText,
+			LongText:     record.LongText,
+			IntValue:     record.IntValue,
+			BigintValue:  record.BigintValue,
+			DecimalValue: record.DecimalValue,
+			FloatValue:   record.FloatValue,
+			EventDate:    record.EventDate,
+			EventTime:    record.EventTime,
+			IsActive:     record.IsActive,
+			Metadata:     record.Metadata,
+			DataBlob:     record.DataBlob,
+			StatusEnum:   record.StatusEnum,
+			Tags:         tagsCopy, // Use the copied slice
+			ClientIP:     record.ClientIP,
+			LocationX:    record.LocationX,
+			LocationY:    record.LocationY,
+		}
+	}
+	return copies
 }
 
 // performBatchInsert executes a batch INSERT operation
@@ -488,18 +526,26 @@ func (g *Generator) formatStringArray(tags []string) interface{} {
 	// Format as PostgreSQL array literal with safe escaping
 	quoted := make([]string, len(tags))
 	for i, tag := range tags {
-		// Safety check for empty or nil tag strings
-		if tag == "" {
+		// Robust safety checks to prevent panics
+		if len(tag) == 0 {
 			quoted[i] = "\"\""
 			continue
 		}
-
+		
+		// Additional safety check: ensure tag has valid memory
+		// Create a new string to avoid potential memory corruption
+		safeTag := string([]byte(tag))
+		
 		// Ensure tag is reasonable length and escape it safely
-		if len(tag) > 1000 {
-			tag = tag[:1000] // Truncate very long tags
+		if len(safeTag) > 1000 {
+			safeTag = safeTag[:1000] // Truncate very long tags
 		}
-		// Use simple string replacement instead of fmt.Sprintf for safety
-		escaped := strings.ReplaceAll(tag, "\"", "\\\"")
+		
+		// Use simple string replacement with additional safety
+		escaped := ""
+		if len(safeTag) > 0 {
+			escaped = strings.ReplaceAll(safeTag, "\"", "\\\"")
+		}
 		quoted[i] = "\"" + escaped + "\""
 	}
 	return fmt.Sprintf("{%s}", strings.Join(quoted, ","))
