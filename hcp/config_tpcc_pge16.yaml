@@ -1,0 +1,60 @@
+# TPC-C Benchmark Workload Configuration - PGE v16
+# Standard TPC-C benchmark for OLTP performance testing
+
+database:
+  type: postgres
+  host: "p-ys0nl9245c-rw-external-d6e5d894e2a130a6.elb.us-east-1.amazonaws.com"
+  port: 5432
+  dbname: "edb_admin"
+  username: "edb_admin"
+  password: "mattdemo123!"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "tpcc"
+scale: 10  # Number of warehouses
+
+# Regular benchmark settings (ignored in progressive mode)
+duration: "4h"
+workers: 8
+connections: 20
+summary_interval: "5m"
+
+# Progressive scaling configuration - 4 hour test with 8 bands of 30 minutes each
+progressive:
+  enabled: true
+  strategy: "linear"              # Linear scaling from 20 to 150 connections
+  min_workers: 8                  # Start with 8 workers
+  max_workers: 70                 # Scale up to 70 workers
+  min_connections: 20             # Start with 20 connections
+  max_connections: 150            # Scale up to 150 connections
+  test_duration: "30m"            # Run each band for 30 minutes
+  warmup_duration: "2m"           # Warmup time per band
+  cooldown_duration: "1m"         # Cooldown time between bands
+  bands: 8                        # Number of test configurations (4 hours total)
+  enable_analysis: true           # Enable mathematical analysis
+
+# TPC-C specific settings
+tpcc:
+  warehouses: 10
+  ramp_time: "2m"
+  
+metrics:
+  enabled: true
+  interval: "10s"
+  histogram_buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+
+# Optimized for PGE v16 stability
+advanced:
+  prepare_statements: true
+  connection_pooling: true
+  transaction_isolation: "read_committed"

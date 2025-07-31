@@ -1,0 +1,65 @@
+# IMDB Mixed Workload Configuration - PGE v16
+database:
+  type: postgres
+  host: "p-ys0nl9245c-rw-external-d6e5d894e2a130a6.elb.us-east-1.amazonaws.com"
+  port: 5432
+  dbname: "edb_admin"
+  username: "edb_admin"
+  password: "mattdemo123!"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  
+  # Specific plugin files to load (optional)
+  files:
+    - "./build/plugins/imdb_plugin.so"
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "imdb_mixed"
+scale: 1000
+
+# Regular benchmark settings (ignored in progressive mode)
+duration: "4h"
+workers: 8
+connections: 15
+summary_interval: "5m"
+
+# Progressive scaling configuration - 4 hour test with 8 bands of 30 minutes each
+progressive:
+  enabled: true
+  strategy: "linear"              # Linear scaling from 20 to 150 connections
+  min_workers: 8                  # Start with 8 workers
+  max_workers: 70                 # Scale up to 70 workers
+  min_connections: 20             # Start with 20 connections
+  max_connections: 150            # Scale up to 150 connections
+  test_duration: "30m"            # Run each band for 30 minutes
+  warmup_duration: "2m"           # Warmup time per band
+  cooldown_duration: "1m"         # Cooldown time between bands
+  bands: 8                        # Number of test configurations (4 hours total)
+  enable_analysis: true           # Enable mathematical analysis
+
+# IMDB-specific configuration
+data_source: "plugin"  # Use plugin's built-in data
+
+metrics:
+  enabled: true
+  interval: "5s"
+  histogram_buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+
+# Enable detailed query logging for analysis
+logging:
+  level: "info"
+  query_logging: true
+  
+# Advanced PGE v16 compatible settings
+advanced:
+  prepare_statements: true
+  connection_pooling: true
+  batch_operations: false  # Conservative for v16
