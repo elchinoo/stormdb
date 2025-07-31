@@ -1,0 +1,44 @@
+# Progress Tracking Demo Configuration
+# E-commerce workload with progress bars during data seeding
+
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "test"
+  username: "storm_user"
+  password: "storm_pwd!123"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  auto_load: true
+
+# E-commerce workload with moderate scale for demo
+workload: "ecommerce_mixed"
+scale: 500                  # 500 users (shows progress bars for users, products, orders, etc.)
+duration: "10s"             # Short duration
+workers: 2                  # Minimal workers
+connections: 4              # Minimal connections
+summary_interval: "2s"      # Frequent summaries
+
+# E-commerce specific configuration
+workload_config:
+  mode: "mixed"
+  
+  data_scale:
+    users: 500
+    products: 250
+    orders: 1000
+    reviews: 500
+    sessions: 1500
+    analytics_events: 2500
+
+  workload_mix:
+    mixed:
+      read_operations: 70
+      write_operations: 20
+      analytics_operations: 10

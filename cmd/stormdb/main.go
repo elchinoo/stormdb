@@ -5,8 +5,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -15,6 +18,7 @@ import (
 	"github.com/elchinoo/stormdb/internal/database"
 	"github.com/elchinoo/stormdb/internal/metrics"
 	"github.com/elchinoo/stormdb/internal/progressive"
+	"github.com/elchinoo/stormdb/internal/results"
 	"github.com/elchinoo/stormdb/internal/workload"
 	"github.com/elchinoo/stormdb/pkg/types"
 
@@ -51,6 +55,8 @@ func main() {
 		pgStatsStatements bool
 		showVersion       bool
 		progressiveMode   bool
+		enableProfiling   bool
+		profilingPort     string
 	)
 
 	rootCmd := &cobra.Command{
@@ -80,6 +86,8 @@ func main() {
 				CollectPgStats:    collectPgStats,
 				PgStatsStatements: pgStatsStatements,
 				ProgressiveMode:   progressiveMode,
+				EnableProfiling:   enableProfiling,
+				ProfilingPort:     profilingPort,
 			})
 		},
 	}
@@ -121,6 +129,8 @@ func main() {
 	rootCmd.Flags().BoolVar(&pgStatsStatements, "pg-stat-statements", false, "Enable pg_stat_statements collection (requires extension)")
 	rootCmd.Flags().BoolVar(&progressiveMode, "progressive", false, "Enable progressive connection scaling (overrides config)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Show version information and exit")
+	rootCmd.Flags().BoolVar(&enableProfiling, "profile", false, "Enable memory profiling server")
+	rootCmd.Flags().StringVar(&profilingPort, "profile-port", "6060", "Port for profiling server (default: 6060)")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -144,6 +154,8 @@ type CLIOptions struct {
 	CollectPgStats    bool
 	PgStatsStatements bool
 	ProgressiveMode   bool
+	EnableProfiling   bool
+	ProfilingPort     string
 }
 
 func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOptions) error {
@@ -154,6 +166,34 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 
 	// Apply CLI overrides to config
 	applyCliOverrides(cfg, cliOpts)
+
+	// Start profiling server if enabled
+	if cliOpts.EnableProfiling {
+		go func() {
+			log.Printf("🔍 Starting memory profiling server on port %s", cliOpts.ProfilingPort)
+			log.Printf("📊 Access profiling at: http://localhost:%s/debug/pprof/", cliOpts.ProfilingPort)
+			log.Printf("💾 Memory profile: http://localhost:%s/debug/pprof/heap", cliOpts.ProfilingPort)
+			log.Printf("⚡ CPU profile: http://localhost:%s/debug/pprof/profile", cliOpts.ProfilingPort)
+
+			// Force garbage collection and print memory stats periodically
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+
+			go func() {
+				for range ticker.C {
+					runtime.GC()
+					var m runtime.MemStats
+					runtime.ReadMemStats(&m)
+					log.Printf("📈 Memory: Alloc=%dMB, TotalAlloc=%dMB, Sys=%dMB, NumGC=%d",
+						bToMb(m.Alloc), bToMb(m.TotalAlloc), bToMb(m.Sys), m.NumGC)
+				}
+			}()
+
+			if err := http.ListenAndServe(":"+cliOpts.ProfilingPort, nil); err != nil {
+				log.Printf("Warning: Failed to start profiling server: %v", err)
+			}
+		}()
+	}
 
 	duration, err := time.ParseDuration(cfg.Duration)
 	if err != nil {
@@ -336,9 +376,8 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 	// Start periodic summary reporting if interval is configured
 	var summaryTicker *time.Ticker
 	var summaryDone chan bool
-	var startTime time.Time
+	startTime := time.Now() // Always record start time for results storage
 	if summaryInterval > 0 {
-		startTime = time.Now()
 		summaryTicker = time.NewTicker(summaryInterval)
 		summaryDone = make(chan bool)
 		go func() {
@@ -389,7 +428,33 @@ func runLoadTest(configFile string, setup bool, rebuild bool, cliOpts *CLIOption
 	}
 
 	// -------------------------------
-	// Phase 3: Report results
+	// Phase 3: Store results in database backend (if configured)
+	// -------------------------------
+
+	// Record end time for test results storage
+	testEndTime := time.Now()
+
+	// Initialize and store test results in database backend if configured
+	if resultsBackend, err := results.CreateBackendFromConfig(cfg); err != nil {
+		log.Printf("⚠️  Failed to create results backend: %v", err)
+	} else if resultsBackend != nil {
+		defer resultsBackend.Close()
+
+		// Store test results
+		if err := results.StoreTestResults(context.Background(), resultsBackend, cfg, metricsData, startTime, testEndTime); err != nil {
+			log.Printf("⚠️  Failed to store test results: %v", err)
+		} else {
+			log.Printf("💾 Test results stored in database backend")
+		}
+
+		// Perform maintenance (cleanup old results)
+		if err := results.PerformMaintenance(context.Background(), resultsBackend); err != nil {
+			log.Printf("⚠️  Failed to perform backend maintenance: %v", err)
+		}
+	}
+
+	// -------------------------------
+	// Phase 4: Report results
 	// -------------------------------
 
 	if interrupted {
@@ -478,4 +543,9 @@ func (w *WorkloadAdapter) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.
 // Cleanup drops tables and reloads data (called only with --rebuild)
 func (w *WorkloadAdapter) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
 	return w.workload.Cleanup(ctx, db, cfg)
+}
+
+// bToMb converts bytes to megabytes
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }

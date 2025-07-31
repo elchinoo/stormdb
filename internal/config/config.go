@@ -119,19 +119,21 @@ func validateConfig(cfg *types.Config) error {
 
 // validateProgressiveConfig validates progressive scaling configuration
 func validateProgressiveConfig(p *struct {
-	Enabled          bool   `mapstructure:"enabled"`
-	Strategy         string `mapstructure:"strategy"`
-	MinWorkers       int    `mapstructure:"min_workers"`
-	MaxWorkers       int    `mapstructure:"max_workers"`
-	MinConns         int    `mapstructure:"min_connections"`
-	MaxConns         int    `mapstructure:"max_connections"`
-	TestDuration     string `mapstructure:"test_duration"`
-	WarmupDuration   string `mapstructure:"warmup_duration"`
-	CooldownDuration string `mapstructure:"cooldown_duration"`
-	Bands            int    `mapstructure:"bands"`
-	ExportCSV        bool   `mapstructure:"export_csv"`
-	ExportJSON       bool   `mapstructure:"export_json"`
-	EnableAnalysis   bool   `mapstructure:"enable_analysis"`
+	Enabled           bool   `mapstructure:"enabled"`
+	Strategy          string `mapstructure:"strategy"`
+	MinWorkers        int    `mapstructure:"min_workers"`
+	MaxWorkers        int    `mapstructure:"max_workers"`
+	MinConns          int    `mapstructure:"min_connections"`
+	MaxConns          int    `mapstructure:"max_connections"`
+	TestDuration      string `mapstructure:"test_duration"`
+	WarmupDuration    string `mapstructure:"warmup_duration"`
+	CooldownDuration  string `mapstructure:"cooldown_duration"`
+	Bands             int    `mapstructure:"bands"`
+	ExportCSV         bool   `mapstructure:"export_csv"`
+	ExportJSON        bool   `mapstructure:"export_json"`
+	EnableAnalysis    bool   `mapstructure:"enable_analysis"`
+	MaxLatencySamples int    `mapstructure:"max_latency_samples"`
+	MemoryLimitMB     int    `mapstructure:"memory_limit_mb"`
 	// Legacy fields for backward compatibility
 	StepWorkers  int    `mapstructure:"step_workers"`
 	StepConns    int    `mapstructure:"step_connections"`

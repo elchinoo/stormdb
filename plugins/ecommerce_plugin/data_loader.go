@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elchinoo/stormdb/internal/progress"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,6 +25,8 @@ func (w *ECommerceWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool
 	orderCount := scale * 2   // 2 orders per user
 	reviewCount := scale      // 1 review per user
 	sessionCount := scale * 3 // 3 sessions per user
+
+	fmt.Printf("📊 Loading E-Commerce sample data (scale=%d)...\n", scale)
 
 	// Load vendors first (required for products)
 	if err := w.loadVendors(ctx, db, vendorCount); err != nil {
@@ -76,8 +79,6 @@ func (w *ECommerceWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool
 
 // loadVendors generates vendor data
 func (w *ECommerceWorkload) loadVendors(ctx context.Context, db *pgxpool.Pool, count int) error {
-	fmt.Printf("📦 Loading %d vendors...\n", count)
-
 	vendorNames := []string{
 		"TechSupply Corp", "Global Electronics", "Fashion Forward Inc", "Home Essentials Ltd",
 		"Sports Gear Co", "Beauty Products Inc", "Toy World Suppliers", "Book Distributors",
@@ -88,6 +89,9 @@ func (w *ECommerceWorkload) loadVendors(ctx context.Context, db *pgxpool.Pool, c
 
 	countries := []string{"USA", "Canada", "UK", "Germany", "France", "Italy", "Spain", "Brazil", "Japan", "China"}
 	paymentTerms := []string{"Net 30", "Net 60", "2/10 Net 30", "COD", "Net 15"}
+
+	// Create progress tracker
+	progressTracker := progress.NewTracker("📦 Loading vendors", count)
 
 	batch := make([][]interface{}, 0, 100)
 	for i := 1; i <= count; i++ {
@@ -112,6 +116,7 @@ func (w *ECommerceWorkload) loadVendors(ctx context.Context, db *pgxpool.Pool, c
 			if err != nil {
 				return fmt.Errorf("failed to insert vendor batch: %w", err)
 			}
+			progressTracker.Update(i)
 			batch = batch[:0]
 		}
 	}
@@ -136,12 +141,14 @@ func (w *ECommerceWorkload) insertVendorBatch(ctx context.Context, db *pgxpool.P
 
 // loadUsers generates user data
 func (w *ECommerceWorkload) loadUsers(ctx context.Context, db *pgxpool.Pool, count int) error {
-	fmt.Printf("👥 Loading %d users...\n", count)
 	firstNames := []string{"Freya", "Sarah", "Michael", "Sofia", "Lucía", "Léa", "Júlia", "Paula", "Isabela", "Oliver", "Olivia", "Chloe", "William", "Arthur", "Zhi", "Yui", "Grace", "Ben", "Paul", "Emma", "Thomas", "Lucas", "Marie", "Haruto", "Linda", "Miguel", "Manuela", "Kim", "Alexander", "Ren", "Raphaël", "Jessica", "Leo", "Hugo", "Florence", "Isabella", "Riku", "Paul", "Susan", "Hina", "Yuna", "Michael", "Jade", "Carlos", "Clara", "Freddie", "Tommaso", "Riccardo", "Sakura", "Leo", "Anna", "Theo", "Guillaume", "Karen", "Maria", "Lukas", "Emily", "Davi", "Chloé", "Jules", "Paula", "Raphael", "Laura", "Juliette", "Maximilian", "Alina", "Zoe", "Felix", "Hannah", "Bernardo", "Ting", "Henry", "Chloe", "Ella", "Oscar", "Alice", "Isla", "Alice", "Noah", "Emma", "Gabriel", "Sophie", "Leo", "Shan", "Kiara", "Yuto", "Anna", "Thomas", "Alice", "Hannah", "Lucas", "Rin"}
 	lastNames := []string{"Nascimento", "Brown", "Tanaka", "Wright", "Campbell", "King", "Takahashi", "Bertrand", "Gao", "Fernández", "Bernard", "Liu", "Almeida", "Wright", "Jones", "Nguyen", "Schneider", "Martin", "Costa", "Suzuki", "López", "Becker", "Richter", "Rossi", "Mendes", "Leroy", "Silva", "Fontaine", "Romano", "Hernández", "Wolf", "Lopez", "Gomes", "Sanchez", "Schäfer", "Meier", "Dupont", "Russo", "Zimmermann", "González", "Miller", "Ribeiro", "Dubois", "Yamada", "Rodríguez", "Anderson", "Souza", "Brown", "Dubois", "Thomas", "Costa", "Araújo", "Müller", "Walker", "Rizzo", "Moreno", "Nguyen", "Fischer", "Alves", "Moreau", "Hayashi", "Lima", "Pérez", "Romero", "Mancini", "Lopez", "Almeida", "Alonso", "Yamada", "Gutiérrez", "Santos", "Guo", "Schwarz", "Morgan", "Marino", "Liu", "Nakamura", "De Luca", "Lee", "Muñoz", "Kimura", "Ribeiro", "Meyer", "Carvalho", "Yamaguchi", "Hoffmann", "Martínez", "Thomas", "Silva", "Dubois", "Hernández", "Schultz", "Costa", "Sato", "Cheng", "Romero", "Costa"}
 	countries := []string{"USA", "Canada", "UK", "Germany", "France", "Australia", "Japan", "Brazil", "India", "Mexico"}
 	cities := []string{"New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "Austin"}
 	genders := []string{"M", "F", "Other"}
+
+	// Create progress tracker
+	progressTracker := progress.NewTracker("👥 Loading users", count)
 
 	batch := make([][]interface{}, 0, 100)
 	for i := 1; i <= count; i++ {
@@ -181,6 +188,7 @@ func (w *ECommerceWorkload) loadUsers(ctx context.Context, db *pgxpool.Pool, cou
 			if err != nil {
 				return fmt.Errorf("failed to insert user batch: %w", err)
 			}
+			progressTracker.Update(i)
 			batch = batch[:0]
 		}
 	}

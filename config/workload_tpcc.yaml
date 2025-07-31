@@ -1,0 +1,136 @@
+# TPC-C Workload Configuration Template
+# TPC-C is a standard OLTP benchmark that simulates an order-entry environment
+# This file contains multiple configuration examples for different scenarios
+
+# =============================================================================
+# DATABASE CONNECTION CONFIGURATION
+# =============================================================================
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "postgres"
+  username: "postgres"
+  password: "postgres"
+  sslmode: "disable"
+
+# =============================================================================
+# RESULTS BACKEND CONFIGURATION (Optional - for analytics)
+# =============================================================================
+# Uncomment and configure to store test results in a separate database
+# results_backend:
+#   enabled: true
+#   host: "localhost"
+#   port: 5432
+#   database: "stormdb_results"
+#   username: "postgres"
+#   password: "postgres"
+#   sslmode: "disable"
+#   retention_days: 90
+#   store_raw_metrics: true
+#   store_pg_stats: true
+#   metrics_batch_size: 2000
+#   table_prefix: "stormdb_"
+
+# =============================================================================
+# TEST METADATA (Optional - for result tracking)
+# =============================================================================
+# test_metadata:
+#   test_name: "tpcc_performance_test"
+#   environment: "local_dev"
+#   database_target: "PostgreSQL 16"
+#   tags: ["tpcc", "oltp", "benchmark"]
+#   notes: "TPC-C benchmark testing"
+
+# =============================================================================
+# PLUGIN CONFIGURATION
+# =============================================================================
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  files: []
+  auto_load: true
+
+# =============================================================================
+# WORKLOAD CONFIGURATION
+# =============================================================================
+workload: "tpcc"
+
+# =============================================================================
+# EXAMPLE 1: BASIC TPC-C TEST (Default - Active Configuration)
+# =============================================================================
+# Small scale test for development and validation
+scale: 5                    # Number of warehouses (small scale for testing)
+duration: "5m"              # Short duration for quick tests
+workers: 4                  # Conservative worker count
+connections: 8              # Connection pool size
+summary_interval: "30s"     # Frequent progress updates
+
+# =============================================================================
+# EXAMPLE 2: PERFORMANCE TPC-C TEST (Commented)
+# =============================================================================
+# Uncomment for larger scale performance testing
+# scale: 100                  # Medium scale - 100 warehouses
+# duration: "30m"             # Longer duration for performance testing
+# workers: 16                 # Higher worker count
+# connections: 32             # Larger connection pool
+# summary_interval: "5m"      # Less frequent updates
+
+# =============================================================================
+# EXAMPLE 3: PROGRESSIVE SCALING TPC-C TEST (Commented)
+# =============================================================================
+# Uncomment for progressive scaling tests
+# scale: 500                  # Large scale
+# duration: "4h"              # Long duration for scaling analysis
+# workers: 10                 # Starting worker count
+# connections: 20             # Starting connection count
+# summary_interval: "5m"
+# 
+# progressive:
+#   enabled: true
+#   strategy: "linear"
+#   min_workers: 10
+#   max_workers: 100
+#   min_connections: 20
+#   max_connections: 200
+#   test_duration: "30m"
+#   warmup_duration: "2m"
+#   cooldown_duration: "1m"
+#   bands: 8
+#   enable_analysis: true
+#   
+#   # Memory management for progressive scaling
+#   max_latency_samples: 50000
+#   memory_limit_mb: 512
+
+# =============================================================================
+# PostgreSQL MONITORING (Optional)
+# =============================================================================
+# Uncomment to collect PostgreSQL statistics
+# collect_pg_stats: true
+# pg_stats_statements: true
+
+# =============================================================================
+# TPC-C WORKLOAD SPECIFIC CONFIGURATION
+# =============================================================================
+workload_config:
+  # Transaction mix (TPC-C standard percentages)
+  transaction_mix:
+    new_order: 45       # 45% New-Order transactions (most intensive)
+    payment: 43         # 43% Payment transactions
+    order_status: 4     # 4% Order-Status transactions (read-only)
+    delivery: 4         # 4% Delivery transactions (batch processing)
+    stock_level: 4      # 4% Stock-Level transactions (analytical)
+  
+  # Performance tuning
+  think_time: 0         # No think time for maximum throughput
+  ramp_up_time: 10      # Ramp-up period in seconds
+
+# =============================================================================
+# METRICS CONFIGURATION
+# =============================================================================
+metrics:
+  enabled: true
+  interval: "5s"
+  latency_percentiles: [50, 90, 95, 99]

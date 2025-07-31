@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elchinoo/stormdb/internal/progress"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,6 +24,8 @@ func (w *ECommerceBasicWorkload) loadSampleData(ctx context.Context, db *pgxpool
 	orderCount := scale * 2
 	reviewCount := scale
 	sessionCount := scale * 3
+
+	fmt.Printf("📊 Loading E-Commerce Basic sample data (scale=%d)...\n", scale)
 
 	// Load users
 	if err := w.loadUsers(ctx, db, userCount); err != nil {
@@ -70,6 +73,9 @@ func (w *ECommerceBasicWorkload) loadUsers(ctx context.Context, db *pgxpool.Pool
 		"Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"}
 	countries := []string{"USA", "Canada", "UK", "Germany", "France", "Australia", "Japan", "Brazil", "India", "Mexico"}
 	cities := []string{"New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose"}
+
+	// Create progress tracker
+	userProgress := progress.NewTracker("👥 Loading users", count)
 
 	batch := 100
 	for i := 0; i < count; i += batch {
@@ -120,6 +126,8 @@ func (w *ECommerceBasicWorkload) loadUsers(ctx context.Context, db *pgxpool.Pool
 		if _, err := db.Exec(ctx, query, values...); err != nil {
 			return fmt.Errorf("failed to insert users batch: %w", err)
 		}
+
+		userProgress.Update(i + batch)
 	}
 
 	return nil

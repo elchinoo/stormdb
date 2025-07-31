@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elchinoo/stormdb/internal/progress"
 	"github.com/elchinoo/stormdb/internal/util"
 	"github.com/elchinoo/stormdb/pkg/types"
 
@@ -388,7 +389,9 @@ func (w *IMDBWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, sca
 
 	// Insert sample actors first (they are referenced by movies)
 	actorCount := scale / 2
-	log.Printf("👥 Loading %d sample actors...", actorCount)
+
+	// Create progress tracker for actors
+	actorProgress := progress.NewTracker("👥 Loading actors", actorCount)
 
 	for i := 1; i <= actorCount; i++ {
 		actorName := fmt.Sprintf("Actor %d", i)
@@ -401,7 +404,11 @@ func (w *IMDBWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, sca
 		if err != nil {
 			return fmt.Errorf("failed to insert actor %d: %w", i, err)
 		}
+		actorProgress.Update(i)
 	}
+
+	// Create progress tracker for movies
+	movieProgress := progress.NewTracker("🎬 Loading movies", scale)
 
 	// Insert sample movies into movies_normalized_meta
 	genres := []string{"Action", "Comedy", "Drama", "Horror", "Romance", "Thriller", "Sci-Fi", "Documentary"}
@@ -430,13 +437,13 @@ func (w *IMDBWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, sca
 			return fmt.Errorf("failed to insert movie %d: %w", i, err)
 		}
 
-		if i%100 == 0 {
-			log.Printf("⏳ Inserted %d / %d movies...", i, scale)
-		}
+		movieProgress.Update(i)
 	}
 
+	// Create progress tracker for movie-actor relationships
+	castProgress := progress.NewTracker("🔗 Creating movie-actor relationships", scale)
+
 	// Link actors to movies in movies_normalized_cast
-	log.Printf("🔗 Creating movie-actor relationships...")
 	for movieID := 1; movieID <= scale; movieID++ {
 		// Each movie has 2-5 actors
 		actorsPerMovie := 2 + (movieID % 4)
@@ -453,11 +460,14 @@ func (w *IMDBWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, sca
 				return fmt.Errorf("failed to link movie %d to actor %d: %w", movieID, actorIdx, err)
 			}
 		}
+		castProgress.Update(movieID)
 	}
 
 	// Insert sample user comments into movies_normalized_user_comments
 	commentCount := scale * 3 // 3 comments per movie on average
-	log.Printf("📝 Loading %d sample user comments...", commentCount)
+
+	// Create progress tracker for comments
+	commentProgress := progress.NewTracker("📝 Loading user comments", commentCount)
 
 	commentTexts := []string{
 		"Great movie! Really enjoyed it.",
@@ -486,14 +496,14 @@ func (w *IMDBWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, sca
 			return fmt.Errorf("failed to insert comment %d: %w", i, err)
 		}
 
-		if i%500 == 0 {
-			log.Printf("⏳ Inserted %d / %d comments...", i, commentCount)
-		}
+		commentProgress.Update(i)
 	}
 
 	// Insert sample viewing logs
 	viewLogCount := scale * 2 // 2 view records per movie on average
-	log.Printf("📺 Loading %d sample viewing logs...", viewLogCount)
+
+	// Create progress tracker for viewing logs
+	viewLogProgress := progress.NewTracker("📺 Loading viewing logs", viewLogCount)
 
 	for i := 1; i <= viewLogCount; i++ {
 		movieIdx := ((i - 1) % scale) + 1
@@ -511,14 +521,14 @@ func (w *IMDBWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, sca
 			return fmt.Errorf("failed to insert view log %d: %w", i, err)
 		}
 
-		if i%1000 == 0 {
-			log.Printf("⏳ Inserted %d / %d view logs...", i, viewLogCount)
-		}
+		viewLogProgress.Update(i)
 	}
 
 	// Insert sample voting history
 	voteHistoryCount := scale * 2 // 2 vote records per movie on average
-	log.Printf("🗳️ Loading %d sample voting history records...", voteHistoryCount)
+
+	// Create progress tracker for voting history
+	voteProgress := progress.NewTracker("🗳️ Loading voting history", voteHistoryCount)
 
 	for i := 1; i <= voteHistoryCount; i++ {
 		movieIdx := ((i - 1) % scale) + 1
@@ -536,9 +546,7 @@ func (w *IMDBWorkload) loadSampleData(ctx context.Context, db *pgxpool.Pool, sca
 			return fmt.Errorf("failed to insert voting history %d: %w", i, err)
 		}
 
-		if i%500 == 0 {
-			log.Printf("⏳ Inserted %d / %d voting records...", i, voteHistoryCount)
-		}
+		voteProgress.Update(i)
 	}
 
 	log.Printf("✅ Simplified IMDB sample data loaded successfully")

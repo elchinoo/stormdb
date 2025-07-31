@@ -1,0 +1,221 @@
+# PgVector Workload Configuration Template
+# PostgreSQL vector database operations for similarity search, embeddings,
+# and AI/ML workloads using the pgvector extension
+# This file contains multiple configuration examples for different vector scenarios
+
+# =============================================================================
+# DATABASE CONNECTION CONFIGURATION
+# =============================================================================
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "postgres"
+  username: "postgres"
+  password: "postgres"
+  sslmode: "disable"
+
+# =============================================================================
+# RESULTS BACKEND CONFIGURATION (Optional - for analytics)
+# =============================================================================
+# Uncomment and configure to store test results in a separate database
+# results_backend:
+#   enabled: true
+#   host: "localhost"
+#   port: 5432
+#   database: "stormdb_results"
+#   username: "postgres"
+#   password: "postgres"
+#   sslmode: "disable"
+#   retention_days: 90
+#   store_raw_metrics: true
+#   store_pg_stats: true
+#   metrics_batch_size: 2000
+#   table_prefix: "stormdb_"
+
+# =============================================================================
+# TEST METADATA (Optional - for result tracking)
+# =============================================================================
+# test_metadata:
+#   test_name: "pgvector_similarity_search"
+#   environment: "local_dev"
+#   database_target: "PostgreSQL 16 with pgvector"
+#   tags: ["pgvector", "similarity", "ai", "ml"]
+#   notes: "Vector similarity search performance testing"
+
+# =============================================================================
+# PLUGIN CONFIGURATION
+# =============================================================================
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  files:
+    - "./build/plugins/vector_plugin.so"
+  auto_load: true
+
+# =============================================================================
+# EXAMPLE 1: VECTOR COSINE SIMILARITY (Default - Active Configuration)
+# =============================================================================
+# Cosine similarity search with 1024-dimensional vectors
+workload: "vector_1024_cosine"
+scale: 1000                 # Number of vectors to work with
+duration: "10m"             # Test duration
+workers: 4                  # Conservative worker count for vector operations
+connections: 8              # Connection pool size
+summary_interval: "1m"      # Progress update interval
+
+# =============================================================================
+# EXAMPLE 2: VECTOR INNER PRODUCT SIMILARITY (Commented)
+# =============================================================================
+# Uncomment for inner product similarity testing
+# workload: "vector_1024_inner"
+# scale: 1500
+# duration: "15m"
+# workers: 6
+# connections: 12
+# summary_interval: "2m"
+
+# =============================================================================
+# EXAMPLE 3: VECTOR INGESTION - SINGLE INSERT (Commented)
+# =============================================================================
+# Uncomment for individual vector insertion performance
+# workload: "pgvector_comprehensive_ingestion_single"
+# scale: 5000                 # Number of vectors to insert
+# duration: "20m"
+# workers: 8
+# connections: 16
+# summary_interval: "2m"
+
+# =============================================================================
+# EXAMPLE 4: VECTOR INGESTION - BATCH INSERT (Commented)
+# =============================================================================
+# Uncomment for batch vector insertion performance
+# workload: "pgvector_ingestion_batch"
+# scale: 10000                # Larger scale for batch operations
+# duration: "30m"
+# workers: 4                  # Fewer workers for batch operations
+# connections: 8
+# summary_interval: "3m"
+
+# =============================================================================
+# EXAMPLE 5: VECTOR INGESTION - COPY COMMAND (Commented)
+# =============================================================================
+# Uncomment for COPY-based vector ingestion (fastest bulk loading)
+# workload: "pgvector_comprehensive_ingestion_copy"
+# scale: 50000                # Very large scale for COPY operations
+# duration: "45m"
+# workers: 2                  # Minimal workers for COPY operations
+# connections: 4
+# summary_interval: "5m"
+
+# =============================================================================
+# EXAMPLE 6: VECTOR READ - INDEXED SEARCH (Commented)
+# =============================================================================
+# Uncomment for indexed vector similarity search
+# workload: "pgvector_comprehensive_read_indexed"
+# scale: 20000                # Large vector dataset
+# duration: "25m"
+# workers: 12                 # More workers for read operations
+# connections: 24
+# summary_interval: "2m"
+
+# =============================================================================
+# EXAMPLE 7: VECTOR READ - SEQUENTIAL SCAN (Commented)
+# =============================================================================
+# Uncomment for sequential scan vector search (no index)
+# workload: "pgvector_comprehensive_read_scan"
+# scale: 5000                 # Smaller scale for sequential scans
+# duration: "30m"
+# workers: 6
+# connections: 12
+# summary_interval: "3m"
+
+# =============================================================================
+# EXAMPLE 8: VECTOR UPDATE OPERATIONS (Commented)
+# =============================================================================
+# Uncomment for vector update performance testing
+# workload: "pgvector_comprehensive_update_single"
+# scale: 8000
+# duration: "20m"
+# workers: 6
+# connections: 12
+# summary_interval: "2m"
+
+# =============================================================================
+# EXAMPLE 9: PROGRESSIVE SCALING VECTOR WORKLOAD (Commented)
+# =============================================================================
+# Uncomment for progressive scaling tests
+# workload: "vector_1024_cosine"
+# scale: 10000
+# duration: "4h"
+# workers: 4
+# connections: 8
+# summary_interval: "5m"
+# 
+# progressive:
+#   enabled: true
+#   strategy: "linear"
+#   min_workers: 4
+#   max_workers: 40
+#   min_connections: 8
+#   max_connections: 80
+#   test_duration: "30m"
+#   warmup_duration: "3m"     # Longer warmup for vector operations
+#   cooldown_duration: "2m"
+#   bands: 8
+#   enable_analysis: true
+#   
+#   # Memory management for progressive scaling
+#   max_latency_samples: 50000
+#   memory_limit_mb: 768      # Higher memory for vector operations
+
+# =============================================================================
+# PostgreSQL MONITORING (Optional)
+# =============================================================================
+# Uncomment to collect PostgreSQL statistics
+# collect_pg_stats: true
+# pg_stats_statements: true
+
+# =============================================================================
+# VECTOR WORKLOAD SPECIFIC CONFIGURATION
+# =============================================================================
+workload_config:
+  # Vector configuration
+  vector_dimensions: 1024     # Dimensionality of vectors
+  similarity_metric: "cosine" # cosine, inner_product, l2_distance
+  
+  # Index configuration
+  index_type: "ivfflat"       # ivfflat, hnsw
+  index_lists: 100            # Number of lists for IVF index
+  index_ef_construction: 64   # HNSW construction parameter
+  index_ef_search: 40         # HNSW search parameter
+  
+  # Query configuration
+  similarity_threshold: 0.7   # Minimum similarity threshold
+  top_k: 10                   # Number of nearest neighbors to return
+  
+  # Data generation
+  vector_distribution: "normal"  # normal, uniform, sparse
+  vector_sparsity: 0.1           # For sparse vectors (0.0 to 1.0)
+  
+  # Operation mix (percentages should sum to 100)
+  operation_mix:
+    similarity_search: 70     # Vector similarity searches
+    insert_vector: 15         # New vector insertions
+    update_vector: 10         # Vector updates
+    delete_vector: 5          # Vector deletions
+
+  # Performance settings
+  batch_size: 100             # Batch size for bulk operations
+  cache_vectors: true         # Enable vector caching
+  think_time: 0               # No think time for maximum throughput
+  ramp_up_time: 30            # Longer ramp-up for index warming
+
+# =============================================================================
+# METRICS CONFIGURATION
+# =============================================================================
+metrics:
+  enabled: true
+  interval: "5s"
+  latency_percentiles: [50, 90, 95, 99]
