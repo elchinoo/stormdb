@@ -1,0 +1,259 @@
+# Demo and Showcase Configuration Template
+# Special configurations for demonstrations, monitoring showcases,
+# feature testing, and development validation scenarios
+# This file contains multiple configuration examples for different demo scenarios
+
+# =============================================================================
+# DATABASE CONNECTION CONFIGURATION
+# =============================================================================
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "postgres"
+  username: "postgres"
+  password: "postgres"
+  sslmode: "disable"
+
+# =============================================================================
+# RESULTS BACKEND CONFIGURATION (Optional - for analytics)
+# =============================================================================
+# Uncomment and configure to store test results in a separate database
+# results_backend:
+#   enabled: true
+#   host: "localhost"
+#   port: 5432
+#   database: "stormdb_results"
+#   username: "postgres"
+#   password: "postgres"
+#   sslmode: "disable"
+#   retention_days: 30
+#   store_raw_metrics: true
+#   store_pg_stats: true
+#   metrics_batch_size: 1000
+#   table_prefix: "stormdb_"
+
+# =============================================================================
+# TEST METADATA (Optional - for result tracking)
+# =============================================================================
+# test_metadata:
+#   test_name: "monitoring_showcase"
+#   environment: "demo"
+#   database_target: "PostgreSQL 16"
+#   tags: ["demo", "showcase", "monitoring"]
+#   notes: "Demonstration of StormDB monitoring capabilities"
+
+# =============================================================================
+# PLUGIN CONFIGURATION
+# =============================================================================
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  files: []
+  auto_load: true
+
+# =============================================================================
+# EXAMPLE 1: MONITORING SHOWCASE (Default - Active Configuration)
+# =============================================================================
+# Demonstrates all monitoring and metrics features
+workload: "simple"
+scale: 10                   # Moderate scale for demonstration
+duration: "5m"              # Medium duration to show trends
+workers: 4                  # Moderate concurrency
+connections: 8              # Reasonable connection pool
+summary_interval: "30s"     # Frequent updates for demo
+
+# =============================================================================
+# EXAMPLE 2: FEATURE SHOWCASE - ALL FEATURES (Commented)
+# =============================================================================
+# Uncomment to demonstrate all StormDB features
+# workload: "connection_overhead"
+# scale: 50
+# duration: "10m"
+# workers: 8
+# connections: 16
+# summary_interval: "1m"
+# 
+# # Enable all monitoring features
+# collect_pg_stats: true
+# pg_stats_statements: true
+# 
+# # Enable detailed metrics
+# metrics:
+#   enabled: true
+#   interval: "2s"
+#   detailed_logging: true
+#   export_format: ["json", "csv"]
+#   
+# # Enable progressive features for demo
+# progressive:
+#   enabled: true
+#   strategy: "step"           # Step strategy for clear demonstration
+#   min_workers: 4
+#   max_workers: 16
+#   min_connections: 8
+#   max_connections: 32
+#   test_duration: "2m"
+#   warmup_duration: "30s"
+#   cooldown_duration: "30s"
+#   bands: 5
+#   enable_analysis: true
+
+# =============================================================================
+# EXAMPLE 3: PROGRESSIVE SCALING DEMO (Commented)
+# =============================================================================
+# Uncomment for progressive scaling demonstration
+# workload: "tpcc"
+# scale: 10                   # Small scale for quick demo
+# duration: "20m"
+# workers: 2
+# connections: 4
+# summary_interval: "1m"
+# 
+# progressive:
+#   enabled: true
+#   strategy: "linear"
+#   min_workers: 2
+#   max_workers: 12
+#   min_connections: 4
+#   max_connections: 24
+#   test_duration: "4m"        # Short bands for demo
+#   warmup_duration: "30s"
+#   cooldown_duration: "30s"
+#   bands: 5
+#   enable_analysis: true
+#   
+#   # Visible memory management for demo
+#   max_latency_samples: 10000
+#   memory_limit_mb: 128
+
+# =============================================================================
+# EXAMPLE 4: DATABASE BACKEND DEMO (Commented)
+# =============================================================================
+# Uncomment to demonstrate database backend features
+# workload: "tpcc"
+# scale: 20
+# duration: "15m"
+# workers: 6
+# connections: 12
+# summary_interval: "2m"
+# 
+# # Enable results backend for demo
+# results_backend:
+#   enabled: true
+#   host: "localhost"
+#   port: 5432
+#   database: "stormdb_results_demo"
+#   username: "postgres"
+#   password: "postgres"
+#   sslmode: "disable"
+#   retention_days: 7          # Short retention for demo
+#   store_raw_metrics: true
+#   store_pg_stats: true
+#   metrics_batch_size: 500
+#   table_prefix: "demo_"
+# 
+# # Demo metadata
+# test_metadata:
+#   test_name: "backend_demo_test"
+#   environment: "demonstration"
+#   database_target: "PostgreSQL Demo Instance"
+#   tags: ["backend", "demo", "analytics"]
+#   notes: "Demonstrating database backend storage capabilities"
+
+# =============================================================================
+# EXAMPLE 5: PLUGIN SYSTEM DEMO (Commented)
+# =============================================================================
+# Uncomment to demonstrate plugin system
+# workload: "ecommerce_mixed"
+# scale: 30
+# duration: "12m"
+# workers: 4
+# connections: 8
+# summary_interval: "2m"
+# 
+# plugins:
+#   paths:
+#     - "./plugins"
+#     - "./build/plugins"
+#   files:
+#     - "./build/plugins/ecommerce_plugin.so"
+#     - "./build/plugins/vector_plugin.so"
+#   auto_load: true
+#   
+#   # Plugin-specific demo configuration
+#   plugin_config:
+#     demo_mode: true
+#     verbose_logging: true
+
+# =============================================================================
+# EXAMPLE 6: STRATEGY COMPARISON DEMO (Commented)
+# =============================================================================
+# Uncomment to demonstrate different scaling strategies
+# workload: "simple"
+# scale: 25
+# duration: "30m"
+# workers: 3
+# connections: 6
+# summary_interval: "2m"
+# 
+# progressive:
+#   enabled: true
+#   strategy: "exponential"    # Show exponential vs linear strategies
+#   min_workers: 3
+#   max_workers: 24
+#   min_connections: 6
+#   max_connections: 48
+#   test_duration: "5m"
+#   warmup_duration: "1m"
+#   cooldown_duration: "1m"
+#   bands: 6
+#   enable_analysis: true
+
+# =============================================================================
+# PostgreSQL MONITORING (Always enabled for demos)
+# =============================================================================
+collect_pg_stats: true
+pg_stats_statements: true
+
+# =============================================================================
+# DEMO WORKLOAD SPECIFIC CONFIGURATION
+# =============================================================================
+workload_config:
+  # Demo-specific settings
+  demo_mode: true             # Enable demo-friendly features
+  verbose_output: true        # More detailed output for demonstrations
+  slow_down_factor: 1.0       # Slow down operations for visibility (1.0 = normal speed)
+  
+  # Visual enhancements
+  progress_bar: true          # Show progress bars
+  colored_output: true        # Enable colored console output
+  detailed_summaries: true    # Show detailed summary information
+  
+  # Performance settings for demo
+  think_time: 100             # Small think time for demo visibility (milliseconds)
+  ramp_up_time: 5             # Quick ramp-up for demos
+  
+  # Error simulation (for demo purposes)
+  simulate_errors: false      # Set to true to demonstrate error handling
+  error_rate: 0.01           # 1% error rate if simulation enabled
+
+# =============================================================================
+# METRICS CONFIGURATION (Enhanced for demos)
+# =============================================================================
+metrics:
+  enabled: true
+  interval: "3s"              # Good balance for demo visibility
+  latency_percentiles: [50, 90, 95, 99]
+  
+  # Demo-specific metrics
+  real_time_display: true     # Real-time metrics display
+  export_charts: false        # Set to true to generate demo charts
+  detailed_logging: true      # Enhanced logging for demos
+  
+  # Connection and performance tracking
+  track_connections: true
+  track_connection_pool: true
+  track_query_counts: true
+  track_memory_usage: true
