@@ -1,0 +1,97 @@
+# Real-World E-Commerce Workload Configuration for EPAS v17
+# This configuration simulates realistic e-commerce database usage patterns
+# with complex queries, mixed OLTP/OLAP workloads, and comprehensive indexing
+
+database:
+  type: postgres
+  host: "p-5z2mcdtt4g-rw-external-4742739c702557c6.elb.us-east-1.amazonaws.com"
+  port: 5432
+  dbname: "edb_admin"
+  username: "edb_admin"
+  password: "mattdemo123!"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  
+  # Specific plugin files to load (optional)
+  files:
+    - "./build/plugins/ecommerce_basic_plugin.so"
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+# Load settings
+workload: "ecommerce_basic"     # Real-world e-commerce workload
+scale: 1500               # Number of users to generate (scaled for EPAS v17)
+
+# Regular benchmark settings (ignored in progressive mode)
+duration: "4h"           # Duration of the test
+workers: 12               # Number of concurrent worker threads
+connections: 24           # Max connections in pool
+summary_interval: "5m"   # Show progress every 5 minutes
+
+# Progressive scaling configuration - 4 hour test with 8 bands of 30 minutes each
+progressive:
+  enabled: true
+  strategy: "linear"              # Linear scaling from 20 to 150 connections
+  min_workers: 12                 # Start with 12 workers
+  max_workers: 85                 # Scale up to 85 workers
+  min_connections: 20             # Start with 20 connections
+  max_connections: 150            # Scale up to 150 connections
+  test_duration: "30m"            # Run each band for 30 minutes
+  warmup_duration: "2m"           # Warmup time per band
+  cooldown_duration: "1m"         # Cooldown time between bands
+  bands: 8                        # Number of test configurations (4 hours total)
+  enable_analysis: true           # Enable mathematical analysis
+
+# Workload-specific settings (these will be parsed by the workload itself)
+workload_config:
+  mode: "mixed"           # Options: read, write, mixed, oltp, analytics
+  
+  # Data scaling parameters
+  data_scale:
+    users: 15000          # Number of users to generate
+    products: 8000        # Number of products to generate
+    orders: 75000         # Number of orders to generate
+    reviews: 40000        # Number of reviews to generate
+    sessions: 150000      # Number of user sessions to generate
+    analytics_events: 750000  # Number of analytics events to generate
+
+  # Workload distribution (percentages should sum to 100)
+  workload_mix:
+    # Mixed mode distribution
+    mixed:
+      read_operations: 70
+      write_operations: 20
+      analytics_operations: 10
+      
+    # OLTP mode distribution
+    oltp:
+      transactional_operations: 85
+      reporting_operations: 10
+      maintenance_operations: 5
+      
+    # Analytics mode distribution
+    analytics:
+      aggregation_queries: 40
+      reporting_queries: 35
+      data_mining_queries: 25
+
+  # Performance and behavior settings
+  performance:
+    batch_size: 100             # Batch size for bulk operations
+    cache_hit_ratio: 0.85      # Simulated cache hit ratio
+    think_time_ms: 50          # Think time between operations (milliseconds)
+    connection_pool_size: 24   # Connection pool size
+    
+  # Feature flags for EPAS v17
+  features:
+    enable_partitioning: true   # Enable table partitioning features
+    enable_parallel_queries: true  # Enable parallel query execution
+    enable_advanced_indexes: true  # Enable advanced indexing features
+    enable_materialized_views: true # Enable materialized views

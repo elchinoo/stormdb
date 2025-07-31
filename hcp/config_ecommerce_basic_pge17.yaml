@@ -1,0 +1,84 @@
+# RealWorld Social Media Workload Configuration - PGE v17
+# Simulates a social media platform similar to Medium/Conduit
+
+database:
+  type: postgres
+  host: "p-kgd54g3gg7-rw-external-2e5e606c35f06e33.elb.us-east-1.amazonaws.com"
+  port: 5432
+  dbname: "edb_admin"
+  username: "edb_admin"
+  password: "mattdemo123!"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  
+  # Specific plugin files to load (optional)
+  files:
+    - "./build/plugins/ecommerce_basic_plugin.so"
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "ecommerce_basic"
+scale: 1500  # More users for v17
+
+# Regular benchmark settings (ignored in progressive mode)
+duration: "4h"
+workers: 8  # Higher for v17
+connections: 20  # Higher for v17
+summary_interval: "5m"
+
+# Progressive scaling configuration - 4 hour test with 8 bands of 30 minutes each
+progressive:
+  enabled: true
+  strategy: "linear"              # Linear scaling from 20 to 150 connections
+  min_workers: 8                  # Start with 8 workers
+  max_workers: 70                 # Scale up to 70 workers
+  min_connections: 20             # Start with 20 connections
+  max_connections: 150            # Scale up to 150 connections
+  test_duration: "30m"            # Run each band for 30 minutes
+  warmup_duration: "2m"           # Warmup time per band
+  cooldown_duration: "1m"         # Cooldown time between bands
+  bands: 8                        # Number of test configurations (4 hours total)
+  enable_analysis: true           # Enable mathematical analysis
+
+# RealWorld workload distribution
+ecommerce_basic:
+  read_ratio: 0.70    # 70% read operations
+  write_ratio: 0.30   # 30% write operations
+  
+  # Operation types
+  operations:
+    article_read: 0.40
+    user_profile: 0.20
+    article_list: 0.10
+    article_create: 0.10
+    comment_create: 0.08
+    user_follow: 0.07
+    article_favorite: 0.05
+
+metrics:
+  enabled: true
+  interval: "5s"
+  histogram_buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+
+# Data generation settings (larger for v17)
+data:
+  users: 1500
+  articles_per_user: 7
+  comments_per_article: 4
+  tags: 75
+
+# Advanced PGE v17 features
+advanced:
+  prepare_statements: true
+  connection_pooling: true
+  batch_size: 200  # Larger batches for v17
+  parallel_queries: true
+  vectorized_operations: true
+  query_optimization: "aggressive"

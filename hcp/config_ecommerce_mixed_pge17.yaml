@@ -1,0 +1,66 @@
+# E-Commerce Mixed Workload Configuration - PGE v17
+# This workload simulates a modern e-commerce platform with:
+# - 75% read operations (product searches, user queries, analytics)
+# - 25% write operations (orders, reviews, inventory updates, stock control)
+# - Automated vendor management and purchase orders
+# - pgvector-powered review similarity search
+# - Real-time stock level management with automatic reordering
+# NOTE: E-commerce workloads are now provided by the ecommerce_plugin
+
+database:
+  type: postgres
+  host: "p-kgd54g3gg7-rw-external-2e5e606c35f06e33.elb.us-east-1.amazonaws.com"
+  port: 5432
+  dbname: "edb_admin"
+  username: "edb_admin"
+  password: "mattdemo123!"
+  sslmode: "disable"
+
+# Plugin system configuration
+plugins:
+  # Directories to search for plugin files (.so, .dll, .dylib)
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  
+  # Specific plugin files to load (optional)
+  files:
+    - "./build/plugins/ecommerce_plugin.so"
+  
+  # Automatically load all plugins found in search paths
+  auto_load: true
+
+workload: "ecommerce_mixed"
+scale: 1000
+
+# Regular benchmark settings (ignored in progressive mode)
+duration: "4h"
+workers: 12  # Higher for v17
+connections: 25  # Higher connection count for v17
+summary_interval: "5m"  # Show progress every 5 minutes
+
+# Progressive scaling configuration - 4 hour test with 8 bands of 30 minutes each
+progressive:
+  enabled: true
+  strategy: "linear"              # Linear scaling from 20 to 150 connections
+  min_workers: 12                 # Start with 12 workers (higher for v17)
+  max_workers: 85                 # Scale up to 85 workers
+  min_connections: 20             # Start with 20 connections
+  max_connections: 150            # Scale up to 150 connections
+  test_duration: "30m"            # Run each band for 30 minutes
+  warmup_duration: "2m"           # Warmup time per band
+  cooldown_duration: "1m"         # Cooldown time between bands
+  bands: 8                        # Number of test configurations (4 hours total)
+  enable_analysis: true           # Enable mathematical analysis
+
+metrics:
+  enabled: true
+  interval: "5s"
+  histogram_buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+
+# Advanced PGE v17 features
+advanced:
+  prepare_statements: true
+  connection_pooling: true
+  parallel_queries: true  # v17 enhancement
+  vectorized_operations: true  # v17 feature
