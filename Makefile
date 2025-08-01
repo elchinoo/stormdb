@@ -8,7 +8,7 @@
 
 # Build configuration
 BINARY_NAME := stormdb
-CMD_DIR := cmd/pgstorm
+CMD_DIR := cmd/stormdb
 BUILD_DIR := build
 COVERAGE_DIR := coverage
 PLUGIN_DIR := $(BUILD_DIR)/plugins
