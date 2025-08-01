@@ -22,6 +22,9 @@ type PluginLoader struct {
 	// workloadTypes maps workload type strings to the plugin that provides them
 	workloadTypes map[string]string
 
+	// failedPlugins tracks plugins that failed to load to avoid retrying
+	failedPlugins map[string]bool
+
 	// mutex protects concurrent access to the plugin registry
 	mutex sync.RWMutex
 
@@ -35,6 +38,7 @@ func NewPluginLoader(pluginPaths []string) *PluginLoader {
 	return &PluginLoader{
 		plugins:       make(map[string]*PluginInfo),
 		workloadTypes: make(map[string]string),
+		failedPlugins: make(map[string]bool),
 		pluginPaths:   pluginPaths,
 	}
 }
@@ -107,10 +111,16 @@ func isPluginFile(filename string) bool {
 
 // loadPluginMetadata loads plugin metadata without fully loading the plugin
 func (pl *PluginLoader) loadPluginMetadata(pluginPath string) error {
+	// Check if this plugin path was already attempted and failed
+	if pl.hasFailedBefore(pluginPath) {
+		return fmt.Errorf("plugin was built with a different version of package internal/runtime/sys (previous failure)")
+	}
+
 	// For now, we'll load the plugin to get metadata
 	// In a more sophisticated system, we might store metadata separately
 	p, err := plugin.Open(pluginPath)
 	if err != nil {
+		pl.markAsFailed(pluginPath)
 		return fmt.Errorf("failed to open plugin: %w", err)
 	}
 
@@ -343,4 +353,14 @@ func (pl *PluginLoader) UnloadAllPlugins() error {
 	}
 
 	return nil
+}
+
+// hasFailedBefore checks if a plugin path has failed to load before
+func (pl *PluginLoader) hasFailedBefore(pluginPath string) bool {
+	return pl.failedPlugins[pluginPath]
+}
+
+// markAsFailed marks a plugin path as failed to prevent retry attempts
+func (pl *PluginLoader) markAsFailed(pluginPath string) {
+	pl.failedPlugins[pluginPath] = true
 }
