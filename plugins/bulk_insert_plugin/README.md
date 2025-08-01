@@ -1,6 +1,16 @@
 # Bulk Insert Workload
 
+**🔧 RECENTLY UPDATED**: This plugin has been comprehensively rewritten to fix critical runtime panics and nil pointer dereference errors. See [FIXES.md](./FIXES.md) for detailed information about the improvements.
+
 The bulk insert workload is designed to comprehensively test PostgreSQL's bulk data insertion performance across different methods, batch sizes, and concurrency patterns. It implements a sophisticated producer-consumer architecture with lock-free ring buffers to achieve maximum throughput while providing detailed performance insights.
+
+## 🚀 Key Improvements
+
+- **✅ Runtime Stability**: Eliminated all nil pointer dereference panics
+- **✅ Memory Safety**: Comprehensive input validation and defensive programming
+- **✅ Error Handling**: Graceful degradation with safe defaults
+- **✅ Thread Safety**: Enhanced concurrency protection
+- **✅ Debugging**: Improved logging and error reporting
 
 ## Overview
 
@@ -182,6 +192,20 @@ The workload generates realistic data patterns:
 
 ## Troubleshooting
 
+### Build and Runtime Validation
+
+**Build Test**:
+```bash
+cd plugins/bulk_insert_plugin
+go build -buildmode=plugin -o bulk_insert_plugin.so .
+```
+
+**Runtime Safety**: The plugin now includes comprehensive validation to prevent crashes:
+- All functions validate nil pointers before dereferencing
+- Safe default values for corrupted state
+- Graceful degradation when errors occur
+- Enhanced logging for debugging issues
+
 ### Common Issues
 
 1. **Buffer Overflow**: Increase `ring_buffer_size` or reduce `producer_threads`
@@ -195,6 +219,16 @@ The workload generates realistic data patterns:
 2. **Ring Buffer**: Size should be 10-100x the largest batch size
 3. **Connections**: Typically 2x the number of workers is sufficient
 4. **Batch Sizes**: Start with [1, 100, 1000] for initial testing
+
+## Recent Fixes
+
+See [FIXES.md](./FIXES.md) for comprehensive details about the critical fixes implemented:
+
+- **Nil Pointer Safety**: Eliminated all potential nil pointer dereferences
+- **Memory Corruption Prevention**: Safe data copying and buffer management
+- **Thread Safety**: Enhanced concurrency protection
+- **Error Recovery**: Graceful handling of error conditions
+- **Input Validation**: Comprehensive parameter checking
 
 ## Integration
 

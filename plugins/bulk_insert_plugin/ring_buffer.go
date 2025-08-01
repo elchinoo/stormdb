@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"time"
 )
@@ -64,17 +65,29 @@ func NewRingBuffer(capacity int) *RingBuffer {
 		capacity = cap
 	}
 
-	return &RingBuffer{
+	rb := &RingBuffer{
 		buffer:        make([]DataRecord, capacity),
 		capacity:      int64(capacity),
 		mask:          int64(capacity - 1),
 		writeComplete: make([]int32, capacity),
 	}
+
+	// Validate that the buffer was created successfully
+	if rb.buffer == nil || rb.writeComplete == nil {
+		return nil
+	}
+
+	return rb
 }
 
 // Push adds a record to the buffer (producer operation)
 // Returns true if successful, false if buffer is full
 func (rb *RingBuffer) Push(record DataRecord) bool {
+	// Validate ring buffer state
+	if rb == nil || rb.buffer == nil || rb.writeComplete == nil {
+		return false
+	}
+
 	for {
 		writeIdx := atomic.LoadInt64(&rb.writeIndex)
 		readIdx := atomic.LoadInt64(&rb.readIndex)
@@ -108,6 +121,11 @@ func (rb *RingBuffer) Push(record DataRecord) bool {
 // Pop removes a record from the buffer (consumer operation)
 // Returns the record and true if successful, zero record and false if buffer is empty
 func (rb *RingBuffer) Pop() (DataRecord, bool) {
+	// Validate ring buffer state
+	if rb == nil || rb.buffer == nil || rb.writeComplete == nil {
+		return DataRecord{}, false
+	}
+
 	for {
 		readIdx := atomic.LoadInt64(&rb.readIndex)
 		writeIdx := atomic.LoadInt64(&rb.writeIndex)
@@ -143,6 +161,11 @@ func (rb *RingBuffer) Pop() (DataRecord, bool) {
 // PopBatch removes up to maxRecords from the buffer
 // Returns slice of records and the actual count retrieved
 func (rb *RingBuffer) PopBatch(maxRecords int) ([]DataRecord, int) {
+	// Validate inputs
+	if rb == nil || maxRecords <= 0 {
+		return nil, 0
+	}
+
 	records := make([]DataRecord, 0, maxRecords)
 
 	for len(records) < maxRecords {
@@ -159,6 +182,17 @@ func (rb *RingBuffer) PopBatch(maxRecords int) ([]DataRecord, int) {
 // PopBatchBlocking waits for records to become available and returns a batch
 // Context can be used to cancel the operation
 func (rb *RingBuffer) PopBatchBlocking(ctx context.Context, minRecords, maxRecords int, timeout time.Duration) ([]DataRecord, error) {
+	// Validate inputs
+	if rb == nil {
+		return nil, fmt.Errorf("ring buffer is nil")
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf("context is nil")
+	}
+	if minRecords <= 0 || maxRecords <= 0 || minRecords > maxRecords {
+		return nil, fmt.Errorf("invalid record counts: min=%d, max=%d", minRecords, maxRecords)
+	}
+
 	start := time.Now()
 	deadline := start.Add(timeout)
 	records := make([]DataRecord, 0, maxRecords)
@@ -191,16 +225,25 @@ func (rb *RingBuffer) PopBatchBlocking(ctx context.Context, minRecords, maxRecor
 
 // IsClosed returns true if the buffer is closed for writing
 func (rb *RingBuffer) IsClosed() bool {
+	if rb == nil {
+		return true // Consider nil buffer as closed
+	}
 	return atomic.LoadInt32(&rb.closed) == 1
 }
 
 // Close marks the buffer as closed for writing
 func (rb *RingBuffer) Close() {
+	if rb == nil {
+		return
+	}
 	atomic.StoreInt32(&rb.closed, 1)
 }
 
 // Size returns the current number of items in the buffer
 func (rb *RingBuffer) Size() int64 {
+	if rb == nil {
+		return 0
+	}
 	writeIdx := atomic.LoadInt64(&rb.writeIndex)
 	readIdx := atomic.LoadInt64(&rb.readIndex)
 	return writeIdx - readIdx
@@ -208,23 +251,35 @@ func (rb *RingBuffer) Size() int64 {
 
 // Capacity returns the maximum capacity of the buffer
 func (rb *RingBuffer) Capacity() int64 {
+	if rb == nil {
+		return 0
+	}
 	return rb.capacity
 }
 
 // Stats returns statistics about buffer usage
 func (rb *RingBuffer) Stats() (produced, consumed, waitTimeNs int64, utilization float64) {
+	if rb == nil {
+		return 0, 0, 0, 0.0
+	}
+
 	produced = atomic.LoadInt64(&rb.produced)
 	consumed = atomic.LoadInt64(&rb.consumed)
 	waitTimeNs = atomic.LoadInt64(&rb.waitTimeNs)
 
 	currentSize := rb.Size()
-	utilization = float64(currentSize) / float64(rb.capacity)
+	if rb.capacity > 0 {
+		utilization = float64(currentSize) / float64(rb.capacity)
+	}
 
 	return produced, consumed, waitTimeNs, utilization
 }
 
 // Reset clears the buffer and resets all counters
 func (rb *RingBuffer) Reset() {
+	if rb == nil {
+		return
+	}
 	atomic.StoreInt64(&rb.writeIndex, 0)
 	atomic.StoreInt64(&rb.readIndex, 0)
 	atomic.StoreInt64(&rb.produced, 0)

@@ -39,20 +39,20 @@ Examples:
 
 // Progressive test flags
 var (
-	progressiveConfigFile    string
-	progressiveStrategy      string
-	progressiveBands         int
-	progressiveMinWorkers    int
-	progressiveMaxWorkers    int
-	progressiveMinConns      int
-	progressiveMaxConns      int
-	progressiveTestDuration  time.Duration
-	progressiveWarmupTime    time.Duration
-	progressiveCooldownTime  time.Duration
+	progressiveConfigFile     string
+	progressiveStrategy       string
+	progressiveBands          int
+	progressiveMinWorkers     int
+	progressiveMaxWorkers     int
+	progressiveMinConns       int
+	progressiveMaxConns       int
+	progressiveTestDuration   time.Duration
+	progressiveWarmupTime     time.Duration
+	progressiveCooldownTime   time.Duration
 	progressiveEnableAnalysis bool
-	progressiveOutputFile    string
-	progressiveReportFile    string
-	progressiveVerbose       bool
+	progressiveOutputFile     string
+	progressiveReportFile     string
+	progressiveVerbose        bool
 )
 
 func init() {
@@ -146,7 +146,7 @@ func runProgressiveTest(cmd *cobra.Command, args []string) error {
 
 	// Get results
 	results := runner.GetResults()
-	
+
 	logger.Info("Progressive test completed",
 		zap.Int("completed_bands", len(results)),
 		zap.Duration("total_duration", time.Since(time.Now())),
@@ -223,15 +223,15 @@ func createProgressiveConfig(baseConfig *types.Config) (*config.StormDBConfig, e
 
 	// Create progressive configuration
 	progressiveConfig := &config.ProgressiveConfig{
-		Enabled:            true,
-		Strategy:           progressiveStrategy,
-		Bands:              progressiveBands,
-		EnableAnalysis:     progressiveEnableAnalysis,
-		TestDuration:       progressiveTestDuration,
-		WarmupDuration:     progressiveWarmupTime,
-		CooldownDuration:   progressiveCooldownTime,
-		MaxLatencySamples:  10000,
-		MemoryLimitMB:      1024,
+		Enabled:           true,
+		Strategy:          progressiveStrategy,
+		Bands:             progressiveBands,
+		EnableAnalysis:    progressiveEnableAnalysis,
+		TestDuration:      progressiveTestDuration,
+		WarmupDuration:    progressiveWarmupTime,
+		CooldownDuration:  progressiveCooldownTime,
+		MaxLatencySamples: 10000,
+		MemoryLimitMB:     1024,
 	}
 
 	// Apply CLI overrides or use defaults
@@ -290,7 +290,7 @@ func estimateTotalDuration(config *config.ProgressiveConfig) time.Duration {
 
 	bandDuration := config.TestDuration + config.WarmupDuration + config.CooldownDuration
 	totalDuration := time.Duration(config.Bands) * bandDuration
-	
+
 	// Add 20% buffer
 	return totalDuration + totalDuration/5
 }
@@ -300,10 +300,10 @@ func printTestPlan(runner *progressive.ProgressiveRunner, logger logging.StormDB
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("PROGRESSIVE SCALING TEST PLAN")
 	fmt.Println(strings.Repeat("=", 80))
-	
+
 	// This would print the test plan details
 	// Implementation depends on exposing plan information from runner
-	
+
 	fmt.Println(strings.Repeat("=", 80) + "\n")
 	return nil
 }
@@ -369,7 +369,7 @@ func printResultsSummary(results []progressive.BandResult) {
 	fmt.Println(strings.Repeat("=", 80))
 
 	fmt.Printf("Total Bands Executed: %d\n", len(results))
-	
+
 	if len(results) == 0 {
 		fmt.Println("No results to display.")
 		return

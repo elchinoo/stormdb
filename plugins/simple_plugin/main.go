@@ -23,6 +23,7 @@ func (p *SimpleWorkloadPlugin) GetMetadata() *plugin.PluginMetadata {
 	return &plugin.PluginMetadata{
 		Name:        "simple_plugin",
 		Version:     "1.0.0",
+		APIVersion:  "1.0",
 		Description: "Basic CRUD operation workloads with configurable read/write ratios",
 		Author:      "StormDB Team",
 		WorkloadTypes: []string{

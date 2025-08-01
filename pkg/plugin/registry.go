@@ -16,14 +16,14 @@ import (
 // DefaultPluginRegistry implements the PluginRegistry interface with
 // comprehensive plugin management including health checks and version validation
 type DefaultPluginRegistry struct {
-	plugins     map[string]*PluginInfo
-	mutex       sync.RWMutex
-	logger      *zap.Logger
-	apiVersion  string
+	plugins        map[string]*PluginInfo
+	mutex          sync.RWMutex
+	logger         *zap.Logger
+	apiVersion     string
 	stormDBVersion string
 	healthInterval time.Duration
-	stopHealth  chan struct{}
-	healthWg    sync.WaitGroup
+	stopHealth     chan struct{}
+	healthWg       sync.WaitGroup
 }
 
 // NewPluginRegistry creates a new plugin registry with specified configuration
@@ -31,7 +31,7 @@ func NewPluginRegistry(logger *zap.Logger, apiVersion, stormDBVersion string) *D
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	
+
 	return &DefaultPluginRegistry{
 		plugins:        make(map[string]*PluginInfo),
 		logger:         logger,
@@ -200,7 +200,7 @@ func (r *DefaultPluginRegistry) SafeLoad(pluginPath string) error {
 	// Load plugin with panic recovery
 	var loadedPlugin *plugin.Plugin
 	var loadErr error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -387,7 +387,7 @@ func (r *DefaultPluginRegistry) StopHealthMonitoring() {
 // performHealthChecks runs health checks on all loaded plugins
 func (r *DefaultPluginRegistry) performHealthChecks() {
 	plugins := r.ListPlugins()
-	
+
 	for _, pluginInfo := range plugins {
 		if !pluginInfo.Loaded {
 			continue
@@ -398,7 +398,7 @@ func (r *DefaultPluginRegistry) performHealthChecks() {
 				zap.String("plugin", pluginInfo.Metadata.Name),
 				zap.Error(err),
 			)
-			
+
 			// Mark plugin as unhealthy but don't unload automatically
 			// Let the application decide what to do
 		}

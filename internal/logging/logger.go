@@ -83,7 +83,7 @@ func NewLogger(config LoggerConfig) (StormDBLogger, error) {
 
 	// Create core and logger
 	core := zapcore.NewCore(encoder, writeSyncer, level)
-	
+
 	// Add caller info and stack traces for errors in development
 	var options []zap.Option
 	if config.Development {
@@ -93,7 +93,7 @@ func NewLogger(config LoggerConfig) (StormDBLogger, error) {
 	}
 
 	logger := zap.New(core, options...)
-	
+
 	return &Logger{logger: logger}, nil
 }
 
@@ -105,14 +105,14 @@ func NewDefaultLogger() StormDBLogger {
 		Output:      "stdout",
 		Development: true,
 	}
-	
+
 	logger, err := NewLogger(config)
 	if err != nil {
 		// Fallback to basic zap logger
 		zapLogger, _ := zap.NewDevelopment()
 		return &Logger{logger: zapLogger}
 	}
-	
+
 	return logger
 }
 
