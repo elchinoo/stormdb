@@ -52,6 +52,44 @@ plugins:
     - "./build/plugins"
   files: []
   auto_load: true
+  
+  # Enhanced Plugin Security Configuration - Demo Settings
+  security:
+    enabled: true
+    require_manifest: false        # Disabled for demo flexibility
+    allow_untrusted: true          # Enabled for demo purposes
+    manifest_path: "plugins/manifest.json"
+    max_plugin_memory: "100MB"
+    trusted_authors:
+      - "stormdb-team"
+      - "demo-team"
+      - "your-organization"
+    validation:
+      verify_checksums: false      # Disabled for demo flexibility
+      max_file_size: "50MB"
+      
+  # Memory Management Configuration - Demo Optimized
+  memory:
+    enabled: true
+    max_total_memory: "1GB"
+    max_plugin_memory: "100MB"
+    check_interval: "30s"
+    enable_gc_tuning: true
+    retention:
+      enabled: true
+      default_ttl: "15m"          # Shorter retention for demos
+      max_collection_size: 7500    # Moderate size for demos
+      memory_warn_threshold: 0.75  # Lower threshold for demo alerts
+      memory_alert_threshold: 0.90
+      
+  # Context Management Configuration - Demo Optimized
+  context:
+    plugin_load_timeout: "20s"
+    health_check_interval: "2m"   # More frequent for demos
+    health_check_timeout: "8s"
+    max_concurrent_loads: 4
+    max_retry_attempts: 2         # Fewer retries for faster demos
+    retry_backoff: "1s"
 
 # =============================================================================
 # EXAMPLE 1: MONITORING SHOWCASE (Default - Active Configuration)

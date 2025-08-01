@@ -53,6 +53,43 @@ plugins:
   files:
     - "./build/plugins/ecommerce_plugin.so"
   auto_load: true
+  
+  # Enhanced Plugin Security Configuration
+  security:
+    enabled: true
+    require_manifest: false        # Disabled by default for compatibility
+    allow_untrusted: true          # Enabled by default for development
+    manifest_path: "plugins/manifest.json"
+    max_plugin_memory: "100MB"
+    trusted_authors:
+      - "stormdb-team"
+      - "your-organization"
+    validation:
+      verify_checksums: false      # Disabled by default for development
+      max_file_size: "50MB"
+      
+  # Memory Management Configuration  
+  memory:
+    enabled: true
+    max_total_memory: "1GB"
+    max_plugin_memory: "100MB"
+    check_interval: "30s"
+    enable_gc_tuning: true
+    retention:
+      enabled: true
+      default_ttl: "1h"
+      max_collection_size: 10000
+      memory_warn_threshold: 0.8
+      memory_alert_threshold: 0.95
+      
+  # Context Management Configuration
+  context:
+    plugin_load_timeout: "30s"
+    health_check_interval: "5m"
+    health_check_timeout: "10s"
+    max_concurrent_loads: 5
+    max_retry_attempts: 3
+    retry_backoff: "1s"
 
 # =============================================================================
 # EXAMPLE 1: E-COMMERCE MIXED WORKLOAD (Default - Active Configuration)
