@@ -1,7 +1,7 @@
 # Binaries and executables
 /build/
-stormdb
-stormdb-dev
+/stormdb
+/stormdb-dev
 *.exe
 *.exe~
 *.dll
