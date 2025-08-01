@@ -38,11 +38,11 @@ func (uc *AnalysisUseCase) AnalyzeTestResults(ctx context.Context, executionID s
 	if err != nil {
 		return nil, fmt.Errorf("failed to load test execution: %w", err)
 	}
-	
+
 	if testExecution.Results == nil {
 		return nil, fmt.Errorf("test execution has no results")
 	}
-	
+
 	// 2. Extract band results for analysis
 	var bands []domain.BandResults
 	if testExecution.Results.ProgressiveResults != nil {
@@ -52,16 +52,16 @@ func (uc *AnalysisUseCase) AnalyzeTestResults(ctx context.Context, executionID s
 	} else {
 		return nil, fmt.Errorf("no band results found")
 	}
-	
+
 	// 3. Perform mathematical analysis
 	analysis, err := uc.analysisService.CalculateStatistics(bands)
 	if err != nil {
 		return nil, fmt.Errorf("statistical analysis failed: %w", err)
 	}
-	
+
 	// 4. Generate recommendations
 	recommendations := uc.generateRecommendations(bands, analysis)
-	
+
 	// 5. Create comprehensive analysis result
 	result := &AnalysisResult{
 		ExecutionID:     executionID,
@@ -70,7 +70,7 @@ func (uc *AnalysisUseCase) AnalyzeTestResults(ctx context.Context, executionID s
 		Recommendations: recommendations,
 		Summary:         uc.generateSummary(bands, analysis),
 	}
-	
+
 	return result, nil
 }
 
@@ -79,10 +79,10 @@ func (uc *AnalysisUseCase) CompareExecutions(ctx context.Context, executionIDs [
 	if len(executionIDs) < 2 {
 		return nil, fmt.Errorf("at least 2 executions required for comparison")
 	}
-	
+
 	var executions []*domain.TestExecution
 	var analyses []*domain.PerformanceAnalysis
-	
+
 	// Load all executions and their analyses
 	for _, id := range executionIDs {
 		execution, err := uc.testRepo.GetByID(ctx, id)
@@ -90,23 +90,23 @@ func (uc *AnalysisUseCase) CompareExecutions(ctx context.Context, executionIDs [
 			log.Printf("Warning: failed to load execution %s: %v", id, err)
 			continue
 		}
-		
+
 		if execution.Results == nil || execution.Results.Analysis == nil {
 			log.Printf("Warning: execution %s has no analysis results", id)
 			continue
 		}
-		
+
 		executions = append(executions, execution)
 		analyses = append(analyses, execution.Results.Analysis)
 	}
-	
+
 	if len(executions) < 2 {
 		return nil, fmt.Errorf("insufficient valid executions for comparison")
 	}
-	
+
 	// Perform comparison analysis
 	comparison := uc.performComparison(executions, analyses)
-	
+
 	return comparison, nil
 }
 
@@ -119,26 +119,26 @@ func (uc *AnalysisUseCase) FindOptimalConfiguration(ctx context.Context, workloa
 		Status:       &statusCompleted,
 		Limit:        100, // Limit to recent executions
 	}
-	
+
 	executions, err := uc.testRepo.List(ctx, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load historical executions: %w", err)
 	}
-	
+
 	if len(executions) == 0 {
 		return nil, fmt.Errorf("no historical data found for workload type %s", workloadType)
 	}
-	
+
 	// Analyze all executions to find optimal configuration
 	optimal := uc.findOptimalFromHistory(executions, criteria)
-	
+
 	return optimal, nil
 }
 
 // generateRecommendations creates actionable recommendations based on analysis
 func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, analysis *domain.PerformanceAnalysis) []Recommendation {
 	var recommendations []Recommendation
-	
+
 	// Analyze bottleneck type
 	switch analysis.BottleneckType {
 	case domain.BottleneckConnection:
@@ -148,7 +148,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 			Description: "Connection pooling is the limiting factor. Consider increasing connection pool size or optimizing connection reuse.",
 			Action:      "Increase max connections gradually and monitor connection utilization",
 		})
-		
+
 	case domain.BottleneckCPU:
 		recommendations = append(recommendations, Recommendation{
 			Type:        "cpu_optimization",
@@ -156,7 +156,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 			Description: "CPU utilization is limiting performance. Consider reducing computational complexity or scaling horizontally.",
 			Action:      "Optimize queries, add indexes, or increase CPU resources",
 		})
-		
+
 	case domain.BottleneckIO:
 		recommendations = append(recommendations, Recommendation{
 			Type:        "io_optimization",
@@ -164,7 +164,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 			Description: "I/O operations are the bottleneck. Consider optimizing disk access patterns or using faster storage.",
 			Action:      "Optimize queries, consider SSD storage, or implement read replicas",
 		})
-		
+
 	case domain.BottleneckMemory:
 		recommendations = append(recommendations, Recommendation{
 			Type:        "memory_optimization",
@@ -173,7 +173,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 			Action:      "Increase RAM, optimize query plans, or implement memory-efficient algorithms",
 		})
 	}
-	
+
 	// Analyze scaling regions
 	for _, region := range analysis.ScalingRegions {
 		switch region.Classification {
@@ -184,7 +184,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 				Description: fmt.Sprintf("Linear scaling detected in range %d-%d connections. This is optimal scaling behavior.", region.StartConnections, region.EndConnections),
 				Action:      "Consider operating in this range for predictable performance",
 			})
-			
+
 		case domain.RegionDiminishingReturns:
 			recommendations = append(recommendations, Recommendation{
 				Type:        "scaling_limit",
@@ -192,7 +192,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 				Description: fmt.Sprintf("Diminishing returns detected at %d+ connections. Additional connections provide minimal benefit.", region.StartConnections),
 				Action:      "Avoid exceeding this connection count unless necessary",
 			})
-			
+
 		case domain.RegionDegradation:
 			recommendations = append(recommendations, Recommendation{
 				Type:        "scaling_warning",
@@ -202,7 +202,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 			})
 		}
 	}
-	
+
 	// Analyze optimal configuration
 	if analysis.OptimalConfiguration.Confidence > 0.8 {
 		recommendations = append(recommendations, Recommendation{
@@ -212,7 +212,7 @@ func (uc *AnalysisUseCase) generateRecommendations(bands []domain.BandResults, a
 			Action:      fmt.Sprintf("Use %d workers and %d connections for best performance", analysis.OptimalConfiguration.OptimalWorkers, analysis.OptimalConfiguration.OptimalConnections),
 		})
 	}
-	
+
 	return recommendations
 }
 
@@ -224,7 +224,7 @@ func (uc *AnalysisUseCase) generateSummary(bands []domain.BandResults, analysis 
 			KeyFindings:   []string{"No data available for analysis"},
 		}
 	}
-	
+
 	// Find best performing band
 	bestBand := bands[0]
 	maxTPS := bestBand.Performance.TotalTPS
@@ -234,7 +234,7 @@ func (uc *AnalysisUseCase) generateSummary(bands []domain.BandResults, analysis 
 			bestBand = band
 		}
 	}
-	
+
 	// Calculate overall efficiency
 	efficiency := uc.calculateOverallEfficiency(bands)
 	var rating string
@@ -248,20 +248,20 @@ func (uc *AnalysisUseCase) generateSummary(bands []domain.BandResults, analysis 
 	default:
 		rating = "poor"
 	}
-	
+
 	// Generate key findings
 	var findings []string
 	findings = append(findings, fmt.Sprintf("Peak performance: %.2f TPS at %d workers/%d connections", maxTPS, bestBand.Workers, bestBand.Connections))
 	findings = append(findings, fmt.Sprintf("Primary bottleneck: %s", analysis.BottleneckType))
 	findings = append(findings, fmt.Sprintf("Scaling efficiency: %.1f%%", efficiency*100))
-	
+
 	if analysis.OptimalConfiguration.Confidence > 0.7 {
-		findings = append(findings, fmt.Sprintf("Recommended configuration: %d workers, %d connections (%.1f%% confidence)", 
-			analysis.OptimalConfiguration.OptimalWorkers, 
+		findings = append(findings, fmt.Sprintf("Recommended configuration: %d workers, %d connections (%.1f%% confidence)",
+			analysis.OptimalConfiguration.OptimalWorkers,
 			analysis.OptimalConfiguration.OptimalConnections,
 			analysis.OptimalConfiguration.Confidence*100))
 	}
-	
+
 	return Summary{
 		OverallRating: rating,
 		KeyFindings:   findings,
@@ -279,30 +279,30 @@ func (uc *AnalysisUseCase) calculateOverallEfficiency(bands []domain.BandResults
 	if len(bands) < 2 {
 		return 0.0
 	}
-	
+
 	// Sort bands by worker count
 	sortedBands := make([]domain.BandResults, len(bands))
 	copy(sortedBands, bands)
 	sort.Slice(sortedBands, func(i, j int) bool {
 		return sortedBands[i].Workers < sortedBands[j].Workers
 	})
-	
+
 	// Calculate efficiency as ratio of actual scaling to ideal linear scaling
 	baseline := sortedBands[0].Performance.TotalTPS
 	maxBand := sortedBands[len(sortedBands)-1]
-	
+
 	actualGain := maxBand.Performance.TotalTPS - baseline
 	idealGain := baseline * float64(maxBand.Workers-sortedBands[0].Workers) / float64(sortedBands[0].Workers)
-	
+
 	if idealGain <= 0 {
 		return 0.0
 	}
-	
+
 	efficiency := actualGain / idealGain
 	if efficiency > 1.0 {
 		efficiency = 1.0 // Cap at 100%
 	}
-	
+
 	return efficiency
 }
 
@@ -311,7 +311,7 @@ func (uc *AnalysisUseCase) performComparison(executions []*domain.TestExecution,
 	// Find best performer by peak TPS
 	bestIdx := 0
 	maxTPS := 0.0
-	
+
 	for i, execution := range executions {
 		var peakTPS float64
 		if execution.Results.ProgressiveResults != nil && execution.Results.ProgressiveResults.OptimalBand != nil {
@@ -319,38 +319,38 @@ func (uc *AnalysisUseCase) performComparison(executions []*domain.TestExecution,
 		} else if execution.Results.SingleBandResults != nil {
 			peakTPS = execution.Results.SingleBandResults.Performance.TotalTPS
 		}
-		
+
 		if peakTPS > maxTPS {
 			maxTPS = peakTPS
 			bestIdx = i
 		}
 	}
-	
+
 	// Generate comparison insights
 	insights := []ComparisonInsight{
 		{
-			Category:    "performance",
-			Description: fmt.Sprintf("Best performer: %s with %.2f TPS", executions[bestIdx].Name, maxTPS),
+			Category:     "performance",
+			Description:  fmt.Sprintf("Best performer: %s with %.2f TPS", executions[bestIdx].Name, maxTPS),
 			Significance: "high",
 		},
 	}
-	
+
 	// Compare bottleneck types
 	bottleneckCounts := make(map[domain.BottleneckType]int)
 	for _, analysis := range analyses {
 		bottleneckCounts[analysis.BottleneckType]++
 	}
-	
+
 	for bottleneck, count := range bottleneckCounts {
 		if count > 1 {
 			insights = append(insights, ComparisonInsight{
-				Category:    "bottleneck",
-				Description: fmt.Sprintf("%s bottleneck detected in %d out of %d tests", bottleneck, count, len(analyses)),
+				Category:     "bottleneck",
+				Description:  fmt.Sprintf("%s bottleneck detected in %d out of %d tests", bottleneck, count, len(analyses)),
 				Significance: "medium",
 			})
 		}
 	}
-	
+
 	return &ComparisonResult{
 		ExecutionCount: len(executions),
 		BestPerformer:  executions[bestIdx],
@@ -362,19 +362,19 @@ func (uc *AnalysisUseCase) performComparison(executions []*domain.TestExecution,
 // findOptimalFromHistory analyzes historical data to find optimal configuration
 func (uc *AnalysisUseCase) findOptimalFromHistory(executions []*domain.TestExecution, criteria OptimizationCriteria) *OptimalConfigurationResult {
 	var candidates []ConfigurationCandidate
-	
+
 	for _, execution := range executions {
 		if execution.Results == nil {
 			continue
 		}
-		
+
 		var bands []domain.BandResults
 		if execution.Results.ProgressiveResults != nil {
 			bands = execution.Results.ProgressiveResults.Bands
 		} else if execution.Results.SingleBandResults != nil {
 			bands = []domain.BandResults{*execution.Results.SingleBandResults}
 		}
-		
+
 		for _, band := range bands {
 			score := uc.calculateScore(band, criteria)
 			candidates = append(candidates, ConfigurationCandidate{
@@ -387,21 +387,21 @@ func (uc *AnalysisUseCase) findOptimalFromHistory(executions []*domain.TestExecu
 			})
 		}
 	}
-	
+
 	if len(candidates) == 0 {
 		return &OptimalConfigurationResult{
-			Found: false,
+			Found:  false,
 			Reason: "No valid configuration data found in historical executions",
 		}
 	}
-	
+
 	// Sort by score and pick the best
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].Score > candidates[j].Score
 	})
-	
+
 	best := candidates[0]
-	
+
 	return &OptimalConfigurationResult{
 		Found: true,
 		OptimalConfiguration: domain.RecommendedConfiguration{
@@ -419,13 +419,13 @@ func (uc *AnalysisUseCase) findOptimalFromHistory(executions []*domain.TestExecu
 // calculateScore computes a composite score based on optimization criteria
 func (uc *AnalysisUseCase) calculateScore(band domain.BandResults, criteria OptimizationCriteria) float64 {
 	score := 0.0
-	
+
 	// Normalize TPS (higher is better)
 	if criteria.MaxExpectedTPS > 0 {
 		tpsScore := band.Performance.TotalTPS / criteria.MaxExpectedTPS
 		score += tpsScore * criteria.TPSWeight
 	}
-	
+
 	// Normalize latency (lower is better)
 	if criteria.MaxAcceptableLatency > 0 {
 		latencyScore := 1.0 - (band.Performance.P95Latency / criteria.MaxAcceptableLatency)
@@ -434,13 +434,13 @@ func (uc *AnalysisUseCase) calculateScore(band domain.BandResults, criteria Opti
 		}
 		score += latencyScore * criteria.LatencyWeight
 	}
-	
+
 	// Resource efficiency (lower resource usage is better)
 	if criteria.ResourceWeight > 0 {
 		resourceScore := 1.0 / float64(band.Workers*band.Connections)
 		score += resourceScore * criteria.ResourceWeight
 	}
-	
+
 	return score
 }
 
@@ -449,28 +449,28 @@ func (uc *AnalysisUseCase) calculateConfidence(candidates []ConfigurationCandida
 	if len(candidates) < 2 {
 		return 0.5 // Low confidence with insufficient data
 	}
-	
+
 	// Calculate score variance
 	scores := make([]float64, len(candidates))
 	for i, candidate := range candidates {
 		scores[i] = candidate.Score
 	}
-	
+
 	mean := 0.0
 	for _, score := range scores {
 		mean += score
 	}
 	mean /= float64(len(scores))
-	
+
 	variance := 0.0
 	for _, score := range scores {
 		variance += math.Pow(score-mean, 2)
 	}
 	variance /= float64(len(scores))
-	
+
 	// Higher variance = lower confidence
 	confidence := 1.0 / (1.0 + variance)
-	
+
 	// Boost confidence if the best score is significantly higher than others
 	if len(candidates) > 1 {
 		gap := best.Score - candidates[1].Score
@@ -478,11 +478,11 @@ func (uc *AnalysisUseCase) calculateConfidence(candidates []ConfigurationCandida
 			confidence += gap * 0.5
 		}
 	}
-	
+
 	if confidence > 1.0 {
 		confidence = 1.0
 	}
-	
+
 	return confidence
 }
 
@@ -544,11 +544,11 @@ type OptimalConfigurationResult struct {
 }
 
 type OptimizationCriteria struct {
-	TPSWeight             float64
-	LatencyWeight         float64
-	ResourceWeight        float64
-	MaxExpectedTPS        float64
-	MaxAcceptableLatency  float64
+	TPSWeight            float64
+	LatencyWeight        float64
+	ResourceWeight       float64
+	MaxExpectedTPS       float64
+	MaxAcceptableLatency float64
 }
 
 type ConfigurationCandidate struct {

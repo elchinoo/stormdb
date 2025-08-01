@@ -15,11 +15,11 @@ type TestExecutionRepository interface {
 	GetByID(ctx context.Context, id string) (*domain.TestExecution, error)
 	List(ctx context.Context, filters TestExecutionFilters) ([]*domain.TestExecution, error)
 	Delete(ctx context.Context, id string) error
-	
+
 	// Results management
 	StoreResults(ctx context.Context, executionID string, results *domain.TestResults) error
 	GetResults(ctx context.Context, executionID string) (*domain.TestResults, error)
-	
+
 	// Analytics queries
 	GetPerformanceTrends(ctx context.Context, workloadType string, timeRange TimeRange) ([]PerformanceTrend, error)
 	CompareExecutions(ctx context.Context, executionIDs []string) (*ExecutionComparison, error)
@@ -29,14 +29,14 @@ type TestExecutionRepository interface {
 type MetricsRepository interface {
 	// Raw metrics storage (streaming-friendly)
 	StoreMetricBatch(ctx context.Context, executionID string, bandID int, metrics []MetricPoint) error
-	
+
 	// Aggregated metrics
 	StoreAggregatedMetrics(ctx context.Context, executionID string, bandID int, aggregated *domain.BandResults) error
 	GetAggregatedMetrics(ctx context.Context, executionID string) ([]domain.BandResults, error)
-	
+
 	// Time-series data
 	GetTimeSeriesData(ctx context.Context, executionID string, bandID int, metricType string) ([]TimeSeriesPoint, error)
-	
+
 	// Cleanup old data
 	CleanupOldMetrics(ctx context.Context, olderThan time.Time) error
 }
@@ -48,7 +48,7 @@ type ConfigurationRepository interface {
 	GetConfiguration(ctx context.Context, name string) (*domain.TestConfiguration, error)
 	ListConfigurations(ctx context.Context) ([]*ConfigurationSummary, error)
 	DeleteConfiguration(ctx context.Context, name string) error
-	
+
 	// Templates
 	GetTemplate(ctx context.Context, workloadType string) (*domain.TestConfiguration, error)
 	ListTemplates(ctx context.Context) ([]*ConfigurationSummary, error)
@@ -58,19 +58,19 @@ type ConfigurationRepository interface {
 type AnalysisService interface {
 	// Statistical analysis
 	CalculateStatistics(bands []domain.BandResults) (*domain.PerformanceAnalysis, error)
-	
+
 	// Curve fitting and modeling
 	FitModel(xValues, yValues []float64, modelType domain.ModelType) (*ModelResults, error)
 	FindBestFitModel(xValues, yValues []float64) (*ModelResults, error)
-	
+
 	// Derivatives and trends
 	CalculateDerivatives(xValues, yValues []float64) (first, second []float64, err error)
 	DetectInflectionPoints(xValues, yValues []float64) ([]InflectionPoint, error)
-	
+
 	// Bottleneck identification
 	ClassifyBottleneck(bands []domain.BandResults) domain.BottleneckType
 	IdentifyScalingRegions(bands []domain.BandResults) []domain.ScalingRegion
-	
+
 	// Recommendations
 	GenerateRecommendations(analysis *domain.PerformanceAnalysis) *domain.RecommendedConfiguration
 	PredictPerformance(analysis *domain.PerformanceAnalysis, workers, connections int) (*domain.PerformancePrediction, error)
@@ -79,15 +79,15 @@ type AnalysisService interface {
 // StreamingMetricsCollector provides memory-efficient metrics collection
 type StreamingMetricsCollector interface {
 	domain.MetricsCollector
-	
+
 	// Streaming statistics (Welford's method for memory efficiency)
 	StartCollection(bandID int, expectedDuration time.Duration)
 	StopCollection() *domain.BandResults
-	
+
 	// Real-time monitoring
 	GetCurrentSnapshot() *MetricsSnapshot
 	RegisterListener(listener MetricsListener)
-	
+
 	// Memory management
 	SetMemoryLimits(maxLatencySamples, maxTPSSamples int)
 	GetMemoryUsage() MemoryUsage
@@ -98,7 +98,7 @@ type WorkloadRegistry interface {
 	Register(name string, workload domain.WorkloadInterface)
 	Get(name string) (domain.WorkloadInterface, error)
 	List() []WorkloadInfo
-	
+
 	// Plugin support
 	LoadPlugin(pluginPath string) error
 	UnloadPlugin(name string) error
@@ -108,11 +108,11 @@ type WorkloadRegistry interface {
 type TestExecutionEngine interface {
 	// Single test execution
 	Execute(ctx context.Context, config *domain.TestConfiguration) (*domain.TestResults, error)
-	
+
 	// Progressive scaling execution
-	ExecuteProgressive(ctx context.Context, config *domain.TestConfiguration, 
+	ExecuteProgressive(ctx context.Context, config *domain.TestConfiguration,
 		progressCallback ProgressCallback) (*domain.TestResults, error)
-	
+
 	// Execution control
 	Cancel(ctx context.Context, executionID string) error
 	GetStatus(ctx context.Context, executionID string) (*ExecutionStatus, error)
@@ -158,18 +158,18 @@ type ExecutionSummary struct {
 }
 
 type ComparisonAnalysis struct {
-	BestPerformer    string
-	MostEfficient    string
-	MostStable       string
-	Recommendations  []string
+	BestPerformer   string
+	MostEfficient   string
+	MostStable      string
+	Recommendations []string
 }
 
 type MetricPoint struct {
-	Timestamp    time.Time
-	MetricType   string
-	Value        float64
-	BandID       int
-	WorkerID     *int
+	Timestamp  time.Time
+	MetricType string
+	Value      float64
+	BandID     int
+	WorkerID   *int
 }
 
 type TimeSeriesPoint struct {
@@ -186,10 +186,10 @@ type ConfigurationSummary struct {
 }
 
 type ModelResults struct {
-	ModelType       domain.ModelType
-	Coefficients    []float64
-	GoodnessOfFit   float64 // R-squared
-	Predictions     []float64
+	ModelType        domain.ModelType
+	Coefficients     []float64
+	GoodnessOfFit    float64 // R-squared
+	Predictions      []float64
 	ConfidenceBounds []domain.ConfidenceInterval
 }
 
@@ -200,13 +200,13 @@ type InflectionPoint struct {
 }
 
 type MetricsSnapshot struct {
-	Timestamp    time.Time
-	TPS          float64
-	QPS          float64
-	LatencyP50   float64
-	LatencyP95   float64
-	LatencyP99   float64
-	ErrorRate    float64
+	Timestamp     time.Time
+	TPS           float64
+	QPS           float64
+	LatencyP50    float64
+	LatencyP95    float64
+	LatencyP99    float64
+	ErrorRate     float64
 	ActiveWorkers int
 }
 
@@ -223,11 +223,11 @@ type MemoryUsage struct {
 }
 
 type WorkloadInfo struct {
-	Name          string
-	Description   string
+	Name           string
+	Description    string
 	SupportedModes []string
-	IsPlugin      bool
-	Version       string
+	IsPlugin       bool
+	Version        string
 }
 
 type ProgressCallback func(bandID int, totalBands int, currentResults *domain.BandResults)
