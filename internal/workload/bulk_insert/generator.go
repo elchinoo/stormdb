@@ -376,16 +376,13 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 	for i, record := range records {
 		// Create deep copies of slices to prevent corruption
 		tagsCopy := make([]string, len(record.Tags))
-		for j, tag := range record.Tags {
-			// Defensive copy each tag string
-			tagsCopy[j] = string([]byte(tag))
-		}
+		copy(tagsCopy, record.Tags) // Simple copy is sufficient for strings
 
-		// Create defensive copies of all string fields to prevent corruption
+		// Simple assignment is sufficient for strings - Go strings are immutable
 		copies[i] = DataRecord{
-			ShortText:    string([]byte(record.ShortText)),
-			MediumText:   string([]byte(record.MediumText)),
-			LongText:     string([]byte(record.LongText)),
+			ShortText:    record.ShortText,
+			MediumText:   record.MediumText,
+			LongText:     record.LongText,
 			IntValue:     record.IntValue,
 			BigintValue:  record.BigintValue,
 			DecimalValue: record.DecimalValue,
@@ -395,9 +392,9 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 			IsActive:     record.IsActive,
 			Metadata:     record.Metadata,
 			DataBlob:     record.DataBlob,
-			StatusEnum:   g.validateAndCopyStatusEnum(record.StatusEnum),
-			Tags:         tagsCopy, // Use the copied slice
-			ClientIP:     string([]byte(record.ClientIP)),
+			StatusEnum:   record.StatusEnum, // Simple assignment
+			Tags:         tagsCopy,
+			ClientIP:     record.ClientIP,
 			LocationX:    record.LocationX,
 			LocationY:    record.LocationY,
 		}
@@ -405,41 +402,12 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 	return copies
 }
 
-// validateAndCopyStatusEnum ensures the status enum is valid and creates a safe copy
-func (g *Generator) validateAndCopyStatusEnum(status string) string {
-	// Use explicit comparisons with string literals to avoid any corruption
-	switch status {
-	case "pending":
-		return "pending"
-	case "processing":
-		return "processing"
-	case "completed":
-		return "completed"
-	case "failed":
-		return "failed"
-	case "cancelled":
-		return "cancelled"
-	default:
-		// If invalid, log and return a safe default
-		log.Printf("⚠️  Invalid status enum detected: %q, using 'pending' as fallback", status)
-		return "pending"
-	}
-}
-
 // validateStatusEnumForSQL performs final validation before SQL execution
 func (g *Generator) validateStatusEnumForSQL(status string) string {
-	// Use explicit comparisons with string literals for maximum safety
+	// Use explicit comparisons for maximum safety
 	switch status {
-	case "pending":
-		return "pending"
-	case "processing":
-		return "processing"
-	case "completed":
-		return "completed"
-	case "failed":
-		return "failed"
-	case "cancelled":
-		return "cancelled"
+	case "pending", "processing", "completed", "failed", "cancelled":
+		return status
 	default:
 		// If invalid, log error and return safe default
 		log.Printf("❌ Critical: Invalid enum at SQL execution: %q, substituting 'pending'", status)
@@ -607,26 +575,19 @@ func (g *Generator) formatStringArray(tags []string) interface{} {
 	// Format as PostgreSQL array literal with safe escaping
 	quoted := make([]string, len(tags))
 	for i, tag := range tags {
-		// Robust safety checks to prevent panics
+		// Basic safety checks
 		if len(tag) == 0 {
 			quoted[i] = "\"\""
 			continue
 		}
 
-		// Additional safety check: ensure tag has valid memory
-		// Create a new string to avoid potential memory corruption
-		safeTag := string([]byte(tag))
-
-		// Ensure tag is reasonable length and escape it safely
-		if len(safeTag) > 1000 {
-			safeTag = safeTag[:1000] // Truncate very long tags
+		// Ensure tag is reasonable length
+		if len(tag) > 1000 {
+			tag = tag[:1000] // Truncate very long tags
 		}
 
-		// Use simple string replacement with additional safety
-		escaped := ""
-		if len(safeTag) > 0 {
-			escaped = strings.ReplaceAll(safeTag, "\"", "\\\"")
-		}
+		// Simple string replacement for quotes
+		escaped := strings.ReplaceAll(tag, "\"", "\\\"")
 		quoted[i] = "\"" + escaped + "\""
 	}
 	return fmt.Sprintf("{%s}", strings.Join(quoted, ","))
