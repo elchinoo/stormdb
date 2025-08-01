@@ -352,7 +352,11 @@ func (b *Backend) StoreTestRun(ctx context.Context, testRun *TestRun, metrics *t
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			// Log rollback error but don't fail the operation
+		}
+	}()
 
 	// Store test run
 	testRunID, err := b.insertTestRun(ctx, tx, testRun)

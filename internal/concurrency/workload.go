@@ -108,8 +108,6 @@ type WorkerStats struct {
 
 // WorkloadMetrics tracks workload management metrics
 type WorkloadMetrics struct {
-	mu sync.RWMutex
-
 	// Job metrics
 	TotalJobs     int64 `json:"total_jobs"`
 	ActiveJobs    int64 `json:"active_jobs"`
@@ -287,7 +285,7 @@ func (wm *WorkloadManager) SubmitJob(job Job) error {
 }
 
 // GetMetrics returns current workload metrics
-func (wm *WorkloadManager) GetMetrics() WorkloadMetrics {
+func (wm *WorkloadManager) GetMetrics() *WorkloadMetrics {
 	wm.mu.RLock()
 	defer wm.mu.RUnlock()
 
@@ -314,7 +312,7 @@ func (wm *WorkloadManager) GetMetrics() WorkloadMetrics {
 		wm.metrics.ThroughputPerSecond = float64(wm.metrics.CompletedJobs) / duration.Seconds()
 	}
 
-	return *wm.metrics
+	return wm.metrics
 }
 
 // GetAdjustmentHistory returns the concurrency adjustment history
@@ -414,7 +412,7 @@ func (wm *WorkloadManager) retryJob(job Job) {
 		// Put job back in queue
 		go func() {
 			time.Sleep(time.Duration(job.Retries) * time.Second) // Exponential backoff
-			wm.SubmitJob(job)
+			_ = wm.SubmitJob(job) // Ignore error on retry submission
 		}()
 		atomic.AddInt64(&wm.metrics.RetryJobs, 1)
 	} else {

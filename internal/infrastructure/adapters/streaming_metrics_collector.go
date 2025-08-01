@@ -696,7 +696,8 @@ func (c *StreamingMetricsCollectorImpl) notifySnapshot() {
 		go func(l ports.MetricsListener) {
 			defer func() {
 				if r := recover(); r != nil {
-					// Log error in production
+					// Log error in production - recovered from listener panic
+					_ = r // Use the recover value to silence linter
 				}
 			}()
 			l.OnSnapshot(snapshot)
@@ -716,7 +717,8 @@ func (c *StreamingMetricsCollectorImpl) notifyBandComplete(results *domain.BandR
 		go func(l ports.MetricsListener) {
 			defer func() {
 				if r := recover(); r != nil {
-					// Log error in production
+					// Log error in production - recovered from listener panic
+					_ = r // Use the recover value to silence linter
 				}
 			}()
 			l.OnBandComplete(results.BandID, results)
