@@ -104,7 +104,7 @@ func main() {
 		},
 	}
 	rootCmd.AddCommand(versionCmd)
-	
+
 	// Plugins command
 	rootCmd.AddCommand(createPluginsCommand())
 
