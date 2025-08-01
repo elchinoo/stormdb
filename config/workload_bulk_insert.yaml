@@ -6,7 +6,7 @@ database:
   host: "localhost"
   port: 5432
   dbname: "stormdb_test"
-  username: "postgres"
+  username: "storm_usr"
   password: "password"
   sslmode: "disable"
 
@@ -16,7 +16,7 @@ results_backend:
   host: "localhost"
   port: 5432
   database: "stormdb_results"
-  username: "postgres"
+  username: "storm_usr"
   password: "password"
   sslmode: "disable"
   retention_days: 30
