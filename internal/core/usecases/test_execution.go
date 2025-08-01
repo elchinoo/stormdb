@@ -22,21 +22,21 @@ type TestExecutionUseCase struct {
 	metricsCollector ports.StreamingMetricsCollector
 	workloadRegistry ports.WorkloadRegistry
 	executionEngine  ports.TestExecutionEngine
-	
+
 	// Active executions tracking (thread-safe)
 	activeExecutions sync.Map // map[string]*ExecutionContext
 }
 
 type ExecutionContext struct {
-	ID              string
-	CancelFunc      context.CancelFunc
-	Status          domain.ExecutionStatus
-	StartTime       time.Time
-	CurrentBand     int
-	TotalBands      int
-	Results         *domain.TestResults
-	Config          *domain.TestConfiguration
-	mutex           sync.RWMutex
+	ID          string
+	CancelFunc  context.CancelFunc
+	Status      domain.ExecutionStatus
+	StartTime   time.Time
+	CurrentBand int
+	TotalBands  int
+	Results     *domain.TestResults
+	Config      *domain.TestConfiguration
+	mutex       sync.RWMutex
 }
 
 func NewTestExecutionUseCase(
@@ -66,15 +66,15 @@ func (uc *TestExecutionUseCase) ExecuteTest(ctx context.Context, configName stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration '%s': %w", configName, err)
 	}
-	
+
 	if err := uc.validateConfiguration(config); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-	
+
 	// 2. Create execution context
 	executionID := uuid.New().String()
 	executionCtx, cancelFunc := context.WithCancel(ctx)
-	
+
 	execContext := &ExecutionContext{
 		ID:         executionID,
 		CancelFunc: cancelFunc,
@@ -83,10 +83,10 @@ func (uc *TestExecutionUseCase) ExecuteTest(ctx context.Context, configName stri
 		TotalBands: len(config.ProgressiveConfig.WorkerSteps),
 		Config:     config,
 	}
-	
+
 	uc.activeExecutions.Store(executionID, execContext)
 	defer uc.activeExecutions.Delete(executionID)
-	
+
 	// 3. Create test execution record
 	testExecution := &domain.TestExecution{
 		ID:           executionID,
@@ -96,18 +96,18 @@ func (uc *TestExecutionUseCase) ExecuteTest(ctx context.Context, configName stri
 		Status:       domain.StatusRunning,
 		StartTime:    time.Now(),
 	}
-	
+
 	if err := uc.testRepo.Store(ctx, testExecution); err != nil {
 		return nil, fmt.Errorf("failed to store test execution: %w", err)
 	}
-	
+
 	// 4. Execute test with progressive scaling
 	results, err := uc.executeWithProgressiveScaling(executionCtx, execContext, config, options.ProgressCallback)
 	if err != nil {
 		uc.updateExecutionStatus(executionID, domain.StatusFailed, err.Error())
 		return nil, fmt.Errorf("test execution failed: %w", err)
 	}
-	
+
 	// 5. Perform comprehensive analysis
 	if results.ProgressiveResults != nil {
 		analysis, err := uc.analysisService.CalculateStatistics(results.ProgressiveResults.Bands)
@@ -117,21 +117,21 @@ func (uc *TestExecutionUseCase) ExecuteTest(ctx context.Context, configName stri
 			results.Analysis = analysis
 		}
 	}
-	
+
 	// 6. Store final results
 	testExecution.Status = domain.StatusCompleted
 	testExecution.EndTime = &time.Time{}
 	*testExecution.EndTime = time.Now()
 	testExecution.Results = results
-	
+
 	if err := uc.testRepo.Store(ctx, testExecution); err != nil {
 		log.Printf("Warning: failed to update test execution: %v", err)
 	}
-	
+
 	if err := uc.testRepo.StoreResults(ctx, executionID, results); err != nil {
 		log.Printf("Warning: failed to store test results: %v", err)
 	}
-	
+
 	return &TestExecutionResult{
 		ExecutionID: executionID,
 		Results:     results,
@@ -146,63 +146,63 @@ func (uc *TestExecutionUseCase) executeWithProgressiveScaling(
 	config *domain.TestConfiguration,
 	progressCallback func(bandID int, totalBands int, results *domain.BandResults),
 ) (*domain.TestResults, error) {
-	
+
 	if config.ProgressiveConfig == nil {
 		return nil, fmt.Errorf("progressive scaling configuration is required")
 	}
-	
+
 	workers := config.ProgressiveConfig.WorkerSteps
 	connections := config.ProgressiveConfig.ConnectionSteps
 	bandDuration := config.ProgressiveConfig.BandDuration
-	
+
 	if len(workers) != len(connections) {
 		return nil, fmt.Errorf("workers and connections arrays must have the same length")
 	}
-	
+
 	var bandResults []domain.BandResults
-	
+
 	for bandID, workerCount := range workers {
 		select {
 		case <-ctx.Done():
 			return nil, fmt.Errorf("execution cancelled")
 		default:
 		}
-		
+
 		// Update execution context
 		execContext.mutex.Lock()
 		execContext.CurrentBand = bandID
 		execContext.mutex.Unlock()
-		
+
 		log.Printf("Starting band %d: %d workers, %d connections", bandID, workerCount, connections[bandID])
-		
+
 		// Execute band
 		bandResult, err := uc.executeBand(ctx, bandID, config, workerCount, connections[bandID], bandDuration)
 		if err != nil {
 			return nil, fmt.Errorf("band %d failed: %w", bandID, err)
 		}
-		
+
 		bandResults = append(bandResults, *bandResult)
-		
+
 		// Store intermediate results
 		if err := uc.metricsRepo.StoreAggregatedMetrics(ctx, execContext.ID, bandID, bandResult); err != nil {
 			log.Printf("Warning: failed to store band %d metrics: %v", bandID, err)
 		}
-		
+
 		// Notify progress
 		if progressCallback != nil {
 			progressCallback(bandID, len(workers), bandResult)
 		}
-		
-		log.Printf("Band %d completed: TPS=%.2f, Latency P95=%.2fms", 
+
+		log.Printf("Band %d completed: TPS=%.2f, Latency P95=%.2fms",
 			bandID, bandResult.Performance.TotalTPS, bandResult.Performance.P95Latency)
 	}
-	
+
 	results := &domain.TestResults{
 		ProgressiveResults: &domain.ProgressiveResults{
 			Bands: bandResults,
 		},
 	}
-	
+
 	// Find optimal band
 	if len(bandResults) > 0 {
 		optimalIdx := 0
@@ -215,7 +215,7 @@ func (uc *TestExecutionUseCase) executeWithProgressiveScaling(
 		}
 		results.ProgressiveResults.OptimalBand = &bandResults[optimalIdx]
 	}
-	
+
 	return results, nil
 }
 
@@ -228,24 +228,24 @@ func (uc *TestExecutionUseCase) executeBand(
 	connections int,
 	duration time.Duration,
 ) (*domain.BandResults, error) {
-	
+
 	// Get workload implementation
 	workload, err := uc.workloadRegistry.Get(config.WorkloadType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workload '%s': %w", config.WorkloadType, err)
 	}
-	
+
 	// Start streaming metrics collection
 	uc.metricsCollector.StartCollection(bandID, duration)
 	defer func() {
 		// Ensure collection is stopped
 		uc.metricsCollector.StopCollection()
 	}()
-	
+
 	// Create band context with timeout
 	bandCtx, cancel := context.WithTimeout(ctx, duration+10*time.Second) // Buffer for cleanup
 	defer cancel()
-	
+
 	// Create configuration for this band
 	bandConfig := *config // Copy the config
 	// Note: Workers and connections are handled by the workload implementation
@@ -255,24 +255,24 @@ func (uc *TestExecutionUseCase) executeBand(
 	}
 	bandConfig.WorkloadParams["workers"] = workers
 	bandConfig.WorkloadParams["connections"] = connections
-	
+
 	// Execute workload
 	startTime := time.Now()
 	err = workload.Run(bandCtx, bandConfig, uc.metricsCollector)
 	endTime := time.Now()
 	actualDuration := endTime.Sub(startTime)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("workload execution failed: %w", err)
 	}
-	
+
 	// Collect final metrics
 	bandResults := uc.metricsCollector.StopCollection()
 	bandResults.BandID = bandID
 	bandResults.Workers = workers
 	bandResults.Connections = connections
 	bandResults.Duration = actualDuration
-	
+
 	return bandResults, nil
 }
 
@@ -281,27 +281,27 @@ func (uc *TestExecutionUseCase) validateConfiguration(config *domain.TestConfigu
 	if config.WorkloadType == "" {
 		return fmt.Errorf("workload type is required")
 	}
-	
+
 	if _, err := uc.workloadRegistry.Get(config.WorkloadType); err != nil {
 		return fmt.Errorf("unsupported workload type '%s': %w", config.WorkloadType, err)
 	}
-	
+
 	if config.ProgressiveConfig == nil {
 		return fmt.Errorf("progressive scaling configuration is required")
 	}
-	
+
 	if config.ProgressiveConfig.BandDuration <= 0 {
 		return fmt.Errorf("band duration must be positive")
 	}
-	
+
 	if len(config.ProgressiveConfig.WorkerSteps) == 0 {
 		return fmt.Errorf("at least one worker configuration is required")
 	}
-	
+
 	if len(config.ProgressiveConfig.WorkerSteps) != len(config.ProgressiveConfig.ConnectionSteps) {
 		return fmt.Errorf("workers and connections arrays must have the same length")
 	}
-	
+
 	for i, workers := range config.ProgressiveConfig.WorkerSteps {
 		if workers <= 0 {
 			return fmt.Errorf("workers count must be positive (band %d)", i)
@@ -310,7 +310,7 @@ func (uc *TestExecutionUseCase) validateConfiguration(config *domain.TestConfigu
 			return fmt.Errorf("connections count must be positive (band %d)", i)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -321,11 +321,11 @@ func (uc *TestExecutionUseCase) updateExecutionStatus(executionID string, status
 		execContext.mutex.Lock()
 		execContext.Status = status
 		execContext.mutex.Unlock()
-		
+
 		// Also update in repository (best effort)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		if testExecution, err := uc.testRepo.GetByID(ctx, executionID); err == nil {
 			testExecution.Status = status
 			if errorMsg != "" {
@@ -347,9 +347,9 @@ func (uc *TestExecutionUseCase) GetExecutionStatus(executionID string) (*Executi
 		execContext := execContextValue.(*ExecutionContext)
 		execContext.mutex.RLock()
 		defer execContext.mutex.RUnlock()
-		
+
 		progress := float64(execContext.CurrentBand) / float64(execContext.TotalBands)
-		
+
 		return &ExecutionStatusInfo{
 			ID:          execContext.ID,
 			Status:      execContext.Status,

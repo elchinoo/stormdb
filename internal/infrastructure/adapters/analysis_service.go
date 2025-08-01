@@ -29,14 +29,14 @@ func (s *MathematicalAnalysisService) CalculateStatistics(bands []domain.BandRes
 	if len(bands) < 2 {
 		return nil, fmt.Errorf("at least 2 bands required for statistical analysis")
 	}
-	
+
 	// Sort bands by connection count for analysis
 	sortedBands := make([]domain.BandResults, len(bands))
 	copy(sortedBands, bands)
 	sort.Slice(sortedBands, func(i, j int) bool {
 		return sortedBands[i].Connections < sortedBands[j].Connections
 	})
-	
+
 	// Extract X (connections) and Y (TPS) values
 	xValues := make([]float64, len(sortedBands))
 	yValues := make([]float64, len(sortedBands))
@@ -44,31 +44,31 @@ func (s *MathematicalAnalysisService) CalculateStatistics(bands []domain.BandRes
 		xValues[i] = float64(band.Connections)
 		yValues[i] = band.Performance.TotalTPS
 	}
-	
+
 	// Calculate derivatives
 	firstDerivative, secondDerivative, err := s.CalculateDerivatives(xValues, yValues)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate derivatives: %w", err)
 	}
-	
+
 	// Find best fit model
 	bestFitModel, err := s.FindBestFitModel(xValues, yValues)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find best fit model: %w", err)
 	}
-	
+
 	// Identify scaling regions
 	scalingRegions := s.IdentifyScalingRegions(sortedBands)
-	
+
 	// Classify bottleneck
 	bottleneckType := s.ClassifyBottleneck(sortedBands)
-	
+
 	// Generate optimal configuration
 	optimalConfig := s.generateOptimalConfiguration(sortedBands, bestFitModel)
-	
+
 	// Generate performance predictions
 	predictions := s.generatePredictions(sortedBands, bestFitModel)
-	
+
 	return &domain.PerformanceAnalysis{
 		FirstDerivative:        firstDerivative,
 		SecondDerivative:       secondDerivative,
@@ -87,15 +87,15 @@ func (s *MathematicalAnalysisService) CalculateDerivatives(xValues, yValues []fl
 	if len(xValues) != len(yValues) {
 		return nil, nil, fmt.Errorf("x and y value arrays must have the same length")
 	}
-	
+
 	if len(xValues) < 3 {
 		return nil, nil, fmt.Errorf("at least 3 points required for derivative calculation")
 	}
-	
+
 	n := len(xValues)
 	first = make([]float64, n)
 	second = make([]float64, n)
-	
+
 	// Calculate first derivative using central differences
 	for i := 0; i < n; i++ {
 		if i == 0 {
@@ -109,7 +109,7 @@ func (s *MathematicalAnalysisService) CalculateDerivatives(xValues, yValues []fl
 			first[i] = (yValues[i+1] - yValues[i-1]) / (xValues[i+1] - xValues[i-1])
 		}
 	}
-	
+
 	// Calculate second derivative
 	for i := 0; i < n; i++ {
 		if i == 0 {
@@ -120,7 +120,7 @@ func (s *MathematicalAnalysisService) CalculateDerivatives(xValues, yValues []fl
 			second[i] = (first[i+1] - first[i-1]) / (xValues[i+1] - xValues[i-1])
 		}
 	}
-	
+
 	return first, second, nil
 }
 
@@ -150,26 +150,26 @@ func (s *MathematicalAnalysisService) FindBestFitModel(xValues, yValues []float6
 		domain.ModelExponential,
 		domain.ModelPolynomial,
 	}
-	
+
 	var bestModel *ports.ModelResults
 	bestRSquared := -1.0
-	
+
 	for _, modelType := range models {
 		result, err := s.FitModel(xValues, yValues, modelType)
 		if err != nil {
 			continue // Skip models that fail to fit
 		}
-		
+
 		if result.GoodnessOfFit > bestRSquared {
 			bestRSquared = result.GoodnessOfFit
 			bestModel = result
 		}
 	}
-	
+
 	if bestModel == nil {
 		return nil, fmt.Errorf("no model could be fitted to the data")
 	}
-	
+
 	return bestModel, nil
 }
 
@@ -179,19 +179,19 @@ func (s *MathematicalAnalysisService) DetectInflectionPoints(xValues, yValues []
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var inflectionPoints []ports.InflectionPoint
-	
+
 	for i := 1; i < len(secondDerivative)-1; i++ {
 		// Look for sign changes in second derivative
 		if (secondDerivative[i-1] > 0 && secondDerivative[i+1] < 0) ||
-		   (secondDerivative[i-1] < 0 && secondDerivative[i+1] > 0) {
-			
+			(secondDerivative[i-1] < 0 && secondDerivative[i+1] > 0) {
+
 			direction := "increasing"
 			if secondDerivative[i-1] > secondDerivative[i+1] {
 				direction = "decreasing"
 			}
-			
+
 			inflectionPoints = append(inflectionPoints, ports.InflectionPoint{
 				X:         xValues[i],
 				Y:         yValues[i],
@@ -199,7 +199,7 @@ func (s *MathematicalAnalysisService) DetectInflectionPoints(xValues, yValues []
 			})
 		}
 	}
-	
+
 	return inflectionPoints, nil
 }
 
@@ -208,63 +208,63 @@ func (s *MathematicalAnalysisService) ClassifyBottleneck(bands []domain.BandResu
 	if len(bands) < 2 {
 		return domain.BottleneckNone
 	}
-	
+
 	// Sort by connections
 	sortedBands := make([]domain.BandResults, len(bands))
 	copy(sortedBands, bands)
 	sort.Slice(sortedBands, func(i, j int) bool {
 		return sortedBands[i].Connections < sortedBands[j].Connections
 	})
-	
+
 	// Calculate scaling efficiency
 	initialTPS := sortedBands[0].Performance.TotalTPS
 	finalTPS := sortedBands[len(sortedBands)-1].Performance.TotalTPS
-	
+
 	connectionIncrease := float64(sortedBands[len(sortedBands)-1].Connections) / float64(sortedBands[0].Connections)
 	tpsIncrease := finalTPS / initialTPS
-	
+
 	scalingEfficiency := tpsIncrease / connectionIncrease
-	
+
 	// Analyze latency trends
 	initialLatency := sortedBands[0].Performance.P95Latency
 	finalLatency := sortedBands[len(sortedBands)-1].Performance.P95Latency
 	latencyIncrease := finalLatency / initialLatency
-	
+
 	// Analyze error rates
 	avgErrorRate := 0.0
 	for _, band := range sortedBands {
 		avgErrorRate += band.Performance.ErrorRate
 	}
 	avgErrorRate /= float64(len(sortedBands))
-	
+
 	// Classification logic
 	if avgErrorRate > 0.05 { // 5% error rate threshold
 		return domain.BottleneckDatabase
 	}
-	
+
 	if latencyIncrease > 2.0 && scalingEfficiency < 0.5 {
 		return domain.BottleneckIO
 	}
-	
+
 	if scalingEfficiency < 0.3 {
 		return domain.BottleneckConnection
 	}
-	
+
 	if latencyIncrease > 1.5 {
 		return domain.BottleneckQueue
 	}
-	
+
 	// Check for memory pressure indicators
 	for _, band := range sortedBands {
 		if band.Resources.MemoryUsageMB > 1000 { // High memory usage
 			return domain.BottleneckMemory
 		}
 	}
-	
+
 	if scalingEfficiency < 0.7 {
 		return domain.BottleneckCPU
 	}
-	
+
 	return domain.BottleneckNone
 }
 
@@ -273,30 +273,30 @@ func (s *MathematicalAnalysisService) IdentifyScalingRegions(bands []domain.Band
 	if len(bands) < 3 {
 		return []domain.ScalingRegion{}
 	}
-	
+
 	// Sort by connections
 	sortedBands := make([]domain.BandResults, len(bands))
 	copy(sortedBands, bands)
 	sort.Slice(sortedBands, func(i, j int) bool {
 		return sortedBands[i].Connections < sortedBands[j].Connections
 	})
-	
+
 	var regions []domain.ScalingRegion
-	
+
 	// Calculate marginal gains for each segment
 	for i := 1; i < len(sortedBands); i++ {
 		startBand := sortedBands[i-1]
 		endBand := sortedBands[i]
-		
+
 		tpsGain := endBand.Performance.TotalTPS - startBand.Performance.TotalTPS
 		connectionGain := float64(endBand.Connections - startBand.Connections)
-		
+
 		marginalGain := tpsGain / connectionGain
-		
+
 		// Classify based on marginal gain
 		var classification domain.RegionClassification
 		var description string
-		
+
 		if i == 1 {
 			classification = domain.RegionBaseline
 			description = "Baseline performance establishment"
@@ -306,7 +306,7 @@ func (s *MathematicalAnalysisService) IdentifyScalingRegions(bands []domain.Band
 			prevTpsGain := startBand.Performance.TotalTPS - prevStartBand.Performance.TotalTPS
 			prevConnectionGain := float64(startBand.Connections - prevStartBand.Connections)
 			prevMarginalGain := prevTpsGain / prevConnectionGain
-			
+
 			if marginalGain > prevMarginalGain*0.9 {
 				classification = domain.RegionLinearScaling
 				description = "Good linear scaling observed"
@@ -321,7 +321,7 @@ func (s *MathematicalAnalysisService) IdentifyScalingRegions(bands []domain.Band
 				description = "Performance degradation"
 			}
 		}
-		
+
 		regions = append(regions, domain.ScalingRegion{
 			StartConnections: startBand.Connections,
 			EndConnections:   endBand.Connections,
@@ -329,7 +329,7 @@ func (s *MathematicalAnalysisService) IdentifyScalingRegions(bands []domain.Band
 			Description:      description,
 		})
 	}
-	
+
 	return regions
 }
 
@@ -338,7 +338,7 @@ func (s *MathematicalAnalysisService) generateOptimalConfiguration(bands []domai
 	// Find the band with the highest efficiency (TPS per connection)
 	bestEfficiency := 0.0
 	var bestBand domain.BandResults
-	
+
 	for _, band := range bands {
 		efficiency := band.Performance.TotalTPS / float64(band.Connections)
 		if efficiency > bestEfficiency {
@@ -346,16 +346,16 @@ func (s *MathematicalAnalysisService) generateOptimalConfiguration(bands []domai
 			bestBand = band
 		}
 	}
-	
+
 	// Calculate confidence based on model fit
 	confidence := model.GoodnessOfFit
 	if confidence > 1.0 {
 		confidence = 1.0
 	}
-	
+
 	reasoning := fmt.Sprintf("Selected based on highest efficiency (%.2f TPS/connection) with %s model fit (R² = %.3f)",
 		bestEfficiency, model.ModelType, model.GoodnessOfFit)
-	
+
 	return domain.RecommendedConfiguration{
 		OptimalWorkers:     bestBand.Workers,
 		OptimalConnections: bestBand.Connections,
@@ -369,11 +369,11 @@ func (s *MathematicalAnalysisService) generateOptimalConfiguration(bands []domai
 // generatePredictions creates performance predictions for untested configurations
 func (s *MathematicalAnalysisService) generatePredictions(bands []domain.BandResults, model *ports.ModelResults) []domain.PerformancePrediction {
 	var predictions []domain.PerformancePrediction
-	
+
 	// Generate predictions for intermediate values
 	minConnections := bands[0].Connections
 	maxConnections := bands[0].Connections
-	
+
 	for _, band := range bands {
 		if band.Connections < minConnections {
 			minConnections = band.Connections
@@ -382,13 +382,13 @@ func (s *MathematicalAnalysisService) generatePredictions(bands []domain.BandRes
 			maxConnections = band.Connections
 		}
 	}
-	
+
 	// Create predictions for values between tested points
 	step := (maxConnections - minConnections) / 10
 	if step < 1 {
 		step = 1
 	}
-	
+
 	for conn := minConnections; conn <= maxConnections; conn += step {
 		// Skip if we already have data for this connection count
 		hasData := false
@@ -401,14 +401,14 @@ func (s *MathematicalAnalysisService) generatePredictions(bands []domain.BandRes
 		if hasData {
 			continue
 		}
-		
+
 		// Predict using the model
 		predictedTPS := s.predictTPS(float64(conn), model)
 		predictedLatency := s.predictLatency(float64(conn), bands)
-		
+
 		// Calculate confidence bounds (simplified)
 		errorMargin := predictedTPS * (1.0 - model.GoodnessOfFit) * 0.5
-		
+
 		predictions = append(predictions, domain.PerformancePrediction{
 			Workers:          conn, // Simplified: assume workers = connections
 			Connections:      conn,
@@ -422,7 +422,7 @@ func (s *MathematicalAnalysisService) generatePredictions(bands []domain.BandRes
 			ModelUsed: model.ModelType,
 		})
 	}
-	
+
 	return predictions
 }
 
@@ -448,7 +448,7 @@ func (s *MathematicalAnalysisService) predictTPS(connections float64, model *por
 		}
 		return result
 	}
-	
+
 	// Fallback to linear interpolation
 	return connections * 10.0 // Simple fallback
 }
@@ -459,23 +459,23 @@ func (s *MathematicalAnalysisService) predictLatency(connections float64, bands 
 	if len(bands) < 2 {
 		return 10.0 // Default value
 	}
-	
+
 	// Find closest bands
 	sort.Slice(bands, func(i, j int) bool {
 		return bands[i].Connections < bands[j].Connections
 	})
-	
+
 	// Linear interpolation
 	for i := 0; i < len(bands)-1; i++ {
 		if float64(bands[i].Connections) <= connections && connections <= float64(bands[i+1].Connections) {
 			// Interpolate
 			x1, y1 := float64(bands[i].Connections), bands[i].Performance.P95Latency
 			x2, y2 := float64(bands[i+1].Connections), bands[i+1].Performance.P95Latency
-			
+
 			return y1 + (y2-y1)*(connections-x1)/(x2-x1)
 		}
 	}
-	
+
 	// Extrapolation
 	if connections < float64(bands[0].Connections) {
 		return bands[0].Performance.P95Latency
@@ -488,27 +488,27 @@ func (s *MathematicalAnalysisService) predictLatency(connections float64, bands 
 func (s *MathematicalAnalysisService) fitLinear(xValues, yValues []float64) (*ports.ModelResults, error) {
 	n := float64(len(xValues))
 	sumX, sumY, sumXY, sumX2 := 0.0, 0.0, 0.0, 0.0
-	
+
 	for i := 0; i < len(xValues); i++ {
 		sumX += xValues[i]
 		sumY += yValues[i]
 		sumXY += xValues[i] * yValues[i]
 		sumX2 += xValues[i] * xValues[i]
 	}
-	
+
 	// Calculate coefficients: y = a + bx
 	b := (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX)
 	a := (sumY - b*sumX) / n
-	
+
 	// Calculate R-squared
 	rSquared := s.calculateRSquared(xValues, yValues, []float64{a, b}, domain.ModelLinear)
-	
+
 	// Generate predictions
 	predictions := make([]float64, len(xValues))
 	for i, x := range xValues {
 		predictions[i] = a + b*x
 	}
-	
+
 	return &ports.ModelResults{
 		ModelType:     domain.ModelLinear,
 		Coefficients:  []float64{a, b},
@@ -526,7 +526,7 @@ func (s *MathematicalAnalysisService) fitLogarithmic(xValues, yValues []float64)
 		}
 		logX[i] = math.Log(x)
 	}
-	
+
 	// Fit linear model to (ln(x), y)
 	return s.fitLinear(logX, yValues)
 }
@@ -540,24 +540,24 @@ func (s *MathematicalAnalysisService) fitExponential(xValues, yValues []float64)
 		}
 		logY[i] = math.Log(y)
 	}
-	
+
 	// Fit linear model to (x, ln(y))
 	linearResult, err := s.fitLinear(xValues, logY)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Transform coefficients back: a = e^(intercept), b = slope
 	a := math.Exp(linearResult.Coefficients[0])
 	b := linearResult.Coefficients[1]
-	
+
 	rSquared := s.calculateRSquared(xValues, yValues, []float64{a, b}, domain.ModelExponential)
-	
+
 	predictions := make([]float64, len(xValues))
 	for i, x := range xValues {
 		predictions[i] = a * math.Exp(b*x)
 	}
-	
+
 	return &ports.ModelResults{
 		ModelType:     domain.ModelExponential,
 		Coefficients:  []float64{a, b},
@@ -580,16 +580,16 @@ func (s *MathematicalAnalysisService) fitLogistic(xValues, yValues []float64) (*
 func (s *MathematicalAnalysisService) fitPolynomial(xValues, yValues []float64, degree int) (*ports.ModelResults, error) {
 	// Simplified polynomial fitting using least squares
 	// For a full implementation, would use matrix operations
-	
+
 	if degree > len(xValues)-1 {
 		degree = len(xValues) - 1
 	}
-	
+
 	// For now, fallback to linear for simplicity
 	if degree <= 1 {
 		return s.fitLinear(xValues, yValues)
 	}
-	
+
 	// Placeholder for higher degree polynomials
 	return &ports.ModelResults{
 		ModelType:     domain.ModelPolynomial,
@@ -603,21 +603,21 @@ func (s *MathematicalAnalysisService) calculateRSquared(xValues, yValues, coeffi
 	if len(yValues) == 0 {
 		return 0.0
 	}
-	
+
 	// Calculate mean of y values
 	yMean := 0.0
 	for _, y := range yValues {
 		yMean += y
 	}
 	yMean /= float64(len(yValues))
-	
+
 	// Calculate total sum of squares and residual sum of squares
 	totalSumSquares := 0.0
 	residualSumSquares := 0.0
-	
+
 	for i, y := range yValues {
 		x := xValues[i]
-		
+
 		// Predict y value using the model
 		var predicted float64
 		switch modelType {
@@ -630,20 +630,20 @@ func (s *MathematicalAnalysisService) calculateRSquared(xValues, yValues, coeffi
 		default:
 			predicted = y // Fallback
 		}
-		
+
 		totalSumSquares += (y - yMean) * (y - yMean)
 		residualSumSquares += (y - predicted) * (y - predicted)
 	}
-	
+
 	if totalSumSquares == 0 {
 		return 0.0
 	}
-	
+
 	rSquared := 1.0 - (residualSumSquares / totalSumSquares)
 	if rSquared < 0 {
 		rSquared = 0.0
 	}
-	
+
 	return rSquared
 }
 

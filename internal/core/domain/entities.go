@@ -24,13 +24,13 @@ type TestConfiguration struct {
 	// Core parameters
 	WorkloadType string
 	Duration     time.Duration
-	
+
 	// Progressive scaling parameters
 	ProgressiveConfig *ProgressiveScalingConfig
-	
+
 	// Database connection
 	DatabaseConfig DatabaseConfiguration
-	
+
 	// Workload-specific parameters
 	WorkloadParams map[string]interface{}
 }
@@ -41,24 +41,24 @@ type ProgressiveScalingConfig struct {
 	MinConnections  int
 	MaxConnections  int
 	ConnectionSteps []int // Exact steps, or nil for calculated steps
-	
-	// Worker scaling  
+
+	// Worker scaling
 	MinWorkers  int
 	MaxWorkers  int
 	WorkerSteps []int // Exact steps, or nil for calculated steps
-	
+
 	// Timing
 	BandDuration time.Duration
 	WarmupTime   time.Duration
 	CooldownTime time.Duration
-	
+
 	// Scaling strategy
 	Strategy ScalingStrategy
-	
+
 	// Memory management
-	MaxMemoryMB         int
-	MaxLatencySamples   int
-	SampleInterval      time.Duration
+	MaxMemoryMB       int
+	MaxLatencySamples int
+	SampleInterval    time.Duration
 }
 
 // ScalingStrategy defines how connections/workers are increased
@@ -86,35 +86,35 @@ type DatabaseConfiguration struct {
 type ExecutionStatus string
 
 const (
-	StatusPending    ExecutionStatus = "pending"
-	StatusRunning    ExecutionStatus = "running"
-	StatusCompleted  ExecutionStatus = "completed"
-	StatusFailed     ExecutionStatus = "failed"
-	StatusCancelled  ExecutionStatus = "cancelled"
+	StatusPending   ExecutionStatus = "pending"
+	StatusRunning   ExecutionStatus = "running"
+	StatusCompleted ExecutionStatus = "completed"
+	StatusFailed    ExecutionStatus = "failed"
+	StatusCancelled ExecutionStatus = "cancelled"
 )
 
 // TestResults contains all results from a test execution
 type TestResults struct {
 	// Progressive scaling results
 	ProgressiveResults *ProgressiveResults
-	
+
 	// Single band results (for non-progressive tests)
 	SingleBandResults *BandResults
-	
+
 	// Analysis results
 	Analysis *PerformanceAnalysis
-	
+
 	// Raw metrics (limited for memory efficiency)
 	RawMetrics *RawMetrics
 }
 
 // ProgressiveResults holds results from progressive scaling tests
 type ProgressiveResults struct {
-	Bands            []BandResults
-	OptimalBand      *BandResults
-	TotalCapacity    float64 // Area under the curve
+	Bands             []BandResults
+	OptimalBand       *BandResults
+	TotalCapacity     float64 // Area under the curve
 	ScalingEfficiency float64
-	BottleneckType   BottleneckType
+	BottleneckType    BottleneckType
 }
 
 // BandResults represents metrics for a single band (connection/worker configuration)
@@ -123,16 +123,16 @@ type BandResults struct {
 	Workers     int
 	Connections int
 	Duration    time.Duration
-	
+
 	// Core performance metrics
 	Performance PerformanceMetrics
-	
+
 	// Efficiency metrics
 	Efficiency EfficiencyMetrics
-	
-	// Stability metrics  
+
+	// Stability metrics
 	Stability StabilityMetrics
-	
+
 	// Resource utilization
 	Resources ResourceMetrics
 }
@@ -142,23 +142,23 @@ type PerformanceMetrics struct {
 	// Throughput
 	TotalTPS float64
 	TotalQPS float64
-	
+
 	// Latency (in milliseconds)
 	AvgLatency float64
 	P50Latency float64
 	P95Latency float64
 	P99Latency float64
-	
+
 	// Errors
 	ErrorCount int64
 	ErrorRate  float64 // Percentage
-	
+
 	// Operation counts
 	SelectQueries int64
 	InsertQueries int64
 	UpdateQueries int64
 	DeleteQueries int64
-	
+
 	// Row counts
 	RowsRead     int64
 	RowsModified int64
@@ -179,11 +179,11 @@ type StabilityMetrics struct {
 	TPSStdDev              float64
 	LatencyStdDev          float64
 	CoefficientOfVariation float64
-	
+
 	// Confidence intervals
-	TPSConfidenceInterval    ConfidenceInterval
+	TPSConfidenceInterval     ConfidenceInterval
 	LatencyConfidenceInterval ConfidenceInterval
-	
+
 	// Consistency over time
 	PerformanceDrift float64 // Change from start to end of band
 }
@@ -208,18 +208,18 @@ type PerformanceAnalysis struct {
 	// Derivatives and trends
 	FirstDerivative  []float64 // Marginal gains
 	SecondDerivative []float64 // Inflection points
-	
+
 	// Model fitting
-	BestFitModel     ModelType
-	ModelCoefficients []float64
+	BestFitModel       ModelType
+	ModelCoefficients  []float64
 	ModelGoodnessOfFit float64 // R-squared
-	
+
 	// Classifications
 	ScalingRegions []ScalingRegion
 	BottleneckType BottleneckType
-	
+
 	// Recommendations
-	OptimalConfiguration RecommendedConfiguration
+	OptimalConfiguration   RecommendedConfiguration
 	PerformancePredictions []PerformancePrediction
 }
 
@@ -228,7 +228,7 @@ type ModelType string
 
 const (
 	ModelLinear      ModelType = "linear"
-	ModelLogarithmic ModelType = "logarithmic" 
+	ModelLogarithmic ModelType = "logarithmic"
 	ModelExponential ModelType = "exponential"
 	ModelLogistic    ModelType = "logistic"
 	ModelPolynomial  ModelType = "polynomial"
@@ -292,10 +292,10 @@ type RawMetrics struct {
 	LatencyHistogram map[int]int64 // Bucket -> count
 	TPSSamples       []float64     // Limited samples for analysis
 	QPSSamples       []float64     // Limited samples for analysis
-	
+
 	// Error details
 	ErrorTypes map[string]int64
-	
+
 	// Timestamps for time-series analysis
 	SampleTimestamps []time.Time
 }
@@ -305,10 +305,10 @@ type WorkloadInterface interface {
 	// Lifecycle
 	Setup(ctx context.Context, config TestConfiguration) error
 	Cleanup(ctx context.Context, config TestConfiguration) error
-	
+
 	// Execution
 	Run(ctx context.Context, config TestConfiguration, collector MetricsCollector) error
-	
+
 	// Metadata
 	Name() string
 	Description() string
@@ -321,15 +321,15 @@ type MetricsCollector interface {
 	RecordTransaction(success bool, latencyNs int64)
 	RecordQuery(queryType string, rowsAffected int64)
 	RecordError(err error)
-	
+
 	// Advanced metrics
 	RecordCustomMetric(name string, value float64)
-	
+
 	// Streaming statistics (memory efficient)
 	GetCurrentTPS() float64
 	GetCurrentLatencyP95() float64
 	GetCurrentErrorRate() float64
-	
+
 	// Snapshot for analysis (limited data)
 	TakeSnapshot() *RawMetrics
 }
