@@ -476,6 +476,9 @@ func (e *ScalingEngine) interpretSecondDerivative(secondDeriv float64) string {
 }
 
 // findSweetSpot identifies the optimal balance of performance and efficiency
+// TODO: This function will be used in future recommendation features
+//
+//nolint:unused
 func (e *ScalingEngine) findSweetSpot() *types.ProgressiveBandMetrics {
 	if len(e.results.Bands) == 0 {
 		return nil
@@ -514,6 +517,9 @@ func (e *ScalingEngine) findSweetSpot() *types.ProgressiveBandMetrics {
 }
 
 // findDiminishingReturnsPoint identifies where gains start to slow down significantly
+// TODO: This function will be used in future recommendation features
+//
+//nolint:unused
 func (e *ScalingEngine) findDiminishingReturnsPoint() *types.ProgressiveBandMetrics {
 	if len(e.results.Bands) < 3 {
 		return nil
@@ -582,6 +588,10 @@ func (e *ScalingEngine) calculateTotalCapacity() float64 {
 }
 
 // generateRecommendations generates actionable recommendations based on analysis
+// generateSimpleRecommendations creates actionable recommendations based on analysis
+// TODO: This function will be used in future recommendation features
+//
+//nolint:unused
 func (e *ScalingEngine) generateSimpleRecommendations(sweetSpot, diminishing, overload *types.ProgressiveBandMetrics) []string {
 	recommendations := make([]string, 0)
 
@@ -706,6 +716,9 @@ type SweetSpotRange struct {
 }
 
 // findSweetSpotRange identifies the connection range with optimal marginal gains
+// TODO: This function will be used in future recommendation features
+//
+//nolint:unused
 func (e *ScalingEngine) findSweetSpotRange() *SweetSpotRange {
 	if len(e.results.Bands) < 2 {
 		return nil
@@ -778,6 +791,9 @@ func (e *ScalingEngine) calculateMarginalGain(connections int) float64 {
 }
 
 // generateEnhancedRecommendations creates improved recommendations based on analysis
+// TODO: This function will be used in future recommendation features
+//
+//nolint:unused
 func (e *ScalingEngine) generateEnhancedRecommendations(sweetSpot *SweetSpotRange, diminishing *types.ProgressiveBandMetrics,
 	overload *types.ProgressiveBandMetrics, errorOnset *types.ProgressiveBandMetrics) []string {
 

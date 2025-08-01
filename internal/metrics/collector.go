@@ -16,9 +16,8 @@ type MetricsCollector struct {
 	startTime time.Time
 
 	// Metrics storage
-	samples    []MetricSample
-	aggregates MetricAggregates
-	mutex      sync.RWMutex
+	samples []MetricSample
+	mutex   sync.RWMutex
 
 	// Collection settings
 	interval   time.Duration

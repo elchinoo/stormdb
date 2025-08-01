@@ -81,7 +81,10 @@ func init() {
 	progressiveCmd.Flags().BoolVarP(&progressiveVerbose, "verbose", "v", false, "Verbose output")
 
 	// Required flags
-	progressiveCmd.MarkFlagRequired("config")
+	if err := progressiveCmd.MarkFlagRequired("config"); err != nil {
+		// This should never happen, but handle gracefully
+		return
+	}
 }
 
 func runProgressiveTest(cmd *cobra.Command, args []string) error {
@@ -107,7 +110,12 @@ func runProgressiveTest(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	defer logger.Sync()
+	defer func() {
+		if syncErr := logger.Sync(); syncErr != nil {
+			// Ignore sync errors for stderr/stdout - common on exit
+			fmt.Fprintf(os.Stderr, "Warning: Logger sync failed: %v\n", syncErr)
+		}
+	}()
 
 	if progressiveVerbose {
 		logger = logger.With(zap.Bool("verbose", true))

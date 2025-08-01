@@ -1,8 +1,8 @@
-# Progressive Scaling Testing Guide
+# StormDB Progressive Scaling Guide
 
 ## Overview
 
-StormDB's Progressive Scaling feature provides comprehensive automated testing that gradually increases workload parameters (workers, connections) to identify optimal configurations, performance bottlenecks, and scaling characteristics. The system combines rigorous mathematical analysis with queueing theory to provide enterprise-grade performance insights.
+Progressive scaling is StormDB's advanced testing methodology that systematically increases database load across multiple bands to identify performance boundaries, scaling characteristics, and optimal configuration parameters. This comprehensive guide covers the enhanced progressive scaling system with statistical analysis, visualization, and resilience features.
 
 ## Key Features
 

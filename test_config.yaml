@@ -1,0 +1,19 @@
+database:
+  type: postgres
+  host: localhost
+  port: 5432
+  dbname: postgres
+  username: postgres
+  password: ""
+  sslmode: disable
+
+workload: simple
+scale: 10
+duration: 5s
+workers: 2
+connections: 4
+
+plugins:
+  paths:
+    - "./build/plugins"
+    - "./plugins"

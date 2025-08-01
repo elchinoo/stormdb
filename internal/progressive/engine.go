@@ -836,6 +836,9 @@ func (e *ScalingEngine) validateConfig() error {
 }
 
 // calculateBandMetrics computes comprehensive metrics for a completed band
+// TODO: This function will be used in future analysis features
+//
+//nolint:unused
 func (e *ScalingEngine) calculateBandMetrics(bandID, workers, connections int,
 	startTime, endTime time.Time, duration time.Duration, metrics *types.Metrics) *types.ProgressiveBandMetrics {
 

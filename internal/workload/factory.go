@@ -33,8 +33,9 @@ func NewFactory(cfg *types.Config) (*Factory, error) {
 
 // Initialize performs any one-time setup required by the factory
 func (f *Factory) Initialize() error {
-	// Plugin loader will handle initialization
-	return nil
+	// Discover available plugins
+	_, err := f.pluginLoader.DiscoverPlugins()
+	return err
 }
 
 // Cleanup performs any cleanup required when the factory is disposed

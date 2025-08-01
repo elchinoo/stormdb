@@ -336,7 +336,10 @@ func (uc *TestExecutionUseCase) updateExecutionStatus(executionID string, status
 				now := time.Now()
 				testExecution.EndTime = &now
 			}
-			uc.testRepo.Store(ctx, testExecution)
+			if err := uc.testRepo.Store(ctx, testExecution); err != nil {
+				// Log storage error but continue monitoring
+				fmt.Printf("Warning: Failed to store test execution: %v\n", err)
+			}
 		}
 	}
 }
