@@ -27,16 +27,8 @@ type BackpressureController struct {
 
 	// Current state
 	activeConnections int64
-	activeWorkers   // GetMetrics returns pool metrics
-func (cp *ConnectionPool) GetMetrics() *PoolMetrics {
-	cp.mu.RLock()
-	defer cp.mu.RUnlock()
-
-	cp.metrics.TotalConnections = atomic.LoadInt64(&cp.totalConnections)
-	cp.metrics.AvailableConnections = int64(len(cp.available))
-	cp.metrics.BusyConnections = cp.metrics.TotalConnections - cp.metrics.AvailableConnections
-
-	return cp.metricsueuedRequests    int64
+	activeWorkers     int64
+	queuedRequests    int64
 	currentLatency    time.Duration
 	pressure          float64
 
