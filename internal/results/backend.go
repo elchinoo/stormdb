@@ -354,7 +354,8 @@ func (b *Backend) StoreTestRun(ctx context.Context, testRun *TestRun, metrics *t
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			// Log rollback error but don't fail the operation
+			// Log rollback error for debugging
+			fmt.Printf("Warning: Transaction rollback failed: %v\n", rollbackErr)
 		}
 	}()
 

@@ -112,7 +112,8 @@ func runProgressiveTest(cmd *cobra.Command, args []string) error {
 	}
 	defer func() {
 		if syncErr := logger.Sync(); syncErr != nil {
-			// Ignore errors from stderr/stdout sync on exit
+			// Ignore sync errors for stderr/stdout - common on exit
+			fmt.Fprintf(os.Stderr, "Warning: Logger sync failed: %v\n", syncErr)
 		}
 	}()
 
