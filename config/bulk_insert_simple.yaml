@@ -23,9 +23,19 @@ duration: "30s"                 # Short duration for testing
 workers: 2                     # Minimal workers for testing
 connections: 4                 # Small connection pool
 
-# Simple progressive test - disabled for quick testing
+# Simple progressive test - enabled for testing band logging
 progressive:
-  enabled: false
+  enabled: true
+  strategy: "linear"
+  min_workers: 1
+  max_workers: 2
+  min_connections: 2
+  max_connections: 4
+  test_duration: "5s"           # Very short tests
+  warmup_duration: "2s"
+  cooldown_duration: "2s"
+  bands: 3
+  enable_analysis: true
 
 # Simple batch size progression for testing
 workload_config:
