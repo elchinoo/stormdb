@@ -412,7 +412,7 @@ func (wm *WorkloadManager) retryJob(job Job) {
 		// Put job back in queue
 		go func() {
 			time.Sleep(time.Duration(job.Retries) * time.Second) // Exponential backoff
-			_ = wm.SubmitJob(job) // Ignore error on retry submission
+			_ = wm.SubmitJob(job)                                // Ignore error on retry submission
 		}()
 		atomic.AddInt64(&wm.metrics.RetryJobs, 1)
 	} else {
