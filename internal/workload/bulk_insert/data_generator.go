@@ -183,9 +183,15 @@ func (dg *DataGenerator) isValidStatusEnum(status string) bool {
 
 // generateStatusEnum returns a random status value
 func (dg *DataGenerator) generateStatusEnum() string {
-	// Use simple random selection to avoid any potential issues with weighted distribution
-	idx := dg.rng.Intn(len(validStatusEnums))
-	return validStatusEnums[idx]
+	// Create a local copy to avoid any potential race conditions on shared data
+	localEnums := []string{"pending", "processing", "completed", "failed", "cancelled"}
+	
+	// Use simple random selection
+	idx := dg.rng.Intn(len(localEnums))
+	selected := localEnums[idx]
+	
+	// Additional safety: create a new string instance to avoid memory sharing
+	return string([]byte(selected))
 }
 
 // generateTags creates an array of tag strings

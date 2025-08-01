@@ -364,12 +364,16 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 	for i, record := range records {
 		// Create deep copies of slices to prevent corruption
 		tagsCopy := make([]string, len(record.Tags))
-		copy(tagsCopy, record.Tags)
+		for j, tag := range record.Tags {
+			// Defensive copy each tag string
+			tagsCopy[j] = string([]byte(tag))
+		}
 
+		// Create defensive copies of all string fields to prevent corruption
 		copies[i] = DataRecord{
-			ShortText:    record.ShortText,
-			MediumText:   record.MediumText,
-			LongText:     record.LongText,
+			ShortText:    string([]byte(record.ShortText)),
+			MediumText:   string([]byte(record.MediumText)),
+			LongText:     string([]byte(record.LongText)),
 			IntValue:     record.IntValue,
 			BigintValue:  record.BigintValue,
 			DecimalValue: record.DecimalValue,
@@ -379,9 +383,9 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 			IsActive:     record.IsActive,
 			Metadata:     record.Metadata,
 			DataBlob:     record.DataBlob,
-			StatusEnum:   record.StatusEnum,
+			StatusEnum:   g.validateAndCopyStatusEnum(record.StatusEnum),
 			Tags:         tagsCopy, // Use the copied slice
-			ClientIP:     record.ClientIP,
+			ClientIP:     string([]byte(record.ClientIP)),
 			LocationX:    record.LocationX,
 			LocationY:    record.LocationY,
 		}
@@ -389,7 +393,40 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 	return copies
 }
 
-// performBatchInsert executes a batch INSERT operation
+// validateAndCopyStatusEnum ensures the status enum is valid and creates a safe copy
+func (g *Generator) validateAndCopyStatusEnum(status string) string {
+	validEnums := []string{"pending", "processing", "completed", "failed", "cancelled"}
+
+	// Create defensive copy
+	safeCopy := string([]byte(status))
+
+	// Validate the status
+	for _, valid := range validEnums {
+		if safeCopy == valid {
+			return safeCopy
+		}
+	}
+
+	// If invalid, log and return a safe default
+	log.Printf("⚠️  Invalid status enum detected: %q, using 'pending' as fallback", safeCopy)
+	return "pending"
+}
+
+// validateStatusEnumForSQL performs final validation before SQL execution
+func (g *Generator) validateStatusEnumForSQL(status string) string {
+	validEnums := []string{"pending", "processing", "completed", "failed", "cancelled"}
+
+	// Validate the status
+	for _, valid := range validEnums {
+		if status == valid {
+			return status
+		}
+	}
+
+	// If invalid, log error and return safe default
+	log.Printf("❌ Critical: Invalid enum at SQL execution: %q, substituting 'pending'", status)
+	return "pending"
+}// performBatchInsert executes a batch INSERT operation
 func (g *Generator) performBatchInsert(ctx context.Context, db *pgxpool.Pool, records []DataRecord) error {
 	if len(records) == 0 {
 		return nil
@@ -420,7 +457,7 @@ func (g *Generator) performBatchInsert(ctx context.Context, db *pgxpool.Pool, re
 			record.IsActive,
 			record.Metadata,
 			record.DataBlob,
-			record.StatusEnum,
+			g.validateStatusEnumForSQL(record.StatusEnum),
 			g.formatStringArray(record.Tags),
 			record.ClientIP,
 			fmt.Sprintf("(%f,%f)", record.LocationX, record.LocationY),
@@ -470,7 +507,7 @@ func (g *Generator) performCopyInsert(ctx context.Context, db *pgxpool.Pool, rec
 			record.IsActive,
 			record.Metadata,
 			record.DataBlob,
-			record.StatusEnum, // Pass directly like other string fields
+			g.validateStatusEnumForSQL(record.StatusEnum), // Pass directly like other string fields
 			g.formatStringArray(record.Tags),
 			record.ClientIP,
 			fmt.Sprintf("(%f,%f)", record.LocationX, record.LocationY),
