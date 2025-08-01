@@ -26,8 +26,18 @@ GO_VERSION ?= $(shell go version | cut -d' ' -f3)
 
 # Go build flags with version information
 GO_LDFLAGS := -s -w -X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildTime=$(BUILD_TIME) -X main.GoVersion=$(GO_VERSION)
+
+# macOS-specific linker flags to suppress dylib warnings
+ifeq ($(shell uname),Darwin)
+    GO_LDFLAGS += -extldflags="-Wl,-w"
+endif
+
 GO_FLAGS := -ldflags="$(GO_LDFLAGS)"
 GO_TEST_FLAGS := -v -race -timeout=30s
+# macOS-specific test flags to suppress linker warnings
+ifeq ($(shell uname),Darwin)
+    GO_TEST_FLAGS += -ldflags="-extldflags=-Wl,-w"
+endif
 GO_BENCH_FLAGS := -bench=. -benchmem -benchtime=5s
 
 # Tools and linters

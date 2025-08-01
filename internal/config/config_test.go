@@ -426,8 +426,10 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 				Connections: 8,
 				Scale:       100,
 				DataLoading: struct {
-					Mode     string `mapstructure:"mode"`
-					FilePath string `mapstructure:"filepath"`
+					Mode        string `mapstructure:"mode"`
+					FilePath    string `mapstructure:"filepath"`
+					BatchSize   int    `mapstructure:"batch_size"`
+					MaxMemoryMB int    `mapstructure:"max_memory_mb"`
 				}{
 					Mode: "generate",
 				},
@@ -458,8 +460,10 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 				Connections: 8,
 				Scale:       100,
 				DataLoading: struct {
-					Mode     string `mapstructure:"mode"`
-					FilePath string `mapstructure:"filepath"`
+					Mode        string `mapstructure:"mode"`
+					FilePath    string `mapstructure:"filepath"`
+					BatchSize   int    `mapstructure:"batch_size"`
+					MaxMemoryMB int    `mapstructure:"max_memory_mb"`
 				}{
 					Mode: "invalid",
 				},
@@ -491,8 +495,10 @@ func TestValidateDataLoadingConfig(t *testing.T) {
 				Connections: 8,
 				Scale:       100,
 				DataLoading: struct {
-					Mode     string `mapstructure:"mode"`
-					FilePath string `mapstructure:"filepath"`
+					Mode        string `mapstructure:"mode"`
+					FilePath    string `mapstructure:"filepath"`
+					BatchSize   int    `mapstructure:"batch_size"`
+					MaxMemoryMB int    `mapstructure:"max_memory_mb"`
 				}{
 					Mode: "dump",
 				},

@@ -10,9 +10,9 @@ database:
   type: postgres
   host: "localhost"
   port: 5432
-  dbname: "postgres"
-  username: "postgres"
-  password: "postgres"
+  dbname: "storm"
+  username: "storm_usr"
+  password: "storm_pwd"
   sslmode: "disable"
 
 # =============================================================================
@@ -24,8 +24,8 @@ database:
 #   host: "localhost"
 #   port: 5432
 #   database: "stormdb_results"
-#   username: "postgres"
-#   password: "postgres"
+#   username: "storm_usr"
+#   password: "storm_pwd"
 #   sslmode: "disable"
 #   retention_days: 30
 #   store_raw_metrics: true
@@ -145,8 +145,8 @@ summary_interval: "30s"     # Frequent updates for demo
 #   host: "localhost"
 #   port: 5432
 #   database: "stormdb_results_demo"
-#   username: "postgres"
-#   password: "postgres"
+#   username: "storm_usr"
+#   password: "storm_pwd"
 #   sslmode: "disable"
 #   retention_days: 7          # Short retention for demo
 #   store_raw_metrics: true
