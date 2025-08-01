@@ -1,6 +1,0 @@
-band_id,workers,connections,duration_sec,total_tps,total_qps,avg_latency_ms,p50_latency_ms,p95_latency_ms,p99_latency_ms,error_rate,total_errors,stddev_latency,variance_latency,coefficient_of_var,confidence_lower,confidence_upper,tps_per_worker,tps_per_connection,worker_efficiency,connection_util
-1,5,10,20.00,0.00,0.00,0.00,0.00,0.00,0.00,NaN,0,0.00,0.00,0.0000,0.00,0.00,0.00,0.00,NaN,NaN
-2,10,20,20.00,0.00,0.00,0.00,0.00,0.00,0.00,NaN,0,0.00,0.00,0.0000,0.00,0.00,0.00,0.00,NaN,NaN
-3,20,40,20.00,0.00,0.00,0.00,0.00,0.00,0.00,NaN,0,0.00,0.00,0.0000,0.00,0.00,0.00,0.00,NaN,NaN
-4,40,80,20.00,0.00,0.00,0.00,0.00,0.00,0.00,NaN,0,0.00,0.00,0.0000,0.00,0.00,0.00,0.00,NaN,NaN
-5,80,100,20.00,0.00,0.00,0.00,0.00,0.00,0.00,NaN,0,0.00,0.00,0.0000,0.00,0.00,0.00,0.00,NaN,NaN

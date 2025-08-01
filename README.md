@@ -12,7 +12,7 @@ StormDB is a comprehensive PostgreSQL benchmarking and load testing tool designe
 
 ### 🔌 Extensible Plugin Architecture
 - **Dynamic Loading**: Load workload plugins at runtime without recompilation
-- **Built-in Workloads**: Core workloads (TPCC, Simple, Connection Overhead) built into the binary
+- **Built-in Workloads**: Core workloads (TPCC, Simple, Connection Overhead, Bulk Insert) built into the binary
 - **Plugin Discovery**: Automatic scanning and loading of plugin files (.so, .dll, .dylib)
 - **Extensible System**: Easy development of custom workloads via plugin interface
 - **Metadata Support**: Rich plugin metadata with version info and compatibility
@@ -21,6 +21,7 @@ StormDB is a comprehensive PostgreSQL benchmarking and load testing tool designe
 - **TPC-C**: Industry-standard OLTP benchmark with realistic transaction processing
 - **Simple/Mixed**: Basic read/write operations for quick testing and baseline performance
 - **Connection Overhead**: Compare persistent vs transient connection performance
+- **Bulk Insert**: High-performance bulk data insertion testing with INSERT vs COPY comparison
 
 #### Plugin Workloads (Dynamically Loaded)
 - **IMDB**: Movie database workload with complex queries and realistic data patterns
@@ -224,6 +225,9 @@ make list-plugins       # List available plugins
 
 # Connection overhead testing
 ./stormdb --config config/config_transient_connections.yaml
+
+# Bulk insert performance testing
+./stormdb --config config/workload_bulk_insert.yaml --setup
 ```
 
 #### Plugin Workloads (Requires building plugins)

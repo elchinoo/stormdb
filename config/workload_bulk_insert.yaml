@@ -1,0 +1,113 @@
+# Bulk Insert Performance Testing Configuration
+# Tests INSERT vs COPY performance with progressive batch sizes and producer-consumer pattern
+
+database:
+  type: postgres
+  host: "localhost"
+  port: 5432
+  dbname: "storm"
+  username: "storm_usr"
+  password: "storm_pwd"
+  sslmode: "disable"
+
+# Results backend configuration for comprehensive analytics
+results_backend:
+  enabled: true
+  host: "localhost"
+  port: 5432
+  database: "stormdb_results"
+  username: "storm_usr"
+  password: "storm_pwd"
+  sslmode: "disable"
+  retention_days: 30
+  store_raw_metrics: true
+  store_pg_stats: true
+  metrics_batch_size: 1000
+  table_prefix: "bulk_insert_"
+
+# Test metadata for tracking and organization
+test_metadata:
+  test_name: "bulk_insert_performance_comparison"
+  environment: "local_development"
+  database_target: "PostgreSQL 15+"
+  tags: ["bulk_insert", "performance", "comparison", "progressive"]
+  notes: "Comprehensive bulk insert testing with INSERT vs COPY methods across progressive batch sizes"
+
+# Plugin system configuration (auto-discover plugins)
+plugins:
+  paths:
+    - "./plugins"
+    - "./build/plugins"
+  auto_load: true
+
+# Bulk Insert workload configuration
+workload: "bulk_insert"        # Use the bulk insert workload
+scale: 1000                    # Base scale for data generation (affects variety)
+
+# Progressive scaling configuration - Test different batch sizes and methods
+progressive:
+  enabled: true
+  strategy: "linear"              # Linear scaling from min to max
+  min_workers: 2                  # Start with 2 workers
+  max_workers: 10                 # Scale up to 10 workers
+  min_connections: 4              # Start with 4 connections
+  max_connections: 20             # Scale up to 20 connections
+  test_duration: "5m"             # Run each band for 5 minutes
+  warmup_duration: "30s"          # Warmup time per band
+  cooldown_duration: "15s"        # Cooldown time between bands
+  bands: 10                       # Number of test configurations
+  enable_analysis: true           # Enable mathematical analysis
+  
+  # Memory management for progressive scaling
+  max_latency_samples: 10000      # Limit latency samples per band
+  memory_limit_mb: 256            # Total memory limit for metrics collection
+
+# Standard test settings (used when progressive scaling is disabled)
+duration: "10m"        # Total test duration for standard mode
+workers: 4             # Number of consumer workers
+connections: 8         # Max connections in pool
+summary_interval: "30s" # Interval for periodic summaries during run
+
+# PostgreSQL monitoring and statistics collection
+collect_pg_stats: true
+pg_stats_statements: true
+
+# Bulk Insert specific configuration
+workload_config:
+  # Producer-consumer ring buffer configuration
+  ring_buffer_size: 50000        # Size of the circular buffer (number of records)
+  producer_threads: 2            # Number of data producer threads
+  
+  # Batch size progression testing
+  batch_sizes: [1, 100, 1000, 10000, 50000]  # Batch sizes to test progressively
+  
+  # Insert method comparison
+  test_insert_method: true       # Test both INSERT and COPY methods
+  
+  # Data generation settings
+  data_seed: 12345              # Seed for reproducible data generation (0 = random)
+  
+  # Performance tuning
+  max_memory_mb: 256            # Maximum memory usage for data generation
+  collect_metrics: true         # Collect detailed performance metrics
+
+# Example scenarios in this configuration:
+# 
+# Scenario 1: INSERT method, batch size 1, 2 workers, 4 connections (band 1)
+# Scenario 2: INSERT method, batch size 1, 3 workers, 6 connections (band 2)
+# ...continuing through the progression...
+# Scenario 6: COPY method, batch size 50000, 10 workers, 20 connections (band 10)
+#
+# Each scenario runs for 5 minutes with 30s warmup and 15s cooldown
+# This provides comprehensive comparison of:
+# - INSERT vs COPY performance
+# - Impact of batch size on throughput and latency
+# - Scalability with increasing workers and connections
+# - Resource utilization patterns
+
+# Expected insights:
+# - COPY should show better performance for large batch sizes
+# - INSERT may be more consistent for small batch sizes
+# - Memory usage patterns with different batch sizes
+# - Optimal worker/connection ratios for bulk operations
+# - Latency distribution patterns across methods and batch sizes
