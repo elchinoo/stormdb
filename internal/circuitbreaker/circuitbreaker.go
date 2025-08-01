@@ -37,23 +37,23 @@ func (s State) String() string {
 
 // CircuitBreaker implements the circuit breaker pattern to prevent cascade failures
 type CircuitBreaker struct {
-	maxFailures    int
-	resetTimeout   time.Duration
-	halfOpenLimit  int
-	
+	maxFailures   int
+	resetTimeout  time.Duration
+	halfOpenLimit int
+
 	// State management
 	state         State
 	failures      int
 	lastFailure   time.Time
 	halfOpenCount int
-	
+
 	// Metrics
-	totalRequests   int64
-	successCount    int64
-	failureCount    int64
-	timeoutCount    int64
-	rejectedCount   int64
-	
+	totalRequests int64
+	successCount  int64
+	failureCount  int64
+	timeoutCount  int64
+	rejectedCount int64
+
 	mutex  sync.RWMutex
 	logger logging.StormDBLogger
 }
@@ -96,7 +96,7 @@ func (cb *CircuitBreaker) Execute(operation func() error) error {
 		cb.mutex.Lock()
 		cb.rejectedCount++
 		cb.mutex.Unlock()
-		
+
 		return &CircuitBreakerError{
 			State:   cb.getState(),
 			Message: "circuit breaker is open",
@@ -126,7 +126,7 @@ func (cb *CircuitBreaker) ExecuteWithContext(ctx context.Context, operation func
 		cb.mutex.Lock()
 		cb.rejectedCount++
 		cb.mutex.Unlock()
-		
+
 		return &CircuitBreakerError{
 			State:   cb.getState(),
 			Message: "circuit breaker is open",
@@ -317,7 +317,7 @@ func (cb *CircuitBreaker) Reset() {
 	cb.state = StateClosed
 	cb.failures = 0
 	cb.halfOpenCount = 0
-	
+
 	cb.logger.Info("Circuit breaker manually reset to closed state")
 }
 

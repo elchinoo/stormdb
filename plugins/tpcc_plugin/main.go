@@ -26,6 +26,7 @@ func (p *TPCCWorkloadPlugin) GetMetadata() *plugin.PluginMetadata {
 	return &plugin.PluginMetadata{
 		Name:        "tpcc_plugin",
 		Version:     "1.0.0",
+		APIVersion:  "1.0",
 		Description: "TPC-C (Transaction Processing Performance Council - C) benchmark workload for OLTP testing",
 		Author:      "StormDB Team",
 		WorkloadTypes: []string{

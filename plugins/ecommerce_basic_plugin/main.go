@@ -16,6 +16,7 @@ func (p *ECommerceBasicPlugin) GetMetadata() *plugin.PluginMetadata {
 	return &plugin.PluginMetadata{
 		Name:        "ecommerce_basic",
 		Version:     "1.0.0",
+		APIVersion:  "1.0",
 		Description: "Basic e-commerce platform workloads with standard OLTP patterns",
 		Author:      "StormDB Team",
 		WorkloadTypes: []string{

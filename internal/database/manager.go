@@ -22,26 +22,26 @@ type DatabaseManager struct {
 	metrics *ConnectionMetrics
 	health  *HealthChecker
 	logger  logging.StormDBLogger
-	
+
 	// Connection tracking
-	activeConnections   int64
-	connectionLifetime  int64 // nanoseconds
-	connectionAttempts  int64
-	connectionFailures  int64
-	
+	activeConnections  int64
+	connectionLifetime int64 // nanoseconds
+	connectionAttempts int64
+	connectionFailures int64
+
 	mutex sync.RWMutex
 }
 
 // ConnectionMetrics tracks database connection statistics
 type ConnectionMetrics struct {
-	ActiveConnections     int64         `json:"active_connections"`
-	IdleConnections       int64         `json:"idle_connections"`
-	FailedConnections     int64         `json:"failed_connections"`
-	TotalConnections      int64         `json:"total_connections"`
-	AverageLifetime       time.Duration `json:"average_lifetime"`
-	AverageAcquireTime    time.Duration `json:"average_acquire_time"`
-	ConnectionsCreated    int64         `json:"connections_created"`
-	ConnectionsDestroyed  int64         `json:"connections_destroyed"`
+	ActiveConnections    int64         `json:"active_connections"`
+	IdleConnections      int64         `json:"idle_connections"`
+	FailedConnections    int64         `json:"failed_connections"`
+	TotalConnections     int64         `json:"total_connections"`
+	AverageLifetime      time.Duration `json:"average_lifetime"`
+	AverageAcquireTime   time.Duration `json:"average_acquire_time"`
+	ConnectionsCreated   int64         `json:"connections_created"`
+	ConnectionsDestroyed int64         `json:"connections_destroyed"`
 }
 
 // HealthChecker monitors database connection health
@@ -50,11 +50,11 @@ type HealthChecker struct {
 	interval time.Duration
 	stop     chan struct{}
 	logger   logging.StormDBLogger
-	
+
 	// Health metrics
-	lastCheck       time.Time
+	lastCheck        time.Time
 	consecutiveFails int64
-	healthHistory   []HealthStatus
+	healthHistory    []HealthStatus
 }
 
 // HealthStatus represents database health at a point in time
@@ -73,13 +73,13 @@ func NewDatabaseManager(config *config.DatabaseConfig, logger logging.StormDBLog
 	if logger == nil {
 		logger = logging.NewDefaultLogger()
 	}
-	
+
 	dm := &DatabaseManager{
 		config:  config,
 		metrics: &ConnectionMetrics{},
 		logger:  logger,
 	}
-	
+
 	// Create health checker
 	dm.health = &HealthChecker{
 		manager:       dm,
@@ -88,7 +88,7 @@ func NewDatabaseManager(config *config.DatabaseConfig, logger logging.StormDBLog
 		logger:        logger.With(zap.String("component", "health_checker")),
 		healthHistory: make([]HealthStatus, 0, 100), // Keep last 100 health checks
 	}
-	
+
 	return dm, nil
 }
 
@@ -97,57 +97,57 @@ func (dm *DatabaseManager) Connect(ctx context.Context) error {
 	dm.logger.Info("Establishing database connection pool",
 		logging.Fields.Database(dm.config.Host, dm.config.Port, dm.config.Database)...,
 	)
-	
+
 	// Build connection string
 	connString := dm.buildConnectionString()
-	
+
 	// Create pool config
 	poolConfig, err := pgxpool.ParseConfig(connString)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse connection string")
 	}
-	
+
 	// Configure pool settings
 	poolConfig.MaxConns = int32(dm.config.MaxConnections)
 	poolConfig.MinConns = int32(dm.config.MinConnections)
 	poolConfig.MaxConnLifetime = dm.config.MaxConnLifetime
 	poolConfig.MaxConnIdleTime = dm.config.MaxConnIdleTime
 	poolConfig.HealthCheckPeriod = dm.config.HealthCheckPeriod
-	
+
 	// Add connection lifecycle callbacks
 	poolConfig.BeforeConnect = dm.beforeConnect
 	poolConfig.AfterConnect = dm.afterConnect
 	poolConfig.BeforeClose = dm.beforeClose
-	
+
 	// Create connection pool with timeout
 	ctx, cancel := context.WithTimeout(ctx, dm.config.ConnectTimeout)
 	defer cancel()
-	
+
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		atomic.AddInt64(&dm.connectionFailures, 1)
 		return errors.Wrap(err, "failed to create connection pool")
 	}
-	
+
 	dm.mutex.Lock()
 	dm.pool = pool
 	dm.mutex.Unlock()
-	
+
 	// Verify connection with ping
 	if err := dm.ping(ctx); err != nil {
 		pool.Close()
 		return errors.Wrap(err, "initial connection health check failed")
 	}
-	
+
 	// Start health monitoring
 	dm.health.Start()
-	
+
 	dm.logger.Info("Database connection pool established successfully",
 		zap.Int("max_connections", dm.config.MaxConnections),
 		zap.Int("min_connections", dm.config.MinConnections),
 		zap.Duration("max_lifetime", dm.config.MaxConnLifetime),
 	)
-	
+
 	return nil
 }
 
@@ -156,14 +156,14 @@ func (dm *DatabaseManager) GetConnection(ctx context.Context) (*pgxpool.Conn, er
 	dm.mutex.RLock()
 	pool := dm.pool
 	dm.mutex.RUnlock()
-	
+
 	if pool == nil {
 		return nil, errors.New("database connection pool not initialized")
 	}
-	
+
 	start := time.Now()
 	atomic.AddInt64(&dm.connectionAttempts, 1)
-	
+
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		atomic.AddInt64(&dm.connectionFailures, 1)
@@ -172,18 +172,18 @@ func (dm *DatabaseManager) GetConnection(ctx context.Context) (*pgxpool.Conn, er
 		)
 		return nil, errors.Wrap(err, "failed to acquire connection")
 	}
-	
+
 	acquireTime := time.Since(start)
 	atomic.AddInt64(&dm.activeConnections, 1)
-	
+
 	// Update metrics
 	dm.updateAcquireTimeMetrics(acquireTime)
-	
+
 	dm.logger.Debug("Database connection acquired",
 		zap.Duration("acquire_time", acquireTime),
 		zap.Int64("active_connections", atomic.LoadInt64(&dm.activeConnections)),
 	)
-	
+
 	return conn, nil
 }
 
@@ -192,7 +192,7 @@ func (dm *DatabaseManager) ReleaseConnection(conn *pgxpool.Conn) {
 	if conn != nil {
 		conn.Release()
 		atomic.AddInt64(&dm.activeConnections, -1)
-		
+
 		dm.logger.Debug("Database connection released",
 			zap.Int64("active_connections", atomic.LoadInt64(&dm.activeConnections)),
 		)
@@ -203,7 +203,7 @@ func (dm *DatabaseManager) ReleaseConnection(conn *pgxpool.Conn) {
 func (dm *DatabaseManager) HealthCheck() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	return dm.ping(ctx)
 }
 
@@ -212,11 +212,11 @@ func (dm *DatabaseManager) ping(ctx context.Context) error {
 	dm.mutex.RLock()
 	pool := dm.pool
 	dm.mutex.RUnlock()
-	
+
 	if pool == nil {
 		return errors.New("connection pool not initialized")
 	}
-	
+
 	return pool.Ping(ctx)
 }
 
@@ -225,7 +225,7 @@ func (dm *DatabaseManager) GetMetrics() ConnectionMetrics {
 	dm.mutex.RLock()
 	pool := dm.pool
 	dm.mutex.RUnlock()
-	
+
 	metrics := ConnectionMetrics{
 		ActiveConnections:    atomic.LoadInt64(&dm.activeConnections),
 		FailedConnections:    atomic.LoadInt64(&dm.connectionFailures),
@@ -233,40 +233,40 @@ func (dm *DatabaseManager) GetMetrics() ConnectionMetrics {
 		ConnectionsCreated:   dm.metrics.ConnectionsCreated,
 		ConnectionsDestroyed: dm.metrics.ConnectionsDestroyed,
 	}
-	
+
 	if pool != nil {
 		stat := pool.Stat()
 		metrics.IdleConnections = int64(stat.IdleConns())
 		metrics.TotalConnections = int64(stat.TotalConns())
 	}
-	
+
 	// Calculate average lifetime
 	if dm.metrics.ConnectionsDestroyed > 0 {
 		metrics.AverageLifetime = time.Duration(
 			atomic.LoadInt64(&dm.connectionLifetime) / dm.metrics.ConnectionsDestroyed,
 		)
 	}
-	
+
 	return metrics
 }
 
 // Close gracefully closes the database connection pool
 func (dm *DatabaseManager) Close() error {
 	dm.logger.Info("Closing database connection pool")
-	
+
 	// Stop health checker
 	dm.health.Stop()
-	
+
 	dm.mutex.Lock()
 	pool := dm.pool
 	dm.pool = nil
 	dm.mutex.Unlock()
-	
+
 	if pool != nil {
 		pool.Close()
 		dm.logger.Info("Database connection pool closed")
 	}
-	
+
 	return nil
 }
 
@@ -323,11 +323,11 @@ func (hc *HealthChecker) Start() {
 	go func() {
 		ticker := time.NewTicker(hc.interval)
 		defer ticker.Stop()
-		
+
 		hc.logger.Info("Starting database health monitoring",
 			zap.Duration("interval", hc.interval),
 		)
-		
+
 		for {
 			select {
 			case <-ticker.C:
@@ -350,15 +350,15 @@ func (hc *HealthChecker) performHealthCheck() {
 	start := time.Now()
 	err := hc.manager.HealthCheck()
 	responseTime := time.Since(start)
-	
+
 	hc.lastCheck = start
-	
+
 	status := HealthStatus{
 		Timestamp:    start,
 		Healthy:      err == nil,
 		ResponseTime: responseTime,
 	}
-	
+
 	if err != nil {
 		status.Error = err.Error()
 		atomic.AddInt64(&hc.consecutiveFails, 1)
@@ -373,14 +373,14 @@ func (hc *HealthChecker) performHealthCheck() {
 			zap.Duration("response_time", responseTime),
 		)
 	}
-	
+
 	// Store health history (keep last 100 entries)
 	if len(hc.healthHistory) >= 100 {
 		copy(hc.healthHistory, hc.healthHistory[1:])
 		hc.healthHistory = hc.healthHistory[:99]
 	}
 	hc.healthHistory = append(hc.healthHistory, status)
-	
+
 	// Alert on consecutive failures
 	consecutiveFails := atomic.LoadInt64(&hc.consecutiveFails)
 	if consecutiveFails >= 3 {
@@ -415,7 +415,7 @@ func NewConnectionPool(config *config.DatabaseConfig, logger logging.StormDBLogg
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ConnectionPool{DatabaseManager: dm}, nil
 }
 
@@ -426,7 +426,7 @@ func (cp *ConnectionPool) WithConnection(ctx context.Context, fn func(*pgxpool.C
 		return err
 	}
 	defer cp.ReleaseConnection(conn)
-	
+
 	return fn(conn)
 }
 
@@ -437,14 +437,14 @@ func (cp *ConnectionPool) WithTransaction(ctx context.Context, fn func(pgx.Tx) e
 		if err != nil {
 			return errors.Wrap(err, "failed to begin transaction")
 		}
-		
+
 		defer func() {
 			if r := recover(); r != nil {
 				_ = tx.Rollback(ctx)
 				panic(r)
 			}
 		}()
-		
+
 		if err := fn(tx); err != nil {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 				cp.logger.Error("Failed to rollback transaction",
@@ -454,7 +454,7 @@ func (cp *ConnectionPool) WithTransaction(ctx context.Context, fn func(pgx.Tx) e
 			}
 			return err
 		}
-		
+
 		return tx.Commit(ctx)
 	})
 }

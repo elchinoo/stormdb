@@ -25,6 +25,7 @@ func (p *ConnectionWorkloadPlugin) GetMetadata() *plugin.PluginMetadata {
 	return &plugin.PluginMetadata{
 		Name:        "connection_plugin",
 		Version:     "1.0.0",
+		APIVersion:  "1.0",
 		Description: "Connection overhead testing workload for measuring connection pool efficiency and connection-related bottlenecks",
 		Author:      "StormDB Team",
 		WorkloadTypes: []string{

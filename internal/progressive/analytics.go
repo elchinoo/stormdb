@@ -23,82 +23,82 @@ func NewAnalyticsEngine(logger logging.StormDBLogger) *AnalyticsEngine {
 
 // AnalysisResult contains comprehensive analysis of progressive test results
 type AnalysisResult struct {
-	Summary              AnalysisSummary           `json:"summary"`
-	StatisticalAnalysis  StatisticalAnalysis       `json:"statistical_analysis"`
-	TrendAnalysis        TrendAnalysis             `json:"trend_analysis"`
-	QueueingAnalysis     QueueingAnalysis          `json:"queueing_analysis"`
-	ScalabilityAnalysis  ScalabilityAnalysis       `json:"scalability_analysis"`
-	Recommendations      []string                  `json:"recommendations"`
+	Summary             AnalysisSummary     `json:"summary"`
+	StatisticalAnalysis StatisticalAnalysis `json:"statistical_analysis"`
+	TrendAnalysis       TrendAnalysis       `json:"trend_analysis"`
+	QueueingAnalysis    QueueingAnalysis    `json:"queueing_analysis"`
+	ScalabilityAnalysis ScalabilityAnalysis `json:"scalability_analysis"`
+	Recommendations     []string            `json:"recommendations"`
 }
 
 // AnalysisSummary provides high-level summary statistics
 type AnalysisSummary struct {
-	TotalBands           int     `json:"total_bands"`
-	OptimalBand          int     `json:"optimal_band"`
-	MaxThroughput        float64 `json:"max_throughput"`
-	BestLatencyBand      int     `json:"best_latency_band"`
-	MinLatencyP95        float64 `json:"min_latency_p95"`
-	OverallStability     float64 `json:"overall_stability"`
-	ScalabilityScore     float64 `json:"scalability_score"`
+	TotalBands       int     `json:"total_bands"`
+	OptimalBand      int     `json:"optimal_band"`
+	MaxThroughput    float64 `json:"max_throughput"`
+	BestLatencyBand  int     `json:"best_latency_band"`
+	MinLatencyP95    float64 `json:"min_latency_p95"`
+	OverallStability float64 `json:"overall_stability"`
+	ScalabilityScore float64 `json:"scalability_score"`
 }
 
 // StatisticalAnalysis contains detailed statistical metrics
 type StatisticalAnalysis struct {
-	ThroughputStats      DescriptiveStats    `json:"throughput_stats"`
-	LatencyStats         DescriptiveStats    `json:"latency_stats"`
-	ErrorRateStats       DescriptiveStats    `json:"error_rate_stats"`
-	CorrelationMatrix    CorrelationMatrix   `json:"correlation_matrix"`
-	Outliers             OutlierAnalysis     `json:"outliers"`
+	ThroughputStats   DescriptiveStats  `json:"throughput_stats"`
+	LatencyStats      DescriptiveStats  `json:"latency_stats"`
+	ErrorRateStats    DescriptiveStats  `json:"error_rate_stats"`
+	CorrelationMatrix CorrelationMatrix `json:"correlation_matrix"`
+	Outliers          OutlierAnalysis   `json:"outliers"`
 }
 
 // DescriptiveStats contains standard statistical measures
 type DescriptiveStats struct {
-	Mean                 float64           `json:"mean"`
-	Median               float64           `json:"median"`
-	Mode                 float64           `json:"mode"`
-	StandardDeviation    float64           `json:"standard_deviation"`
-	Variance             float64           `json:"variance"`
-	CoefficientOfVariation float64         `json:"coefficient_of_variation"`
-	Skewness             float64           `json:"skewness"`
-	Kurtosis             float64           `json:"kurtosis"`
-	ConfidenceInterval95 ConfidenceInterval `json:"confidence_interval_95"`
-	ConfidenceInterval99 ConfidenceInterval `json:"confidence_interval_99"`
+	Mean                   float64            `json:"mean"`
+	Median                 float64            `json:"median"`
+	Mode                   float64            `json:"mode"`
+	StandardDeviation      float64            `json:"standard_deviation"`
+	Variance               float64            `json:"variance"`
+	CoefficientOfVariation float64            `json:"coefficient_of_variation"`
+	Skewness               float64            `json:"skewness"`
+	Kurtosis               float64            `json:"kurtosis"`
+	ConfidenceInterval95   ConfidenceInterval `json:"confidence_interval_95"`
+	ConfidenceInterval99   ConfidenceInterval `json:"confidence_interval_99"`
 }
 
 // TrendAnalysis contains trend and derivative analysis
 type TrendAnalysis struct {
-	ThroughputTrend      TrendData      `json:"throughput_trend"`
-	LatencyTrend         TrendData      `json:"latency_trend"`
-	ErrorRateTrend       TrendData      `json:"error_rate_trend"`
-	DerivativeAnalysis   DerivativeData `json:"derivative_analysis"`
-	IntegralAnalysis     IntegralData   `json:"integral_analysis"`
-	RegressionAnalysis   RegressionData `json:"regression_analysis"`
+	ThroughputTrend    TrendData      `json:"throughput_trend"`
+	LatencyTrend       TrendData      `json:"latency_trend"`
+	ErrorRateTrend     TrendData      `json:"error_rate_trend"`
+	DerivativeAnalysis DerivativeData `json:"derivative_analysis"`
+	IntegralAnalysis   IntegralData   `json:"integral_analysis"`
+	RegressionAnalysis RegressionData `json:"regression_analysis"`
 }
 
 // TrendData contains trend information
 type TrendData struct {
-	Direction            string    `json:"direction"` // "increasing", "decreasing", "stable", "volatile"
-	Slope                float64   `json:"slope"`
-	RSquared             float64   `json:"r_squared"`
-	TrendStrength        float64   `json:"trend_strength"` // 0.0 to 1.0
-	ChangePoints         []int     `json:"change_points"`
+	Direction     string  `json:"direction"` // "increasing", "decreasing", "stable", "volatile"
+	Slope         float64 `json:"slope"`
+	RSquared      float64 `json:"r_squared"`
+	TrendStrength float64 `json:"trend_strength"` // 0.0 to 1.0
+	ChangePoints  []int   `json:"change_points"`
 }
 
 // DerivativeData contains derivative analysis
 type DerivativeData struct {
-	FirstDerivative      []float64 `json:"first_derivative"`
-	SecondDerivative     []float64 `json:"second_derivative"`
-	MaxAcceleration      float64   `json:"max_acceleration"`
-	MaxDeceleration      float64   `json:"max_deceleration"`
-	InflectionPoints     []int     `json:"inflection_points"`
+	FirstDerivative  []float64 `json:"first_derivative"`
+	SecondDerivative []float64 `json:"second_derivative"`
+	MaxAcceleration  float64   `json:"max_acceleration"`
+	MaxDeceleration  float64   `json:"max_deceleration"`
+	InflectionPoints []int     `json:"inflection_points"`
 }
 
 // IntegralData contains integral analysis
 type IntegralData struct {
-	ThroughputIntegral   float64   `json:"throughput_integral"`
-	LatencyIntegral      float64   `json:"latency_integral"`
-	AreaUnderCurve       float64   `json:"area_under_curve"`
-	CumulativeEfficiency float64   `json:"cumulative_efficiency"`
+	ThroughputIntegral   float64 `json:"throughput_integral"`
+	LatencyIntegral      float64 `json:"latency_integral"`
+	AreaUnderCurve       float64 `json:"area_under_curve"`
+	CumulativeEfficiency float64 `json:"cumulative_efficiency"`
 }
 
 // RegressionData contains curve fitting results
@@ -113,11 +113,11 @@ type RegressionData struct {
 
 // LinearFit contains linear regression results
 type LinearFit struct {
-	Slope       float64 `json:"slope"`
-	Intercept   float64 `json:"intercept"`
-	RSquared    float64 `json:"r_squared"`
-	PValue      float64 `json:"p_value"`
-	Equation    string  `json:"equation"`
+	Slope     float64 `json:"slope"`
+	Intercept float64 `json:"intercept"`
+	RSquared  float64 `json:"r_squared"`
+	PValue    float64 `json:"p_value"`
+	Equation  string  `json:"equation"`
 }
 
 // PolynomialFit contains polynomial regression results
@@ -130,7 +130,7 @@ type PolynomialFit struct {
 
 // ExponentialFit contains exponential curve fitting results
 type ExponentialFit struct {
-	A        float64 `json:"a"`        // y = A * e^(B*x)
+	A        float64 `json:"a"` // y = A * e^(B*x)
 	B        float64 `json:"b"`
 	RSquared float64 `json:"r_squared"`
 	Equation string  `json:"equation"`
@@ -138,7 +138,7 @@ type ExponentialFit struct {
 
 // LogarithmicFit contains logarithmic curve fitting results
 type LogarithmicFit struct {
-	A        float64 `json:"a"`        // y = A * ln(x) + B
+	A        float64 `json:"a"` // y = A * ln(x) + B
 	B        float64 `json:"b"`
 	RSquared float64 `json:"r_squared"`
 	Equation string  `json:"equation"`
@@ -146,25 +146,25 @@ type LogarithmicFit struct {
 
 // QueueingAnalysis contains queueing theory analysis
 type QueueingAnalysis struct {
-	QueueingModel        string    `json:"queueing_model"`
-	ServiceRate          float64   `json:"service_rate"`
-	ArrivalRate          float64   `json:"arrival_rate"`
-	UtilizationFactor    float64   `json:"utilization_factor"`
-	AverageQueueLength   float64   `json:"average_queue_length"`
-	AverageWaitTime      float64   `json:"average_wait_time"`
-	AverageSystemTime    float64   `json:"average_system_time"`
-	ThroughputCapacity   float64   `json:"throughput_capacity"`
-	SaturationPoint      float64   `json:"saturation_point"`
-	LittlesLawValidation bool      `json:"littles_law_validation"`
+	QueueingModel        string  `json:"queueing_model"`
+	ServiceRate          float64 `json:"service_rate"`
+	ArrivalRate          float64 `json:"arrival_rate"`
+	UtilizationFactor    float64 `json:"utilization_factor"`
+	AverageQueueLength   float64 `json:"average_queue_length"`
+	AverageWaitTime      float64 `json:"average_wait_time"`
+	AverageSystemTime    float64 `json:"average_system_time"`
+	ThroughputCapacity   float64 `json:"throughput_capacity"`
+	SaturationPoint      float64 `json:"saturation_point"`
+	LittlesLawValidation bool    `json:"littles_law_validation"`
 }
 
 // ScalabilityAnalysis contains scalability metrics
 type ScalabilityAnalysis struct {
-	LinearScalabilityScore    float64          `json:"linear_scalability_score"`
-	ScalabilityBreakpoints    []ScalabilityBreakpoint `json:"scalability_breakpoints"`
-	OptimalConnectionRange    ConnectionRange  `json:"optimal_connection_range"`
-	EfficiencyMetrics         EfficiencyMetrics `json:"efficiency_metrics"`
-	BottleneckAnalysis        BottleneckAnalysis `json:"bottleneck_analysis"`
+	LinearScalabilityScore float64                 `json:"linear_scalability_score"`
+	ScalabilityBreakpoints []ScalabilityBreakpoint `json:"scalability_breakpoints"`
+	OptimalConnectionRange ConnectionRange         `json:"optimal_connection_range"`
+	EfficiencyMetrics      EfficiencyMetrics       `json:"efficiency_metrics"`
+	BottleneckAnalysis     BottleneckAnalysis      `json:"bottleneck_analysis"`
 }
 
 // ScalabilityBreakpoint identifies points where scalability changes
@@ -178,10 +178,10 @@ type ScalabilityBreakpoint struct {
 
 // ConnectionRange defines optimal connection ranges
 type ConnectionRange struct {
-	Min         int     `json:"min"`
-	Max         int     `json:"max"`
-	Optimal     int     `json:"optimal"`
-	Confidence  float64 `json:"confidence"`
+	Min        int     `json:"min"`
+	Max        int     `json:"max"`
+	Optimal    int     `json:"optimal"`
+	Confidence float64 `json:"confidence"`
 }
 
 // EfficiencyMetrics contains efficiency calculations
@@ -194,9 +194,9 @@ type EfficiencyMetrics struct {
 
 // BottleneckAnalysis identifies performance bottlenecks
 type BottleneckAnalysis struct {
-	PrimaryBottleneck   string   `json:"primary_bottleneck"`
-	BottleneckFactors   []string `json:"bottleneck_factors"`
-	ImpactAssessment    string   `json:"impact_assessment"`
+	PrimaryBottleneck    string   `json:"primary_bottleneck"`
+	BottleneckFactors    []string `json:"bottleneck_factors"`
+	ImpactAssessment     string   `json:"impact_assessment"`
 	MitigationStrategies []string `json:"mitigation_strategies"`
 }
 
@@ -218,10 +218,10 @@ type OutlierAnalysis struct {
 
 // OutlierData contains information about detected outliers
 type OutlierData struct {
-	BandID     int     `json:"band_id"`
-	Value      float64 `json:"value"`
-	ZScore     float64 `json:"z_score"`
-	Severity   string  `json:"severity"` // "mild", "moderate", "extreme"
+	BandID   int     `json:"band_id"`
+	Value    float64 `json:"value"`
+	ZScore   float64 `json:"z_score"`
+	Severity string  `json:"severity"` // "mild", "moderate", "extreme"
 }
 
 // Analyze performs comprehensive analysis on progressive test results
@@ -242,13 +242,13 @@ func (ae *AnalyticsEngine) Analyze(results []BandResult) error {
 
 	// Perform statistical analysis
 	statsAnalysis := ae.performStatisticalAnalysis(throughputSeries, latencySeries, errorRateSeries)
-	
+
 	// Perform trend analysis
 	trendAnalysis := ae.performTrendAnalysis(throughputSeries, latencySeries, errorRateSeries)
-	
+
 	// Perform queueing analysis
 	queueingAnalysis := ae.performQueueingAnalysis(results)
-	
+
 	// Perform scalability analysis
 	scalabilityAnalysis := ae.performScalabilityAnalysis(connectionSeries, throughputSeries, latencySeries)
 
@@ -320,11 +320,11 @@ func (ae *AnalyticsEngine) extractConnectionSeries(results []BandResult) []float
 // performStatisticalAnalysis calculates comprehensive statistics
 func (ae *AnalyticsEngine) performStatisticalAnalysis(throughput, latency, errorRate []float64) StatisticalAnalysis {
 	return StatisticalAnalysis{
-		ThroughputStats: ae.calculateDescriptiveStats(throughput),
-		LatencyStats:    ae.calculateDescriptiveStats(latency),
-		ErrorRateStats:  ae.calculateDescriptiveStats(errorRate),
+		ThroughputStats:   ae.calculateDescriptiveStats(throughput),
+		LatencyStats:      ae.calculateDescriptiveStats(latency),
+		ErrorRateStats:    ae.calculateDescriptiveStats(errorRate),
 		CorrelationMatrix: ae.calculateCorrelationMatrix(throughput, latency, errorRate),
-		Outliers:        ae.detectOutliers(throughput, latency, errorRate),
+		Outliers:          ae.detectOutliers(throughput, latency, errorRate),
 	}
 }
 
@@ -363,7 +363,7 @@ func (ae *AnalyticsEngine) calculateDescriptiveStats(data []float64) Descriptive
 	// Confidence intervals
 	if len(data) > 1 {
 		sem := stdDev / math.Sqrt(float64(len(data)))
-		
+
 		// 95% CI
 		margin95 := 1.96 * sem
 		stats.ConfidenceInterval95 = ConfidenceInterval{
@@ -494,7 +494,7 @@ func (ae *AnalyticsEngine) generateSummary(results []BandResult, throughput, lat
 				maxThroughput = result.Metrics.AvgTPS
 				optimalBand = i + 1
 			}
-			
+
 			if result.Metrics.LatencyP95 < minLatencyP95 {
 				minLatencyP95 = result.Metrics.LatencyP95
 				bestLatencyBand = i + 1
@@ -513,13 +513,13 @@ func (ae *AnalyticsEngine) generateSummary(results []BandResult, throughput, lat
 	scalabilityScore := ae.calculateScalabilityScore(throughput)
 
 	return AnalysisSummary{
-		TotalBands:          len(results),
-		OptimalBand:         optimalBand,
-		MaxThroughput:       maxThroughput,
-		BestLatencyBand:     bestLatencyBand,
-		MinLatencyP95:       minLatencyP95,
-		OverallStability:    stability,
-		ScalabilityScore:    scalabilityScore,
+		TotalBands:       len(results),
+		OptimalBand:      optimalBand,
+		MaxThroughput:    maxThroughput,
+		BestLatencyBand:  bestLatencyBand,
+		MinLatencyP95:    minLatencyP95,
+		OverallStability: stability,
+		ScalabilityScore: scalabilityScore,
 	}
 }
 
@@ -622,7 +622,7 @@ func (ae *AnalyticsEngine) kurtosis(data []float64, mean, stdDev float64) float6
 		normalized := (v - mean) / stdDev
 		sum += normalized * normalized * normalized * normalized
 	}
-	return (sum/float64(len(data))) - 3.0 // Excess kurtosis
+	return (sum / float64(len(data))) - 3.0 // Excess kurtosis
 }
 
 func (ae *AnalyticsEngine) analyzeTrend(data []float64) TrendData {
@@ -644,7 +644,7 @@ func (ae *AnalyticsEngine) analyzeTrend(data []float64) TrendData {
 	}
 
 	slope := (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX)
-	
+
 	direction := "stable"
 	if slope > 0.1 {
 		direction = "increasing"
@@ -662,7 +662,7 @@ func (ae *AnalyticsEngine) analyzeTrend(data []float64) TrendData {
 		ssRes += (y - predicted) * (y - predicted)
 		ssTot += (y - yMean) * (y - yMean)
 	}
-	
+
 	rSquared := 0.0
 	if ssTot > 0 {
 		rSquared = 1.0 - (ssRes / ssTot)
@@ -720,7 +720,7 @@ func (ae *AnalyticsEngine) calculateIntegrals(throughput, latency []float64) Int
 	// Simple trapezoidal rule integration
 	throughputIntegral := ae.trapezoidalIntegration(throughput)
 	latencyIntegral := ae.trapezoidalIntegration(latency)
-	
+
 	// Area under the curve for combined efficiency
 	auc := 0.0
 	if len(throughput) == len(latency) {
@@ -744,7 +744,7 @@ func (ae *AnalyticsEngine) trapezoidalIntegration(data []float64) float64 {
 	if len(data) < 2 {
 		return 0
 	}
-	
+
 	integral := 0.0
 	for i := 0; i < len(data)-1; i++ {
 		integral += (data[i] + data[i+1]) / 2.0
@@ -755,7 +755,7 @@ func (ae *AnalyticsEngine) trapezoidalIntegration(data []float64) float64 {
 func (ae *AnalyticsEngine) performRegressionAnalysis(data []float64) RegressionData {
 	// Linear regression
 	linearFit := ae.calculateLinearRegression(data)
-	
+
 	// For now, return just linear regression
 	// In a full implementation, you'd add polynomial, exponential, and logarithmic fits
 	return RegressionData{
@@ -795,7 +795,7 @@ func (ae *AnalyticsEngine) calculateLinearRegression(data []float64) LinearFit {
 		ssRes += (y - predicted) * (y - predicted)
 		ssTot += (y - yMean) * (y - yMean)
 	}
-	
+
 	rSquared := 0.0
 	if ssTot > 0 {
 		rSquared = 1.0 - (ssRes / ssTot)
@@ -812,8 +812,8 @@ func (ae *AnalyticsEngine) calculateLinearRegression(data []float64) LinearFit {
 func (ae *AnalyticsEngine) calculateCorrelationMatrix(throughput, latency, errorRate []float64) CorrelationMatrix {
 	// Simple correlation coefficient calculation
 	return CorrelationMatrix{
-		ThroughputVsLatency: ae.correlation(throughput, latency),
-		ErrorRateVsLatency:  ae.correlation(errorRate, latency),
+		ThroughputVsLatency:   ae.correlation(throughput, latency),
+		ErrorRateVsLatency:    ae.correlation(errorRate, latency),
 		ErrorRateVsThroughput: ae.correlation(errorRate, throughput),
 	}
 }
@@ -825,11 +825,11 @@ func (ae *AnalyticsEngine) correlation(x, y []float64) float64 {
 
 	xMean := ae.mean(x)
 	yMean := ae.mean(y)
-	
+
 	numerator := 0.0
 	xSumSq := 0.0
 	ySumSq := 0.0
-	
+
 	for i := 0; i < len(x); i++ {
 		xDiff := x[i] - xMean
 		yDiff := y[i] - yMean
@@ -837,12 +837,12 @@ func (ae *AnalyticsEngine) correlation(x, y []float64) float64 {
 		xSumSq += xDiff * xDiff
 		ySumSq += yDiff * yDiff
 	}
-	
+
 	denominator := math.Sqrt(xSumSq * ySumSq)
 	if denominator == 0 {
 		return 0
 	}
-	
+
 	return numerator / denominator
 }
 
@@ -872,7 +872,7 @@ func (ae *AnalyticsEngine) findOutliers(data []float64) []OutlierData {
 			} else if zScore > 2.5 {
 				severity = "moderate"
 			}
-			
+
 			outliers = append(outliers, OutlierData{
 				BandID:   i + 1,
 				Value:    value,
@@ -896,7 +896,7 @@ func (ae *AnalyticsEngine) calculateLinearScalabilityScore(connections, throughp
 func (ae *AnalyticsEngine) detectScalabilityBreakpoints(connections, throughput, latency []float64) []ScalabilityBreakpoint {
 	// Simplified implementation - detect significant drops in throughput efficiency
 	breakpoints := []ScalabilityBreakpoint{}
-	
+
 	if len(connections) < 3 {
 		return breakpoints
 	}
@@ -904,14 +904,14 @@ func (ae *AnalyticsEngine) detectScalabilityBreakpoints(connections, throughput,
 	for i := 1; i < len(throughput)-1; i++ {
 		efficiency := throughput[i] / connections[i]
 		prevEfficiency := throughput[i-1] / connections[i-1]
-		
+
 		if efficiency < prevEfficiency*0.8 { // 20% drop
 			breakpoints = append(breakpoints, ScalabilityBreakpoint{
 				BandID:      i + 1,
 				Connections: int(connections[i]),
 				Type:        "cliff",
 				Impact:      (prevEfficiency - efficiency) / prevEfficiency,
-				Description: fmt.Sprintf("Efficiency drop of %.1f%% at %d connections", 
+				Description: fmt.Sprintf("Efficiency drop of %.1f%% at %d connections",
 					((prevEfficiency-efficiency)/prevEfficiency)*100, int(connections[i])),
 			})
 		}
@@ -940,7 +940,7 @@ func (ae *AnalyticsEngine) findOptimalConnectionRange(connections, throughput, l
 	}
 
 	optimal := int(connections[optimalIdx])
-	
+
 	return ConnectionRange{
 		Min:        int(connections[0]),
 		Max:        int(connections[len(connections)-1]),
@@ -1003,7 +1003,7 @@ func (ae *AnalyticsEngine) analyzeBottlenecks(connections, throughput, latency [
 			maxLatency = lat
 		}
 	}
-	
+
 	if maxLatency > avgLatency*2 {
 		bottleneckFactors = append(bottleneckFactors, "latency_spike")
 		if primaryBottleneck == "unknown" {

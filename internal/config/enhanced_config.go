@@ -19,13 +19,13 @@ type ConfigValidator interface {
 
 // StormDBConfig represents the complete configuration structure with validation
 type StormDBConfig struct {
-	Version  string           `yaml:"version" validate:"required,semver"`
-	Database DatabaseConfig   `yaml:"database" validate:"required"`
-	Workload WorkloadConfig   `yaml:"workload" validate:"required"`
-	Plugins  PluginConfig     `yaml:"plugins"`
-	Metrics  MetricsConfig    `yaml:"metrics"`
-	Advanced AdvancedConfig   `yaml:"advanced"`
-	Logger   LoggerConfig     `yaml:"logger"`
+	Version  string         `yaml:"version" validate:"required,semver"`
+	Database DatabaseConfig `yaml:"database" validate:"required"`
+	Workload WorkloadConfig `yaml:"workload" validate:"required"`
+	Plugins  PluginConfig   `yaml:"plugins"`
+	Metrics  MetricsConfig  `yaml:"metrics"`
+	Advanced AdvancedConfig `yaml:"advanced"`
+	Logger   LoggerConfig   `yaml:"logger"`
 }
 
 // DatabaseConfig holds database connection configuration with validation
@@ -37,7 +37,7 @@ type DatabaseConfig struct {
 	Username string `yaml:"username" validate:"required"`
 	Password string `yaml:"password" validate:"required"`
 	SSLMode  string `yaml:"sslmode" validate:"oneof=disable require verify-ca verify-full"`
-	
+
 	// Connection pool settings
 	MaxConnections    int           `yaml:"max_connections" validate:"min=1,max=1000"`
 	MinConnections    int           `yaml:"min_connections" validate:"min=0"`
@@ -55,62 +55,62 @@ type WorkloadConfig struct {
 	Connections     int           `yaml:"connections" validate:"min=1,max=10000"`
 	Scale           int           `yaml:"scale" validate:"min=1"`
 	SummaryInterval time.Duration `yaml:"summary_interval" validate:"min=1s"`
-	
+
 	// Progressive scaling configuration
 	Progressive *ProgressiveConfig `yaml:"progressive"`
-	
+
 	// Workload-specific configuration
 	Config map[string]interface{} `yaml:"workload_config"`
 }
 
 // ProgressiveConfig defines progressive scaling parameters
 type ProgressiveConfig struct {
-	Enabled            bool          `yaml:"enabled"`
-	Strategy           string        `yaml:"strategy" validate:"oneof=linear exponential fibonacci custom"`
-	MinWorkers         int           `yaml:"min_workers" validate:"min=1"`
-	MaxWorkers         int           `yaml:"max_workers" validate:"min=1"`
-	MinConnections     int           `yaml:"min_connections" validate:"min=1"`
-	MaxConnections     int           `yaml:"max_connections" validate:"min=1"`
-	TestDuration       time.Duration `yaml:"test_duration" validate:"min=10s"`
-	WarmupDuration     time.Duration `yaml:"warmup_duration" validate:"min=1s"`
-	CooldownDuration   time.Duration `yaml:"cooldown_duration" validate:"min=1s"`
-	Bands              int           `yaml:"bands" validate:"min=2,max=50"`
-	EnableAnalysis     bool          `yaml:"enable_analysis"`
-	MaxLatencySamples  int           `yaml:"max_latency_samples" validate:"min=1000"`
-	MemoryLimitMB      int           `yaml:"memory_limit_mb" validate:"min=100"`
+	Enabled           bool          `yaml:"enabled"`
+	Strategy          string        `yaml:"strategy" validate:"oneof=linear exponential fibonacci custom"`
+	MinWorkers        int           `yaml:"min_workers" validate:"min=1"`
+	MaxWorkers        int           `yaml:"max_workers" validate:"min=1"`
+	MinConnections    int           `yaml:"min_connections" validate:"min=1"`
+	MaxConnections    int           `yaml:"max_connections" validate:"min=1"`
+	TestDuration      time.Duration `yaml:"test_duration" validate:"min=10s"`
+	WarmupDuration    time.Duration `yaml:"warmup_duration" validate:"min=1s"`
+	CooldownDuration  time.Duration `yaml:"cooldown_duration" validate:"min=1s"`
+	Bands             int           `yaml:"bands" validate:"min=2,max=50"`
+	EnableAnalysis    bool          `yaml:"enable_analysis"`
+	MaxLatencySamples int           `yaml:"max_latency_samples" validate:"min=1000"`
+	MemoryLimitMB     int           `yaml:"memory_limit_mb" validate:"min=100"`
 }
 
 // PluginConfig defines plugin system configuration
 type PluginConfig struct {
-	Paths              []string      `yaml:"paths"`
-	Files              []string      `yaml:"files"`
-	AutoLoad           bool          `yaml:"auto_load"`
-	HealthCheckEnabled bool          `yaml:"health_check_enabled"`
+	Paths               []string      `yaml:"paths"`
+	Files               []string      `yaml:"files"`
+	AutoLoad            bool          `yaml:"auto_load"`
+	HealthCheckEnabled  bool          `yaml:"health_check_enabled"`
 	HealthCheckInterval time.Duration `yaml:"health_check_interval"`
-	MaxLoadAttempts    int           `yaml:"max_load_attempts" validate:"min=1,max=10"`
-	LoadTimeout        time.Duration `yaml:"load_timeout"`
+	MaxLoadAttempts     int           `yaml:"max_load_attempts" validate:"min=1,max=10"`
+	LoadTimeout         time.Duration `yaml:"load_timeout"`
 }
 
 // MetricsConfig defines metrics collection and reporting configuration
 type MetricsConfig struct {
-	Enabled             bool          `yaml:"enabled"`
-	Interval            time.Duration `yaml:"interval" validate:"min=1s"`
-	LatencyPercentiles  []int         `yaml:"latency_percentiles" validate:"dive,min=1,max=100"`
-	CollectPGStats      bool          `yaml:"collect_pg_stats"`
-	PGStatsStatements   bool          `yaml:"pg_stats_statements"`
-	ExportPrometheus    bool          `yaml:"export_prometheus"`
-	PrometheusPort      int           `yaml:"prometheus_port" validate:"min=1024,max=65535"`
-	BatchSize           int           `yaml:"batch_size" validate:"min=1,max=10000"`
-	FlushInterval       time.Duration `yaml:"flush_interval"`
-	MaxMemoryMB         int           `yaml:"max_memory_mb" validate:"min=10"`
+	Enabled            bool          `yaml:"enabled"`
+	Interval           time.Duration `yaml:"interval" validate:"min=1s"`
+	LatencyPercentiles []int         `yaml:"latency_percentiles" validate:"dive,min=1,max=100"`
+	CollectPGStats     bool          `yaml:"collect_pg_stats"`
+	PGStatsStatements  bool          `yaml:"pg_stats_statements"`
+	ExportPrometheus   bool          `yaml:"export_prometheus"`
+	PrometheusPort     int           `yaml:"prometheus_port" validate:"min=1024,max=65535"`
+	BatchSize          int           `yaml:"batch_size" validate:"min=1,max=10000"`
+	FlushInterval      time.Duration `yaml:"flush_interval"`
+	MaxMemoryMB        int           `yaml:"max_memory_mb" validate:"min=10"`
 }
 
 // AdvancedConfig contains advanced configuration options
 type AdvancedConfig struct {
-	CircuitBreaker    CircuitBreakerConfig `yaml:"circuit_breaker"`
-	ResourceLimits    ResourceLimitsConfig `yaml:"resource_limits"`
-	ErrorHandling     ErrorHandlingConfig  `yaml:"error_handling"`
-	Observability     ObservabilityConfig  `yaml:"observability"`
+	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
+	ResourceLimits ResourceLimitsConfig `yaml:"resource_limits"`
+	ErrorHandling  ErrorHandlingConfig  `yaml:"error_handling"`
+	Observability  ObservabilityConfig  `yaml:"observability"`
 }
 
 // CircuitBreakerConfig defines circuit breaker parameters
@@ -123,11 +123,11 @@ type CircuitBreakerConfig struct {
 
 // ResourceLimitsConfig defines resource usage limits
 type ResourceLimitsConfig struct {
-	MaxMemoryMB      int           `yaml:"max_memory_mb" validate:"min=100"`
-	MaxCPUPercent    int           `yaml:"max_cpu_percent" validate:"min=1,max=100"`
-	MaxGoroutines    int           `yaml:"max_goroutines" validate:"min=10"`
-	GCTargetPercent  int           `yaml:"gc_target_percent" validate:"min=10,max=200"`
-	ShutdownTimeout  time.Duration `yaml:"shutdown_timeout" validate:"min=1s"`
+	MaxMemoryMB     int           `yaml:"max_memory_mb" validate:"min=100"`
+	MaxCPUPercent   int           `yaml:"max_cpu_percent" validate:"min=1,max=100"`
+	MaxGoroutines   int           `yaml:"max_goroutines" validate:"min=10"`
+	GCTargetPercent int           `yaml:"gc_target_percent" validate:"min=10,max=200"`
+	ShutdownTimeout time.Duration `yaml:"shutdown_timeout" validate:"min=1s"`
 }
 
 // ErrorHandlingConfig defines error handling behavior
@@ -143,13 +143,13 @@ type ErrorHandlingConfig struct {
 
 // ObservabilityConfig defines observability and tracing configuration
 type ObservabilityConfig struct {
-	TracingEnabled    bool   `yaml:"tracing_enabled"`
-	TracingEndpoint   string `yaml:"tracing_endpoint"`
-	MetricsEnabled    bool   `yaml:"metrics_enabled"`
-	MetricsEndpoint   string `yaml:"metrics_endpoint"`
-	ServiceName       string `yaml:"service_name"`
-	ServiceVersion    string `yaml:"service_version"`
-	SampleRate        float64 `yaml:"sample_rate" validate:"min=0.0,max=1.0"`
+	TracingEnabled  bool    `yaml:"tracing_enabled"`
+	TracingEndpoint string  `yaml:"tracing_endpoint"`
+	MetricsEnabled  bool    `yaml:"metrics_enabled"`
+	MetricsEndpoint string  `yaml:"metrics_endpoint"`
+	ServiceName     string  `yaml:"service_name"`
+	ServiceVersion  string  `yaml:"service_version"`
+	SampleRate      float64 `yaml:"sample_rate" validate:"min=0.0,max=1.0"`
 }
 
 // LoggerConfig defines logging configuration
@@ -162,16 +162,16 @@ type LoggerConfig struct {
 
 // CLIOptions represents command-line override options
 type CLIOptions struct {
-	ConfigFile      string
-	Workers         *int
-	Connections     *int
-	Duration        *time.Duration
-	Scale           *int
-	Workload        string
-	DatabaseURL     string
-	LogLevel        string
-	Verbose         bool
-	DryRun          bool
+	ConfigFile  string
+	Workers     *int
+	Connections *int
+	Duration    *time.Duration
+	Scale       *int
+	Workload    string
+	DatabaseURL string
+	LogLevel    string
+	Verbose     bool
+	DryRun      bool
 }
 
 // NewStormDBConfig creates a new configuration with defaults
@@ -338,7 +338,7 @@ func (c *StormDBConfig) SetDefaults() {
 // Validate performs comprehensive validation of the configuration
 func (c *StormDBConfig) Validate() error {
 	validate := validator.New()
-	
+
 	// Register custom validation functions
 	if err := c.registerCustomValidators(validate); err != nil {
 		return errors.Wrap(err, "failed to register custom validators")
@@ -378,7 +378,7 @@ func (c *StormDBConfig) registerCustomValidators(validate *validator.Validate) e
 // formatValidationErrors formats validation errors into a readable format
 func (c *StormDBConfig) formatValidationErrors(err error) error {
 	var errorMessages []string
-	
+
 	if validationErrors, ok := err.(validator.ValidationErrors); ok {
 		for _, err := range validationErrors {
 			errorMessages = append(errorMessages, fmt.Sprintf(
@@ -387,7 +387,7 @@ func (c *StormDBConfig) formatValidationErrors(err error) error {
 			))
 		}
 	}
-	
+
 	return fmt.Errorf("configuration validation failed: %s", strings.Join(errorMessages, "; "))
 }
 
@@ -512,7 +512,7 @@ func (c *StormDBConfig) parseDatabaseURL(url string) error {
 	if !strings.HasPrefix(url, "postgres://") {
 		return errors.New("unsupported database URL format")
 	}
-	
+
 	// For now, just store the URL - implement proper parsing as needed
 	return errors.New("database URL parsing not yet implemented")
 }
@@ -536,7 +536,7 @@ func NewConfigManager(logger *zap.Logger) *ConfigManager {
 func (cm *ConfigManager) LoadConfig(filePath string, cliOptions CLIOptions) (*StormDBConfig, error) {
 	// Load base configuration
 	config := NewStormDBConfig()
-	
+
 	// Apply CLI overrides
 	if err := config.ApplyOverrides(cliOptions); err != nil {
 		return nil, errors.Wrap(err, "failed to apply CLI overrides")
@@ -548,7 +548,7 @@ func (cm *ConfigManager) LoadConfig(filePath string, cliOptions CLIOptions) (*St
 	}
 
 	cm.config = config
-	
+
 	cm.logger.Info("Configuration loaded successfully",
 		zap.String("version", config.Version),
 		zap.String("workload", config.Workload.Type),

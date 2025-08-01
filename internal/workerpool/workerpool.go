@@ -29,24 +29,24 @@ type Result interface {
 
 // WorkerPool manages a pool of workers for processing jobs
 type WorkerPool struct {
-	workers     int
-	jobs        chan Job
-	results     chan Result
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
-	logger      logging.StormDBLogger
-	
+	workers int
+	jobs    chan Job
+	results chan Result
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	logger  logging.StormDBLogger
+
 	// Metrics
-	jobsProcessed   int64
-	jobsSuccessful  int64
-	jobsFailed      int64
-	totalDuration   int64 // nanoseconds
-	
+	jobsProcessed  int64
+	jobsSuccessful int64
+	jobsFailed     int64
+	totalDuration  int64 // nanoseconds
+
 	// Configuration
 	bufferSize      int
 	shutdownTimeout time.Duration
-	
+
 	// Status
 	running bool
 	mutex   sync.RWMutex
@@ -76,7 +76,7 @@ func NewWorkerPool(config WorkerPoolConfig) *WorkerPool {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &WorkerPool{
 		workers:         config.Workers,
 		jobs:            make(chan Job, config.BufferSize),
@@ -93,27 +93,27 @@ func NewWorkerPool(config WorkerPoolConfig) *WorkerPool {
 func (wp *WorkerPool) Start() error {
 	wp.mutex.Lock()
 	defer wp.mutex.Unlock()
-	
+
 	if wp.running {
 		return errors.New("worker pool is already running")
 	}
-	
+
 	wp.logger.Info("Starting worker pool",
 		zap.Int("workers", wp.workers),
 		zap.Int("buffer_size", wp.bufferSize),
 	)
-	
+
 	for i := 0; i < wp.workers; i++ {
 		wp.wg.Add(1)
 		go wp.worker(i)
 	}
-	
+
 	wp.running = true
-	
+
 	wp.logger.Info("Worker pool started successfully",
 		zap.Int("workers", wp.workers),
 	)
-	
+
 	return nil
 }
 
@@ -122,11 +122,11 @@ func (wp *WorkerPool) Submit(job Job) error {
 	wp.mutex.RLock()
 	running := wp.running
 	wp.mutex.RUnlock()
-	
+
 	if !running {
 		return errors.New("worker pool is not running")
 	}
-	
+
 	select {
 	case wp.jobs <- job:
 		return nil
@@ -151,21 +151,21 @@ func (wp *WorkerPool) Shutdown() error {
 	}
 	wp.running = false
 	wp.mutex.Unlock()
-	
+
 	wp.logger.Info("Shutting down worker pool",
 		zap.Duration("timeout", wp.shutdownTimeout),
 	)
-	
+
 	// Close jobs channel to signal workers to stop
 	close(wp.jobs)
-	
+
 	// Wait for workers to finish with timeout
 	done := make(chan struct{})
 	go func() {
 		wp.wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		wp.logger.Info("Worker pool shutdown completed successfully")
@@ -181,10 +181,10 @@ func (wp *WorkerPool) Shutdown() error {
 			return errors.New("shutdown timeout exceeded")
 		}
 	}
-	
+
 	// Close results channel
 	close(wp.results)
-	
+
 	return nil
 }
 
@@ -195,9 +195,9 @@ func (wp *WorkerPool) Stats() WorkerPoolStats {
 		JobsProcessed:  atomic.LoadInt64(&wp.jobsProcessed),
 		JobsSuccessful: atomic.LoadInt64(&wp.jobsSuccessful),
 		JobsFailed:     atomic.LoadInt64(&wp.jobsFailed),
-		AverageDuration: time.Duration(atomic.LoadInt64(&wp.totalDuration) / 
+		AverageDuration: time.Duration(atomic.LoadInt64(&wp.totalDuration) /
 			max(atomic.LoadInt64(&wp.jobsProcessed), 1)),
-		Running:        wp.isRunning(),
+		Running: wp.isRunning(),
 	}
 }
 
@@ -214,20 +214,20 @@ type WorkerPoolStats struct {
 // worker processes jobs from the job queue
 func (wp *WorkerPool) worker(id int) {
 	defer wp.wg.Done()
-	
+
 	workerLogger := wp.logger.With(zap.Int("worker_id", id))
 	workerLogger.Debug("Worker started")
-	
+
 	defer func() {
 		if r := recover(); r != nil {
-			workerLogger.Error("Worker panicked", 
+			workerLogger.Error("Worker panicked",
 				fmt.Errorf("panic: %v", r),
 				zap.Any("panic_value", r),
 			)
 		}
 		workerLogger.Debug("Worker stopped")
 	}()
-	
+
 	for {
 		select {
 		case job, ok := <-wp.jobs:
@@ -235,9 +235,9 @@ func (wp *WorkerPool) worker(id int) {
 				// Jobs channel closed, worker should exit
 				return
 			}
-			
+
 			wp.processJob(workerLogger, job)
-			
+
 		case <-wp.ctx.Done():
 			// Context cancelled, worker should exit
 			return
@@ -248,7 +248,7 @@ func (wp *WorkerPool) worker(id int) {
 // processJob executes a single job and records the result
 func (wp *WorkerPool) processJob(logger logging.StormDBLogger, job Job) {
 	start := time.Now()
-	
+
 	// Execute job with panic recovery
 	var result Result
 	func() {
@@ -266,16 +266,16 @@ func (wp *WorkerPool) processJob(logger logging.StormDBLogger, job Job) {
 				}
 			}
 		}()
-		
+
 		result = job.Execute(wp.ctx)
 	}()
-	
+
 	duration := time.Since(start)
-	
+
 	// Update metrics
 	atomic.AddInt64(&wp.jobsProcessed, 1)
 	atomic.AddInt64(&wp.totalDuration, int64(duration))
-	
+
 	if result.Error() != nil {
 		atomic.AddInt64(&wp.jobsFailed, 1)
 		logger.Debug("Job failed",
@@ -290,7 +290,7 @@ func (wp *WorkerPool) processJob(logger logging.StormDBLogger, job Job) {
 			zap.Duration("duration", duration),
 		)
 	}
-	
+
 	// Send result
 	select {
 	case wp.results <- result:
@@ -388,12 +388,12 @@ type ResourceMonitor struct {
 
 // ResourceMetrics contains resource usage information
 type ResourceMetrics struct {
-	Timestamp       time.Time
-	ActiveWorkers   int
-	QueueLength     int
-	ProcessingRate  float64 // jobs per second
-	ErrorRate       float64 // errors per second
-	MemoryUsageMB   float64
+	Timestamp      time.Time
+	ActiveWorkers  int
+	QueueLength    int
+	ProcessingRate float64 // jobs per second
+	ErrorRate      float64 // errors per second
+	MemoryUsageMB  float64
 }
 
 // NewResourceMonitor creates a resource monitor for a worker pool
@@ -411,21 +411,21 @@ func (rm *ResourceMonitor) Start(interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
-		
+
 		var lastProcessed int64
 		var lastFailed int64
 		lastTime := time.Now()
-		
+
 		for {
 			select {
 			case <-ticker.C:
 				stats := rm.pool.Stats()
 				now := time.Now()
 				elapsed := now.Sub(lastTime).Seconds()
-				
+
 				processingRate := float64(stats.JobsProcessed-lastProcessed) / elapsed
 				errorRate := float64(stats.JobsFailed-lastFailed) / elapsed
-				
+
 				metrics := ResourceMetrics{
 					Timestamp:      now,
 					ActiveWorkers:  stats.Workers,
@@ -434,17 +434,17 @@ func (rm *ResourceMonitor) Start(interval time.Duration) {
 					ErrorRate:      errorRate,
 					// MemoryUsageMB would need runtime.ReadMemStats() implementation
 				}
-				
+
 				select {
 				case rm.metrics <- metrics:
 				default:
 					rm.logger.Warn("Resource metrics channel full, dropping sample")
 				}
-				
+
 				lastProcessed = stats.JobsProcessed
 				lastFailed = stats.JobsFailed
 				lastTime = now
-				
+
 			case <-rm.stop:
 				return
 			}

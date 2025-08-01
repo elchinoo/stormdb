@@ -18,10 +18,10 @@ import (
 type Strategy string
 
 const (
-	StrategyLinear     Strategy = "linear"
+	StrategyLinear      Strategy = "linear"
 	StrategyExponential Strategy = "exponential"
-	StrategyFibonacci  Strategy = "fibonacci"
-	StrategyCustom     Strategy = "custom"
+	StrategyFibonacci   Strategy = "fibonacci"
+	StrategyCustom      Strategy = "custom"
 )
 
 // ProgressiveRunner manages progressive scaling test execution
@@ -31,7 +31,7 @@ type ProgressiveRunner struct {
 	bands     []BandConfig
 	results   []BandResult
 	analytics *AnalyticsEngine
-	
+
 	// State management
 	currentBand int
 	running     bool
@@ -40,23 +40,23 @@ type ProgressiveRunner struct {
 
 // BandConfig defines configuration for a single test band
 type BandConfig struct {
-	BandID      int           `json:"band_id"`
-	Workers     int           `json:"workers"`
-	Connections int           `json:"connections"`
-	Duration    time.Duration `json:"duration"`
-	WarmupTime  time.Duration `json:"warmup_time"`
+	BandID       int           `json:"band_id"`
+	Workers      int           `json:"workers"`
+	Connections  int           `json:"connections"`
+	Duration     time.Duration `json:"duration"`
+	WarmupTime   time.Duration `json:"warmup_time"`
 	CooldownTime time.Duration `json:"cooldown_time"`
 }
 
 // BandResult contains results from a single test band
 type BandResult struct {
-	BandConfig BandConfig                `json:"band_config"`
-	StartTime  time.Time                 `json:"start_time"`
-	EndTime    time.Time                 `json:"end_time"`
-	Metrics    *BandMetrics              `json:"metrics"`
-	Samples    []MetricSample            `json:"samples"`
-	Health     BandHealth                `json:"health"`
-	Errors     []string                  `json:"errors,omitempty"`
+	BandConfig BandConfig     `json:"band_config"`
+	StartTime  time.Time      `json:"start_time"`
+	EndTime    time.Time      `json:"end_time"`
+	Metrics    *BandMetrics   `json:"metrics"`
+	Samples    []MetricSample `json:"samples"`
+	Health     BandHealth     `json:"health"`
+	Errors     []string       `json:"errors,omitempty"`
 }
 
 // BandMetrics contains aggregated metrics for a test band
@@ -66,23 +66,23 @@ type BandMetrics struct {
 	TotalQueries      int64   `json:"total_queries"`
 	AvgTPS            float64 `json:"avg_tps"`
 	AvgQPS            float64 `json:"avg_qps"`
-	
+
 	// Latency metrics (milliseconds)
-	LatencyP50  float64 `json:"latency_p50_ms"`
-	LatencyP90  float64 `json:"latency_p90_ms"`
-	LatencyP95  float64 `json:"latency_p95_ms"`
-	LatencyP99  float64 `json:"latency_p99_ms"`
-	LatencyMean float64 `json:"latency_mean_ms"`
+	LatencyP50    float64 `json:"latency_p50_ms"`
+	LatencyP90    float64 `json:"latency_p90_ms"`
+	LatencyP95    float64 `json:"latency_p95_ms"`
+	LatencyP99    float64 `json:"latency_p99_ms"`
+	LatencyMean   float64 `json:"latency_mean_ms"`
 	LatencyStdDev float64 `json:"latency_stddev_ms"`
-	
+
 	// Variability metrics
-	CoefficientOfVariation float64 `json:"coefficient_of_variation"`
+	CoefficientOfVariation float64            `json:"coefficient_of_variation"`
 	ConfidenceInterval95   ConfidenceInterval `json:"confidence_interval_95"`
-	
+
 	// Error metrics
-	TotalErrors   int64   `json:"total_errors"`
-	ErrorRate     float64 `json:"error_rate"`
-	ErrorTypes    map[string]int64 `json:"error_types"`
+	TotalErrors int64            `json:"total_errors"`
+	ErrorRate   float64          `json:"error_rate"`
+	ErrorTypes  map[string]int64 `json:"error_types"`
 }
 
 // ConfidenceInterval represents a statistical confidence interval
@@ -94,13 +94,13 @@ type ConfidenceInterval struct {
 
 // MetricSample represents a single metrics sample during the test
 type MetricSample struct {
-	Timestamp    time.Time `json:"timestamp"`
-	ElapsedTime  time.Duration `json:"elapsed_time"`
-	TPS          float64   `json:"tps"`
-	QPS          float64   `json:"qps"`
-	LatencyP95   float64   `json:"latency_p95_ms"`
-	ErrorCount   int64     `json:"error_count"`
-	ActiveConns  int       `json:"active_connections"`
+	Timestamp   time.Time     `json:"timestamp"`
+	ElapsedTime time.Duration `json:"elapsed_time"`
+	TPS         float64       `json:"tps"`
+	QPS         float64       `json:"qps"`
+	LatencyP95  float64       `json:"latency_p95_ms"`
+	ErrorCount  int64         `json:"error_count"`
+	ActiveConns int           `json:"active_connections"`
 }
 
 // BandHealth tracks health status during band execution
@@ -138,10 +138,10 @@ func NewProgressiveRunner(config *config.ProgressiveConfig, logger logging.Storm
 // generateBands creates band configurations based on the strategy
 func (pr *ProgressiveRunner) generateBands() error {
 	pr.bands = make([]BandConfig, pr.config.Bands)
-	
+
 	workerSteps := pr.generateSteps(pr.config.MinWorkers, pr.config.MaxWorkers, pr.config.Bands, Strategy(pr.config.Strategy))
 	connSteps := pr.generateSteps(pr.config.MinConnections, pr.config.MaxConnections, pr.config.Bands, Strategy(pr.config.Strategy))
-	
+
 	if len(workerSteps) != pr.config.Bands || len(connSteps) != pr.config.Bands {
 		return fmt.Errorf("failed to generate correct number of steps: workers=%d, connections=%d, expected=%d",
 			len(workerSteps), len(connSteps), pr.config.Bands)
@@ -194,7 +194,7 @@ func (pr *ProgressiveRunner) generateLinearSteps(min, max, bands int) []int {
 		steps[0] = max
 		return steps
 	}
-	
+
 	step := float64(max-min) / float64(bands-1)
 	for i := 0; i < bands; i++ {
 		steps[i] = min + int(float64(i)*step)
@@ -210,7 +210,7 @@ func (pr *ProgressiveRunner) generateExponentialSteps(min, max, bands int) []int
 		steps[0] = max
 		return steps
 	}
-	
+
 	// Use exponential growth: value = min * (max/min)^(i/(bands-1))
 	ratio := float64(max) / float64(min)
 	for i := 0; i < bands; i++ {
@@ -229,7 +229,7 @@ func (pr *ProgressiveRunner) generateFibonacciSteps(min, max, bands int) []int {
 		steps[0] = max
 		return steps
 	}
-	
+
 	// Generate Fibonacci sequence
 	fib := make([]int, bands)
 	if bands >= 1 {
@@ -241,7 +241,7 @@ func (pr *ProgressiveRunner) generateFibonacciSteps(min, max, bands int) []int {
 	for i := 2; i < bands; i++ {
 		fib[i] = fib[i-1] + fib[i-2]
 	}
-	
+
 	// Scale Fibonacci to fit min-max range
 	fibMax := fib[bands-1]
 	for i := 0; i < bands; i++ {
@@ -249,7 +249,7 @@ func (pr *ProgressiveRunner) generateFibonacciSteps(min, max, bands int) []int {
 		value := float64(min) + scaled*float64(max-min)
 		steps[i] = int(math.Round(value))
 	}
-	
+
 	return steps
 }
 
@@ -355,7 +355,7 @@ func (pr *ProgressiveRunner) runBand(ctx context.Context, band BandConfig, workl
 
 	// Main test execution with metrics collection
 	metricsCollector := pr.startMetricsCollection(bandCtx, band)
-	
+
 	metrics, err := workloadRunner(bandCtx, band)
 	if err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("workload execution failed: %v", err))
@@ -394,7 +394,7 @@ func (pr *ProgressiveRunner) startMetricsCollection(ctx context.Context, band Ba
 	go func() {
 		ticker := time.NewTicker(collector.interval)
 		defer ticker.Stop()
-		
+
 		startTime := time.Now()
 
 		for {
@@ -408,7 +408,7 @@ func (pr *ProgressiveRunner) startMetricsCollection(ctx context.Context, band Ba
 					ActiveConns: band.Connections,
 					// Other metrics would be collected from the actual workload
 				}
-				
+
 				collector.mutex.Lock()
 				collector.samples = append(collector.samples, sample)
 				collector.mutex.Unlock()
@@ -427,10 +427,10 @@ func (pr *ProgressiveRunner) startMetricsCollection(ctx context.Context, band Ba
 // stopMetricsCollection stops metrics collection and returns collected samples
 func (pr *ProgressiveRunner) stopMetricsCollection(collector *MetricsCollector) []MetricSample {
 	close(collector.stop)
-	
+
 	collector.mutex.Lock()
 	defer collector.mutex.Unlock()
-	
+
 	samples := make([]MetricSample, len(collector.samples))
 	copy(samples, collector.samples)
 	return samples
@@ -550,7 +550,7 @@ func (pr *ProgressiveRunner) calculateBandHealth(samples []MetricSample) BandHea
 		if errorRate > maxErrorRate {
 			maxErrorRate = errorRate
 		}
-		
+
 		// Consider healthy if error rate < 5% and latency < 100ms
 		if errorRate < 0.05 && sample.LatencyP95 < 100 {
 			healthyCount++
@@ -616,10 +616,10 @@ func (pr *ProgressiveRunner) GetProgress() ProgressInfo {
 	defer pr.mutex.RUnlock()
 
 	return ProgressInfo{
-		Running:        pr.running,
-		CurrentBand:    pr.currentBand,
-		TotalBands:     len(pr.bands),
-		CompletedBands: len(pr.results),
+		Running:            pr.running,
+		CurrentBand:        pr.currentBand,
+		TotalBands:         len(pr.bands),
+		CompletedBands:     len(pr.results),
 		EstimatedRemaining: pr.estimateRemainingDuration(),
 	}
 }

@@ -14,78 +14,78 @@ import (
 type MetricsCollector struct {
 	logger    logging.StormDBLogger
 	startTime time.Time
-	
+
 	// Metrics storage
 	samples    []MetricSample
 	aggregates MetricAggregates
 	mutex      sync.RWMutex
-	
+
 	// Collection settings
 	interval   time.Duration
 	maxSamples int
-	
+
 	// Control channels
-	stopChan   chan struct{}
-	doneChan   chan struct{}
-	running    bool
+	stopChan chan struct{}
+	doneChan chan struct{}
+	running  bool
 }
 
 // MetricSample represents a single point-in-time metric sample
 type MetricSample struct {
-	Timestamp        time.Time `json:"timestamp"`
-	ElapsedSeconds   float64   `json:"elapsed_seconds"`
-	
+	Timestamp      time.Time `json:"timestamp"`
+	ElapsedSeconds float64   `json:"elapsed_seconds"`
+
 	// Throughput metrics
-	TPS              float64   `json:"tps"`
-	QPS              float64   `json:"qps"`
-	
+	TPS float64 `json:"tps"`
+	QPS float64 `json:"qps"`
+
 	// Latency metrics (milliseconds)
-	LatencyMean      float64   `json:"latency_mean_ms"`
-	LatencyP50       float64   `json:"latency_p50_ms"`
-	LatencyP90       float64   `json:"latency_p90_ms"`
-	LatencyP95       float64   `json:"latency_p95_ms"`
-	LatencyP99       float64   `json:"latency_p99_ms"`
-	LatencyStdDev    float64   `json:"latency_stddev_ms"`
-	
+	LatencyMean   float64 `json:"latency_mean_ms"`
+	LatencyP50    float64 `json:"latency_p50_ms"`
+	LatencyP90    float64 `json:"latency_p90_ms"`
+	LatencyP95    float64 `json:"latency_p95_ms"`
+	LatencyP99    float64 `json:"latency_p99_ms"`
+	LatencyStdDev float64 `json:"latency_stddev_ms"`
+
 	// Error metrics
-	ErrorCount       int64     `json:"error_count"`
-	ErrorRate        float64   `json:"error_rate"`
-	
+	ErrorCount int64   `json:"error_count"`
+	ErrorRate  float64 `json:"error_rate"`
+
 	// System metrics
-	ActiveConnections int      `json:"active_connections"`
-	CPUUsage         float64   `json:"cpu_usage_percent"`
-	MemoryUsageMB    float64   `json:"memory_usage_mb"`
-	
+	ActiveConnections int     `json:"active_connections"`
+	CPUUsage          float64 `json:"cpu_usage_percent"`
+	MemoryUsageMB     float64 `json:"memory_usage_mb"`
+
 	// Database metrics
-	DBConnections    int       `json:"db_connections"`
-	DBIdleConns      int       `json:"db_idle_connections"`
-	DBActiveQueries  int       `json:"db_active_queries"`
-	DBCacheHitRatio  float64   `json:"db_cache_hit_ratio"`
+	DBConnections   int     `json:"db_connections"`
+	DBIdleConns     int     `json:"db_idle_connections"`
+	DBActiveQueries int     `json:"db_active_queries"`
+	DBCacheHitRatio float64 `json:"db_cache_hit_ratio"`
 }
 
 // MetricAggregates contains aggregated metrics over the collection period
 type MetricAggregates struct {
-	StartTime        time.Time `json:"start_time"`
-	EndTime          time.Time `json:"end_time"`
-	Duration         time.Duration `json:"duration"`
-	
+	StartTime time.Time     `json:"start_time"`
+	EndTime   time.Time     `json:"end_time"`
+	Duration  time.Duration `json:"duration"`
+
 	// Throughput aggregates
-	TPSStats         StatisticalSummary `json:"tps_stats"`
-	QPSStats         StatisticalSummary `json:"qps_stats"`
-	
+	TPSStats StatisticalSummary `json:"tps_stats"`
+	QPSStats StatisticalSummary `json:"qps_stats"`
+
 	// Latency aggregates
-	LatencyStats     LatencyStatistics  `json:"latency_stats"`
-	
+	LatencyStats LatencyStatistics `json:"latency_stats"`
+
 	// Error aggregates
-	TotalErrors      int64              `json:"total_errors"`
-	ErrorRateStats   StatisticalSummary `json:"error_rate_stats"`
-	
+	TotalErrors    int64              `json:"total_errors"`
+	ErrorRateStats StatisticalSummary `json:"error_rate_stats"`
+
 	// Trend analysis
-	TPSTrend         TrendAnalysis      `json:"tps_trend"`
-	LatencyTrend     TrendAnalysis      `json:"latency_trend"`
-	
+	TPSTrend     TrendAnalysis `json:"tps_trend"`
+	LatencyTrend TrendAnalysis `json:"latency_trend"`
+
 	// Quality metrics
-	DataQuality      DataQualityMetrics `json:"data_quality"`
+	DataQuality DataQualityMetrics `json:"data_quality"`
 }
 
 // StatisticalSummary provides comprehensive statistical summary
@@ -107,15 +107,15 @@ type StatisticalSummary struct {
 
 // LatencyStatistics provides detailed latency analysis
 type LatencyStatistics struct {
-	OverallStats     StatisticalSummary `json:"overall_stats"`
-	P50Stats         StatisticalSummary `json:"p50_stats"`
-	P90Stats         StatisticalSummary `json:"p90_stats"`
-	P95Stats         StatisticalSummary `json:"p95_stats"`
-	P99Stats         StatisticalSummary `json:"p99_stats"`
-	
+	OverallStats StatisticalSummary `json:"overall_stats"`
+	P50Stats     StatisticalSummary `json:"p50_stats"`
+	P90Stats     StatisticalSummary `json:"p90_stats"`
+	P95Stats     StatisticalSummary `json:"p95_stats"`
+	P99Stats     StatisticalSummary `json:"p99_stats"`
+
 	// SLA compliance
-	SLAThresholds    map[string]float64 `json:"sla_thresholds"`
-	SLACompliance    map[string]float64 `json:"sla_compliance"`
+	SLAThresholds map[string]float64 `json:"sla_thresholds"`
+	SLACompliance map[string]float64 `json:"sla_compliance"`
 }
 
 // TrendAnalysis provides trend detection and analysis
@@ -132,12 +132,12 @@ type TrendAnalysis struct {
 
 // DataQualityMetrics assess the quality of collected metrics
 type DataQualityMetrics struct {
-	Completeness     float64 `json:"completeness"`     // Percentage of expected samples collected
-	Consistency      float64 `json:"consistency"`      // Consistency of sampling intervals
-	Accuracy         float64 `json:"accuracy"`         // Estimated accuracy of measurements
-	Timeliness       float64 `json:"timeliness"`       // Timeliness of data collection
-	Validity         float64 `json:"validity"`         // Percentage of valid samples
-	OverallScore     float64 `json:"overall_score"`    // Combined quality score
+	Completeness float64 `json:"completeness"`  // Percentage of expected samples collected
+	Consistency  float64 `json:"consistency"`   // Consistency of sampling intervals
+	Accuracy     float64 `json:"accuracy"`      // Estimated accuracy of measurements
+	Timeliness   float64 `json:"timeliness"`    // Timeliness of data collection
+	Validity     float64 `json:"validity"`      // Percentage of valid samples
+	OverallScore float64 `json:"overall_score"` // Combined quality score
 }
 
 // NewMetricsCollector creates a new metrics collector
@@ -194,13 +194,13 @@ func (mc *MetricsCollector) Stop() MetricAggregates {
 
 	// Signal collection to stop
 	close(mc.stopChan)
-	
+
 	// Wait for collection to finish
 	<-mc.doneChan
 
 	// Calculate final aggregates
 	aggregates := mc.calculateAggregates()
-	
+
 	mc.logger.Info("Stopped metrics collection",
 		zap.Int("total_samples", len(mc.samples)),
 		zap.Duration("collection_duration", aggregates.Duration),
@@ -212,7 +212,7 @@ func (mc *MetricsCollector) Stop() MetricAggregates {
 // collectMetrics runs the metrics collection loop
 func (mc *MetricsCollector) collectMetrics(ctx context.Context) {
 	defer close(mc.doneChan)
-	
+
 	ticker := time.NewTicker(mc.interval)
 	defer ticker.Stop()
 
@@ -221,7 +221,7 @@ func (mc *MetricsCollector) collectMetrics(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			sample := mc.collectSample()
-			
+
 			mc.mutex.Lock()
 			if len(mc.samples) >= mc.maxSamples {
 				// Remove oldest sample to make room
@@ -262,8 +262,8 @@ func (mc *MetricsCollector) collectSample() MetricSample {
 	// In a real implementation, these would collect actual metrics
 	// For now, we create a placeholder sample
 	sample := MetricSample{
-		Timestamp:         now,
-		ElapsedSeconds:    elapsed,
+		Timestamp:      now,
+		ElapsedSeconds: elapsed,
 		// Actual metrics would be collected here from:
 		// - Performance counters
 		// - Database statistics
@@ -390,7 +390,7 @@ func (mc *MetricsCollector) calculateStatisticalSummary(data []float64) Statisti
 	// Sort data for percentile calculations
 	sortedData := make([]float64, len(data))
 	copy(sortedData, data)
-	
+
 	// Simple sort - in production, use sort.Float64s
 	for i := 0; i < len(sortedData); i++ {
 		for j := i + 1; j < len(sortedData); j++ {
@@ -487,17 +487,17 @@ func (mc *MetricsCollector) calculateLatencyStatistics() LatencyStatistics {
 
 	// Calculate SLA compliance (example thresholds)
 	slaThresholds := map[string]float64{
-		"p50_100ms":  100.0,
-		"p95_200ms":  200.0,
-		"p99_500ms":  500.0,
-		"mean_50ms":  50.0,
+		"p50_100ms": 100.0,
+		"p95_200ms": 200.0,
+		"p99_500ms": 500.0,
+		"mean_50ms": 50.0,
 	}
 
 	slaCompliance := map[string]float64{
-		"p50_100ms":  mc.calculateSLACompliance(p50Values, 100.0),
-		"p95_200ms":  mc.calculateSLACompliance(p95Values, 200.0),
-		"p99_500ms":  mc.calculateSLACompliance(p99Values, 500.0),
-		"mean_50ms":  mc.calculateSLACompliance(meanValues, 50.0),
+		"p50_100ms": mc.calculateSLACompliance(p50Values, 100.0),
+		"p95_200ms": mc.calculateSLACompliance(p95Values, 200.0),
+		"p99_500ms": mc.calculateSLACompliance(p99Values, 500.0),
+		"mean_50ms": mc.calculateSLACompliance(meanValues, 50.0),
 	}
 
 	return LatencyStatistics{
@@ -535,7 +535,7 @@ func (mc *MetricsCollector) calculateTrendAnalysis(values []float64) TrendAnalys
 
 	// Simple linear regression for trend detection
 	n := float64(len(values))
-	sumX := n * (n - 1) / 2  // Sum of 0, 1, 2, ..., n-1
+	sumX := n * (n - 1) / 2 // Sum of 0, 1, 2, ..., n-1
 	sumY := 0.0
 	sumXY := 0.0
 	sumX2 := 0.0
@@ -549,7 +549,7 @@ func (mc *MetricsCollector) calculateTrendAnalysis(values []float64) TrendAnalys
 
 	// Calculate slope and R-squared
 	slope := (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX)
-	
+
 	// Determine direction
 	direction := "stable"
 	if slope > 0.1 {
@@ -568,7 +568,7 @@ func (mc *MetricsCollector) calculateTrendAnalysis(values []float64) TrendAnalys
 		ssRes += (y - predicted) * (y - predicted)
 		ssTot += (y - yMean) * (y - yMean)
 	}
-	
+
 	rSquared := 0.0
 	if ssTot > 0 {
 		rSquared = 1.0 - (ssRes / ssTot)
@@ -600,22 +600,22 @@ func (mc *MetricsCollector) calculateDataQuality() DataQualityMetrics {
 
 	// Calculate consistency of sampling intervals
 	intervalConsistency := 100.0 // Simplified - would check actual intervals
-	
+
 	// Calculate other quality metrics (simplified)
-	accuracy := 95.0    // Placeholder
-	timeliness := 98.0  // Placeholder
-	validity := 99.0    // Placeholder
+	accuracy := 95.0   // Placeholder
+	timeliness := 98.0 // Placeholder
+	validity := 99.0   // Placeholder
 
 	// Calculate overall quality score
 	overallScore := (completeness + intervalConsistency + accuracy + timeliness + validity) / 5.0
 
 	return DataQualityMetrics{
-		Completeness:     completeness,
-		Consistency:      intervalConsistency,
-		Accuracy:         accuracy,
-		Timeliness:       timeliness,
-		Validity:         validity,
-		OverallScore:     overallScore,
+		Completeness: completeness,
+		Consistency:  intervalConsistency,
+		Accuracy:     accuracy,
+		Timeliness:   timeliness,
+		Validity:     validity,
+		OverallScore: overallScore,
 	}
 }
 
