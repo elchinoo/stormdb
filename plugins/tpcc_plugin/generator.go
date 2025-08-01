@@ -48,15 +48,16 @@ func (t *TPCC) worker(ctx context.Context, db *pgxpool.Pool, _ *types.Config, me
 			start := time.Now()
 
 			var err error
+			var queryCount int64
 			switch txType := rollTransaction(rng); txType {
 			case "new_order":
-				err = t.newOrderTx(ctx, db, rng)
+				err, queryCount = t.newOrderTxWithQueryCount(ctx, db, rng)
 				atomic.AddInt64(&metrics.NewOrderCount, 1)
 			case "payment":
-				err = t.paymentTx(ctx, db, rng)
+				err, queryCount = t.paymentTxWithQueryCount(ctx, db, rng)
 				atomic.AddInt64(&metrics.PaymentCount, 1)
 			case "order_status":
-				err = t.orderStatusTx(ctx, db, rng)
+				err, queryCount = t.orderStatusTxWithQueryCount(ctx, db, rng)
 				atomic.AddInt64(&metrics.OrderStatusCount, 1)
 			default: // think
 				atomic.AddInt64(&metrics.ThinkCount, 1)
@@ -78,7 +79,7 @@ func (t *TPCC) worker(ctx context.Context, db *pgxpool.Pool, _ *types.Config, me
 				metrics.Mu.Unlock()
 			} else {
 				atomic.AddInt64(&metrics.TPS, 1)
-				atomic.AddInt64(&metrics.QPS, 1)
+				atomic.AddInt64(&metrics.QPS, queryCount) // Add actual query count
 			}
 
 			// Simulate think time

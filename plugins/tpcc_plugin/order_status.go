@@ -9,6 +9,12 @@ import (
 )
 
 func (t *TPCC) orderStatusTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+	err, _ := t.orderStatusTxWithQueryCount(ctx, db, rng)
+	return err
+}
+
+func (t *TPCC) orderStatusTxWithQueryCount(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) (error, int64) {
+	queryCount := int64(0)
 	wID := 1
 	dID := rng.Intn(10) + 1
 
@@ -29,20 +35,21 @@ func (t *TPCC) orderStatusTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Ra
 		// Find the middle customer by last name (simplified)
 		rows, err := db.Query(ctx, "SELECT c_id FROM customer WHERE c_w_id = $1::INT AND c_d_id = $2::INT AND c_last = $3 ORDER BY c_id", wID, dID, last)
 		if err != nil {
-			return err
+			return err, queryCount
 		}
 		defer rows.Close()
+		queryCount++
 
 		cIDs := []int{}
 		for rows.Next() {
 			var id int
 			if err := rows.Scan(&id); err != nil {
-				return err
+				return err, queryCount
 			}
 			cIDs = append(cIDs, id)
 		}
 		if err := rows.Err(); err != nil {
-			return err
+			return err, queryCount
 		}
 
 		if len(cIDs) > 0 {
@@ -57,7 +64,7 @@ func (t *TPCC) orderStatusTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Ra
 
 	tx, err := db.Begin(ctx)
 	if err != nil {
-		return err
+		return err, queryCount
 	}
 	defer func() {
 		_ = tx.Rollback(ctx)
@@ -67,8 +74,9 @@ func (t *TPCC) orderStatusTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Ra
 	var cBalance float64
 	err = tx.QueryRow(ctx, "SELECT c_balance FROM customer WHERE c_w_id = $1::INT AND c_d_id = $2::INT AND c_id = $3::INT", wID, dID, cID).Scan(&cBalance)
 	if err != nil {
-		return err
+		return err, queryCount
 	}
+	queryCount++
 
 	// Get last order
 	var oID, oCarrierID, oEntryD int
@@ -76,29 +84,31 @@ func (t *TPCC) orderStatusTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Ra
 		wID, dID, cID).Scan(&oID, &oCarrierID, &oEntryD)
 	if err != nil {
 		// No order, still valid
-		return tx.Commit(ctx)
+		return tx.Commit(ctx), queryCount
 	}
+	queryCount++
 
 	// Get order lines
 	rows, err := tx.Query(ctx, "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, EXTRACT(EPOCH FROM ol_delivery_d)::INT FROM order_line WHERE ol_w_id = $1::INT AND ol_d_id = $2::INT AND ol_o_id = $3::INT",
 		wID, dID, oID)
 	if err != nil {
-		return err
+		return err, queryCount
 	}
 	defer rows.Close()
+	queryCount++
 
 	for rows.Next() {
 		var olIID, olSupplyWID, olQuantity int
 		var olAmount float64
 		var olDeliveryD *int
 		if err := rows.Scan(&olIID, &olSupplyWID, &olQuantity, &olAmount, &olDeliveryD); err != nil {
-			return err
+			return err, queryCount
 		}
 		// Just read — no processing
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return err, queryCount
 	}
 
-	return tx.Commit(ctx)
+	return tx.Commit(ctx), queryCount
 }
