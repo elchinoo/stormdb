@@ -413,7 +413,9 @@ func (g *Generator) validateStatusEnumForSQL(status string) string {
 		log.Printf("❌ Critical: Invalid enum at SQL execution: %q, substituting 'pending'", status)
 		return "pending"
 	}
-} // performBatchInsert executes a batch INSERT operation
+}
+
+// performBatchInsert executes a batch INSERT operation
 func (g *Generator) performBatchInsert(ctx context.Context, db *pgxpool.Pool, records []DataRecord) error {
 	if len(records) == 0 {
 		return nil
