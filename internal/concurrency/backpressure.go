@@ -27,8 +27,16 @@ type BackpressureController struct {
 
 	// Current state
 	activeConnections int64
-	activeWorkers     int64
-	queuedRequests    int64
+	activeWorkers   // GetMetrics returns pool metrics
+func (cp *ConnectionPool) GetMetrics() *PoolMetrics {
+	cp.mu.RLock()
+	defer cp.mu.RUnlock()
+
+	cp.metrics.TotalConnections = atomic.LoadInt64(&cp.totalConnections)
+	cp.metrics.AvailableConnections = int64(len(cp.available))
+	cp.metrics.BusyConnections = cp.metrics.TotalConnections - cp.metrics.AvailableConnections
+
+	return cp.metricsueuedRequests    int64
 	currentLatency    time.Duration
 	pressure          float64
 
@@ -50,8 +58,6 @@ type BackpressureController struct {
 
 // ConcurrencyMetrics tracks concurrency-related metrics
 type ConcurrencyMetrics struct {
-	mu sync.RWMutex
-
 	// Connection metrics
 	TotalConnections     int64 `json:"total_connections"`
 	ActiveConnections    int64 `json:"active_connections"`
@@ -334,7 +340,7 @@ func (bc *BackpressureController) GetPressure() float64 {
 }
 
 // GetMetrics returns current concurrency metrics
-func (bc *BackpressureController) GetMetrics() ConcurrencyMetrics {
+func (bc *BackpressureController) GetMetrics() *ConcurrencyMetrics {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
 
@@ -345,7 +351,7 @@ func (bc *BackpressureController) GetMetrics() ConcurrencyMetrics {
 	bc.metrics.CurrentPressure = bc.pressure
 	bc.metrics.LastUpdate = time.Now()
 
-	return *bc.metrics
+	return bc.metrics
 }
 
 // GetScalingHistory returns the scaling event history
@@ -525,8 +531,6 @@ type PooledConnection struct {
 
 // PoolMetrics tracks connection pool metrics
 type PoolMetrics struct {
-	mu sync.RWMutex
-
 	TotalConnections     int64         `json:"total_connections"`
 	AvailableConnections int64         `json:"available_connections"`
 	BusyConnections      int64         `json:"busy_connections"`
@@ -616,7 +620,7 @@ func (cp *ConnectionPool) ReleaseConnection(conn *PooledConnection) {
 }
 
 // GetMetrics returns pool metrics
-func (cp *ConnectionPool) GetMetrics() PoolMetrics {
+func (cp *ConnectionPool) GetMetrics() *PoolMetrics {
 	cp.mu.RLock()
 	defer cp.mu.RUnlock()
 
@@ -624,7 +628,7 @@ func (cp *ConnectionPool) GetMetrics() PoolMetrics {
 	cp.metrics.AvailableConnections = int64(len(cp.available))
 	cp.metrics.BusyConnections = cp.metrics.TotalConnections - cp.metrics.AvailableConnections
 
-	return *cp.metrics
+	return cp.metrics
 }
 
 // Close closes the connection pool

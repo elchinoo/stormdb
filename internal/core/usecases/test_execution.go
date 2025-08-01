@@ -336,7 +336,9 @@ func (uc *TestExecutionUseCase) updateExecutionStatus(executionID string, status
 				now := time.Now()
 				testExecution.EndTime = &now
 			}
-			uc.testRepo.Store(ctx, testExecution)
+			if err := uc.testRepo.Store(ctx, testExecution); err != nil {
+				// Log error but don't stop monitoring
+			}
 		}
 	}
 }
