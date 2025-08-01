@@ -2,7 +2,10 @@ package plugin
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"plugin"
 	"sync"
@@ -13,10 +16,31 @@ import (
 	"go.uber.org/zap"
 )
 
+// PluginSecurity handles plugin security validation
+type PluginSecurity struct {
+	AllowedHashes    map[string]bool // SHA256 hashes of allowed plugin files
+	TrustedAuthors   map[string]bool // Trusted plugin authors
+	MaxPluginSize    int64           // Maximum allowed plugin file size
+	RequireSignature bool            // Whether plugins must be signed
+}
+
+// DefaultPluginSecurity returns secure default settings
+func DefaultPluginSecurity() *PluginSecurity {
+	return &PluginSecurity{
+		AllowedHashes:    make(map[string]bool),
+		TrustedAuthors:   make(map[string]bool),
+		MaxPluginSize:    50 * 1024 * 1024, // 50MB max
+		RequireSignature: false,            // Disabled by default for development
+	}
+}
+
 // DefaultPluginRegistry implements the PluginRegistry interface with
 // comprehensive plugin management including health checks and version validation
 type DefaultPluginRegistry struct {
 	plugins        map[string]*PluginInfo
+	dependencies   map[string][]string // plugin -> dependencies
+	dependents     map[string][]string // plugin -> dependents
+	security       *PluginSecurity
 	mutex          sync.RWMutex
 	logger         *zap.Logger
 	apiVersion     string
@@ -28,12 +52,23 @@ type DefaultPluginRegistry struct {
 
 // NewPluginRegistry creates a new plugin registry with specified configuration
 func NewPluginRegistry(logger *zap.Logger, apiVersion, stormDBVersion string) *DefaultPluginRegistry {
+	return NewPluginRegistryWithSecurity(logger, apiVersion, stormDBVersion, DefaultPluginSecurity())
+}
+
+// NewPluginRegistryWithSecurity creates a new plugin registry with security settings
+func NewPluginRegistryWithSecurity(logger *zap.Logger, apiVersion, stormDBVersion string, security *PluginSecurity) *DefaultPluginRegistry {
 	if logger == nil {
 		logger = zap.NewNop()
+	}
+	if security == nil {
+		security = DefaultPluginSecurity()
 	}
 
 	return &DefaultPluginRegistry{
 		plugins:        make(map[string]*PluginInfo),
+		dependencies:   make(map[string][]string),
+		dependents:     make(map[string][]string),
+		security:       security,
 		logger:         logger,
 		apiVersion:     apiVersion,
 		stormDBVersion: stormDBVersion,
@@ -52,11 +87,21 @@ func (r *DefaultPluginRegistry) Register(pluginInstance WorkloadPlugin) error {
 		return errors.Wrapf(err, "plugin validation failed for %s", metadata.Name)
 	}
 
+	// Check dependencies
+	if err := r.checkDependencies(metadata); err != nil {
+		return errors.Wrapf(err, "dependency check failed for %s", metadata.Name)
+	}
+
 	// Check for conflicts
 	if existing, exists := r.plugins[metadata.Name]; exists {
 		if existing.Loaded {
 			return fmt.Errorf("plugin %s is already loaded", metadata.Name)
 		}
+	}
+
+	// Initialize plugin
+	if err := pluginInstance.Initialize(); err != nil {
+		return errors.Wrapf(err, "plugin initialization failed for %s", metadata.Name)
 	}
 
 	pluginInfo := &PluginInfo{
@@ -68,11 +113,18 @@ func (r *DefaultPluginRegistry) Register(pluginInstance WorkloadPlugin) error {
 	}
 
 	r.plugins[metadata.Name] = pluginInfo
+	r.dependencies[metadata.Name] = metadata.Dependencies
+
+	// Update dependents map
+	for _, dep := range metadata.Dependencies {
+		r.dependents[dep] = append(r.dependents[dep], metadata.Name)
+	}
 
 	r.logger.Info("Plugin registered successfully",
 		zap.String("name", metadata.Name),
 		zap.String("version", metadata.Version),
 		zap.String("api_version", metadata.APIVersion),
+		zap.Strings("dependencies", metadata.Dependencies),
 	)
 
 	return nil
@@ -450,4 +502,123 @@ func (r *DefaultPluginRegistry) unloadPluginUnsafe(name string) error {
 	pluginInfo.Plugin = nil
 
 	return nil
+}
+
+// checkDependencies validates that all plugin dependencies are available
+func (r *DefaultPluginRegistry) checkDependencies(metadata *PluginMetadata) error {
+	for _, dep := range metadata.Dependencies {
+		if _, exists := r.plugins[dep]; !exists {
+			return fmt.Errorf("dependency %s not found", dep)
+		}
+	}
+	return nil
+}
+
+// GetDependencyGraph returns the dependency relationships
+func (r *DefaultPluginRegistry) GetDependencyGraph() map[string][]string {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	graph := make(map[string][]string)
+	for plugin, deps := range r.dependencies {
+		graph[plugin] = make([]string, len(deps))
+		copy(graph[plugin], deps)
+	}
+
+	return graph
+}
+
+// ValidatePluginSecurity checks plugin file security
+func (r *DefaultPluginRegistry) ValidatePluginSecurity(pluginPath string) error {
+	// Check file size
+	fileInfo, err := os.Stat(pluginPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat plugin file: %w", err)
+	}
+
+	if fileInfo.Size() > r.security.MaxPluginSize {
+		return fmt.Errorf("plugin file too large: %d bytes (max %d)",
+			fileInfo.Size(), r.security.MaxPluginSize)
+	}
+
+	// Check hash if allowed hashes are configured
+	if len(r.security.AllowedHashes) > 0 {
+		hash, err := r.calculateFileHash(pluginPath)
+		if err != nil {
+			return fmt.Errorf("failed to calculate file hash: %w", err)
+		}
+
+		if !r.security.AllowedHashes[hash] {
+			return fmt.Errorf("plugin hash %s not in allowed list", hash)
+		}
+	}
+
+	return nil
+}
+
+// calculateFileHash computes SHA256 hash of a file
+func (r *DefaultPluginRegistry) calculateFileHash(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
+}
+
+// AddTrustedAuthor adds an author to the trusted list
+func (r *DefaultPluginRegistry) AddTrustedAuthor(author string) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.security.TrustedAuthors[author] = true
+}
+
+// RemoveTrustedAuthor removes an author from the trusted list
+func (r *DefaultPluginRegistry) RemoveTrustedAuthor(author string) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	delete(r.security.TrustedAuthors, author)
+}
+
+// AddAllowedHash adds a file hash to the allowed list
+func (r *DefaultPluginRegistry) AddAllowedHash(hash string) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.security.AllowedHashes[hash] = true
+}
+
+// RemoveAllowedHash removes a file hash from the allowed list
+func (r *DefaultPluginRegistry) RemoveAllowedHash(hash string) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	delete(r.security.AllowedHashes, hash)
+}
+
+// GetSecurityConfig returns a copy of the current security configuration
+func (r *DefaultPluginRegistry) GetSecurityConfig() PluginSecurity {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	config := PluginSecurity{
+		AllowedHashes:    make(map[string]bool),
+		TrustedAuthors:   make(map[string]bool),
+		MaxPluginSize:    r.security.MaxPluginSize,
+		RequireSignature: r.security.RequireSignature,
+	}
+
+	for hash := range r.security.AllowedHashes {
+		config.AllowedHashes[hash] = true
+	}
+
+	for author := range r.security.TrustedAuthors {
+		config.TrustedAuthors[author] = true
+	}
+
+	return config
 }
