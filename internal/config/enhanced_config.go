@@ -1,12 +1,17 @@
 package config
 
 import (
+	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -556,4 +561,307 @@ func (cm *ConfigManager) LoadConfig(filePath string, cliOptions CLIOptions) (*St
 	)
 
 	return config, nil
+}
+
+// DynamicConfigManager extends ConfigManager with dynamic reloading capabilities
+type DynamicConfigManager struct {
+	*ConfigManager
+	mu             sync.RWMutex
+	watcher        *fsnotify.Watcher
+	configPath     string
+	callbacks      []func(*StormDBConfig)
+	reloadDebounce time.Duration
+	ctx            context.Context
+	cancel         context.CancelFunc
+}
+
+// NewDynamicConfigManager creates a new dynamic configuration manager
+func NewDynamicConfigManager(logger *zap.Logger) *DynamicConfigManager {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		logger.Error("Failed to create file watcher", zap.Error(err))
+		watcher = nil
+	}
+
+	return &DynamicConfigManager{
+		ConfigManager:  NewConfigManager(logger),
+		watcher:        watcher,
+		callbacks:      make([]func(*StormDBConfig), 0),
+		reloadDebounce: 1 * time.Second,
+		ctx:            ctx,
+		cancel:         cancel,
+	}
+}
+
+// LoadConfigWithReload loads configuration and sets up file watching
+func (dcm *DynamicConfigManager) LoadConfigWithReload(filePath string, cliOptions CLIOptions) (*StormDBConfig, error) {
+	// Load initial configuration
+	config, err := dcm.LoadConfig(filePath, cliOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	dcm.mu.Lock()
+	dcm.configPath = filePath
+	dcm.mu.Unlock()
+
+	// Set up file watching if watcher is available
+	if dcm.watcher != nil {
+		if err := dcm.setupFileWatching(filePath); err != nil {
+			dcm.logger.Warn("Failed to setup file watching",
+				zap.String("path", filePath),
+				zap.Error(err))
+		} else {
+			go dcm.watchFiles()
+		}
+	}
+
+	return config, nil
+}
+
+// OnConfigChange registers a callback for configuration changes
+func (dcm *DynamicConfigManager) OnConfigChange(callback func(*StormDBConfig)) {
+	dcm.mu.Lock()
+	defer dcm.mu.Unlock()
+	dcm.callbacks = append(dcm.callbacks, callback)
+}
+
+// GetConfig returns the current configuration (thread-safe)
+func (dcm *DynamicConfigManager) GetConfig() *StormDBConfig {
+	dcm.mu.RLock()
+	defer dcm.mu.RUnlock()
+	return dcm.config
+}
+
+// ReloadConfig manually reloads configuration
+func (dcm *DynamicConfigManager) ReloadConfig() error {
+	dcm.mu.RLock()
+	configPath := dcm.configPath
+	dcm.mu.RUnlock()
+
+	if configPath == "" {
+		return fmt.Errorf("no configuration file path available for reload")
+	}
+
+	// Load new configuration
+	newConfig, err := dcm.LoadConfig(configPath, CLIOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to reload config: %w", err)
+	}
+
+	// Notify callbacks of the change
+	dcm.notifyConfigChange(newConfig)
+
+	dcm.logger.Info("Configuration reloaded successfully",
+		zap.String("path", configPath))
+
+	return nil
+}
+
+// Stop stops the dynamic configuration manager
+func (dcm *DynamicConfigManager) Stop() {
+	dcm.cancel()
+
+	if dcm.watcher != nil {
+		dcm.watcher.Close()
+	}
+
+	dcm.logger.Info("Dynamic configuration manager stopped")
+}
+
+// Private methods
+
+func (dcm *DynamicConfigManager) setupFileWatching(configPath string) error {
+	// Add the directory containing the config file to the watcher
+	dir := filepath.Dir(configPath)
+	if err := dcm.watcher.Add(dir); err != nil {
+		return fmt.Errorf("failed to add directory to watcher: %w", err)
+	}
+
+	dcm.logger.Info("File watching enabled", zap.String("path", configPath))
+	return nil
+}
+
+func (dcm *DynamicConfigManager) watchFiles() {
+	debouncer := time.NewTimer(dcm.reloadDebounce)
+	debouncer.Stop()
+
+	for {
+		select {
+		case <-dcm.ctx.Done():
+			return
+
+		case event, ok := <-dcm.watcher.Events:
+			if !ok {
+				return
+			}
+
+			// Check if this is our config file
+			dcm.mu.RLock()
+			configPath := dcm.configPath
+			dcm.mu.RUnlock()
+
+			if event.Name == configPath {
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					dcm.logger.Debug("Config file modified", zap.String("file", event.Name))
+
+					// Debounce rapid file changes
+					debouncer.Reset(dcm.reloadDebounce)
+				}
+			}
+
+		case err, ok := <-dcm.watcher.Errors:
+			if !ok {
+				return
+			}
+			dcm.logger.Error("File watcher error", zap.Error(err))
+
+		case <-debouncer.C:
+			if err := dcm.ReloadConfig(); err != nil {
+				dcm.logger.Error("Failed to reload configuration", zap.Error(err))
+			}
+		}
+	}
+}
+
+func (dcm *DynamicConfigManager) notifyConfigChange(newConfig *StormDBConfig) {
+	dcm.mu.RLock()
+	callbacks := make([]func(*StormDBConfig), len(dcm.callbacks))
+	copy(callbacks, dcm.callbacks)
+	dcm.mu.RUnlock()
+
+	for _, callback := range callbacks {
+		go func(cb func(*StormDBConfig)) {
+			defer func() {
+				if r := recover(); r != nil {
+					dcm.logger.Error("Config change callback panic", zap.Any("panic", r))
+				}
+			}()
+			cb(newConfig)
+		}(callback)
+	}
+}
+
+// ValidateConfigFile validates a configuration file without loading it
+func ValidateConfigFile(filePath string) error {
+	v := viper.New()
+	v.SetConfigFile(filePath)
+
+	if err := v.ReadInConfig(); err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	config := NewStormDBConfig()
+	if err := v.Unmarshal(config); err != nil {
+		return fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return config.Validate()
+}
+
+// ExportConfigTemplate exports a template configuration with all options
+func ExportConfigTemplate(filePath string) error {
+	config := NewStormDBConfig()
+	config.SetDefaults()
+
+	v := viper.New()
+	v.SetConfigType("yaml")
+
+	// Set all configuration values in viper
+	setViperDefaults(v, config)
+
+	return v.WriteConfigAs(filePath)
+}
+
+func setViperDefaults(v *viper.Viper, config *StormDBConfig) {
+	// Database
+	v.SetDefault("database.type", config.Database.Type)
+	v.SetDefault("database.host", config.Database.Host)
+	v.SetDefault("database.port", config.Database.Port)
+	v.SetDefault("database.database", "example_db")
+	v.SetDefault("database.username", "username")
+	v.SetDefault("database.password", "password")
+	v.SetDefault("database.sslmode", config.Database.SSLMode)
+	v.SetDefault("database.max_connections", config.Database.MaxConnections)
+	v.SetDefault("database.min_connections", config.Database.MinConnections)
+	v.SetDefault("database.max_conn_lifetime", config.Database.MaxConnLifetime)
+	v.SetDefault("database.max_conn_idle_time", config.Database.MaxConnIdleTime)
+	v.SetDefault("database.health_check_period", config.Database.HealthCheckPeriod)
+	v.SetDefault("database.connect_timeout", config.Database.ConnectTimeout)
+
+	// Workload
+	v.SetDefault("workload.type", "read")
+	v.SetDefault("workload.duration", config.Workload.Duration)
+	v.SetDefault("workload.workers", config.Workload.Workers)
+	v.SetDefault("workload.connections", config.Workload.Connections)
+	v.SetDefault("workload.scale", config.Workload.Scale)
+	v.SetDefault("workload.summary_interval", config.Workload.SummaryInterval)
+
+	// Progressive
+	v.SetDefault("workload.progressive.enabled", false)
+	v.SetDefault("workload.progressive.strategy", "linear")
+	v.SetDefault("workload.progressive.min_workers", 1)
+	v.SetDefault("workload.progressive.max_workers", 100)
+	v.SetDefault("workload.progressive.min_connections", 1)
+	v.SetDefault("workload.progressive.max_connections", 200)
+	v.SetDefault("workload.progressive.test_duration", "30s")
+	v.SetDefault("workload.progressive.warmup_duration", "5s")
+	v.SetDefault("workload.progressive.cooldown_duration", "5s")
+	v.SetDefault("workload.progressive.bands", 10)
+	v.SetDefault("workload.progressive.enable_analysis", true)
+	v.SetDefault("workload.progressive.max_latency_samples", 10000)
+	v.SetDefault("workload.progressive.memory_limit_mb", 500)
+
+	// Plugins
+	v.SetDefault("plugins.paths", config.Plugins.Paths)
+	v.SetDefault("plugins.auto_load", config.Plugins.AutoLoad)
+	v.SetDefault("plugins.health_check_enabled", config.Plugins.HealthCheckEnabled)
+	v.SetDefault("plugins.health_check_interval", config.Plugins.HealthCheckInterval)
+	v.SetDefault("plugins.max_load_attempts", config.Plugins.MaxLoadAttempts)
+	v.SetDefault("plugins.load_timeout", config.Plugins.LoadTimeout)
+
+	// Metrics
+	v.SetDefault("metrics.enabled", config.Metrics.Enabled)
+	v.SetDefault("metrics.interval", config.Metrics.Interval)
+	v.SetDefault("metrics.latency_percentiles", config.Metrics.LatencyPercentiles)
+	v.SetDefault("metrics.collect_pg_stats", false)
+	v.SetDefault("metrics.pg_stats_statements", false)
+	v.SetDefault("metrics.export_prometheus", false)
+	v.SetDefault("metrics.prometheus_port", config.Metrics.PrometheusPort)
+	v.SetDefault("metrics.batch_size", config.Metrics.BatchSize)
+	v.SetDefault("metrics.flush_interval", config.Metrics.FlushInterval)
+	v.SetDefault("metrics.max_memory_mb", config.Metrics.MaxMemoryMB)
+
+	// Advanced
+	v.SetDefault("advanced.circuit_breaker.enabled", config.Advanced.CircuitBreaker.Enabled)
+	v.SetDefault("advanced.circuit_breaker.max_failures", config.Advanced.CircuitBreaker.MaxFailures)
+	v.SetDefault("advanced.circuit_breaker.reset_timeout", config.Advanced.CircuitBreaker.ResetTimeout)
+	v.SetDefault("advanced.circuit_breaker.half_open_limit", config.Advanced.CircuitBreaker.HalfOpenLimit)
+
+	v.SetDefault("advanced.resource_limits.max_memory_mb", config.Advanced.ResourceLimits.MaxMemoryMB)
+	v.SetDefault("advanced.resource_limits.max_cpu_percent", config.Advanced.ResourceLimits.MaxCPUPercent)
+	v.SetDefault("advanced.resource_limits.max_goroutines", config.Advanced.ResourceLimits.MaxGoroutines)
+	v.SetDefault("advanced.resource_limits.gc_target_percent", config.Advanced.ResourceLimits.GCTargetPercent)
+	v.SetDefault("advanced.resource_limits.shutdown_timeout", config.Advanced.ResourceLimits.ShutdownTimeout)
+
+	v.SetDefault("advanced.error_handling.fail_fast", false)
+	v.SetDefault("advanced.error_handling.max_retries", config.Advanced.ErrorHandling.MaxRetries)
+	v.SetDefault("advanced.error_handling.retry_backoff", config.Advanced.ErrorHandling.RetryBackoff)
+	v.SetDefault("advanced.error_handling.backoff_multiplier", config.Advanced.ErrorHandling.BackoffMultiplier)
+	v.SetDefault("advanced.error_handling.max_backoff", config.Advanced.ErrorHandling.MaxBackoff)
+	v.SetDefault("advanced.error_handling.panic_recovery", config.Advanced.ErrorHandling.PanicRecovery)
+	v.SetDefault("advanced.error_handling.error_rate_threshold", config.Advanced.ErrorHandling.ErrorRateThreshold)
+
+	v.SetDefault("advanced.observability.tracing_enabled", false)
+	v.SetDefault("advanced.observability.metrics_enabled", false)
+	v.SetDefault("advanced.observability.service_name", config.Advanced.Observability.ServiceName)
+	v.SetDefault("advanced.observability.sample_rate", config.Advanced.Observability.SampleRate)
+
+	// Logger
+	v.SetDefault("logger.level", config.Logger.Level)
+	v.SetDefault("logger.format", config.Logger.Format)
+	v.SetDefault("logger.output", config.Logger.Output)
+	v.SetDefault("logger.development", false)
 }
