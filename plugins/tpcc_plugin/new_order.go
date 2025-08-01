@@ -9,6 +9,12 @@ import (
 )
 
 func (t *TPCC) newOrderTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) error {
+	_, _ = t.newOrderTxWithQueryCount(ctx, db, rng)
+	return nil
+}
+
+func (t *TPCC) newOrderTxWithQueryCount(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand) (error, int64) {
+	queryCount := int64(0)
 	wID := 1
 	dID := rng.Intn(10) + 1
 	cID := rng.Intn(300) + 1
@@ -30,7 +36,7 @@ func (t *TPCC) newOrderTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand)
 
 	tx, err := db.Begin(ctx)
 	if err != nil {
-		return err
+		return err, queryCount
 	}
 	defer func() {
 		_ = tx.Rollback(ctx)
@@ -40,8 +46,9 @@ func (t *TPCC) newOrderTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand)
 	var nextOID int
 	err = tx.QueryRow(ctx, "SELECT d_next_o_id FROM district WHERE d_w_id = $1::INT AND d_id = $2::INT FOR UPDATE", wID, dID).Scan(&nextOID)
 	if err != nil {
-		return err
+		return err, queryCount
 	}
+	queryCount++
 
 	// Insert order
 	oAllLocal := 1
@@ -51,14 +58,16 @@ func (t *TPCC) newOrderTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand)
 	_, err = tx.Exec(ctx, "INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local) VALUES ($1, $2::INT, $3, $4, NOW(), NULL, $5, $6)",
 		nextOID, dID, wID, cID, olCount, oAllLocal)
 	if err != nil {
-		return err
+		return err, queryCount
 	}
+	queryCount++
 
 	// Increment next order ID
 	_, err = tx.Exec(ctx, "UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_w_id = $1::INT AND d_id = $2::INT", wID, dID)
 	if err != nil {
-		return err
+		return err, queryCount
 	}
+	queryCount++
 
 	// Insert order lines
 	for i := 0; i < olCount; i++ {
@@ -77,13 +86,14 @@ func (t *TPCC) newOrderTx(ctx context.Context, db *pgxpool.Pool, rng *rand.Rand)
 		_, err = tx.Exec(ctx, "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES ($1, $2::INT, $3, $4, $5, $6, NULL, $7, $8, 'S_DIST_' || lpad($2::text, 2, '0'))",
 			nextOID, dID, wID, olNumber, olIID, olSupplyWID, olQuantity, olAmount)
 		if err != nil {
-			return err
+			return err, queryCount
 		}
+		queryCount++
 
 		// Update stock (simulate)
 		// In real TPC-C, stock is updated here, but we skip for now (no stock table)
 		// You can add it later if needed
 	}
 
-	return tx.Commit(ctx)
+	return tx.Commit(ctx), queryCount
 }
