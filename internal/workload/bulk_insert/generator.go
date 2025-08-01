@@ -359,13 +359,13 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 	if len(records) == 0 {
 		return nil
 	}
-	
+
 	copies := make([]DataRecord, len(records))
 	for i, record := range records {
 		// Create deep copies of slices to prevent corruption
 		tagsCopy := make([]string, len(record.Tags))
 		copy(tagsCopy, record.Tags)
-		
+
 		copies[i] = DataRecord{
 			ShortText:    record.ShortText,
 			MediumText:   record.MediumText,
@@ -531,16 +531,16 @@ func (g *Generator) formatStringArray(tags []string) interface{} {
 			quoted[i] = "\"\""
 			continue
 		}
-		
+
 		// Additional safety check: ensure tag has valid memory
 		// Create a new string to avoid potential memory corruption
 		safeTag := string([]byte(tag))
-		
+
 		// Ensure tag is reasonable length and escape it safely
 		if len(safeTag) > 1000 {
 			safeTag = safeTag[:1000] // Truncate very long tags
 		}
-		
+
 		// Use simple string replacement with additional safety
 		escaped := ""
 		if len(safeTag) > 0 {
