@@ -104,6 +104,9 @@ func main() {
 		},
 	}
 	rootCmd.AddCommand(versionCmd)
+	
+	// Plugins command
+	rootCmd.AddCommand(createPluginsCommand())
 
 	// File and setup options
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "Path to config file")
