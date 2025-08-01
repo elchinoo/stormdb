@@ -347,6 +347,10 @@ func (g *Generator) consumer(ctx context.Context, dbCtx context.Context, db *pgx
 			atomic.AddInt64(&metrics.TPS, 1)
 			atomic.AddInt64(&state.totalInserted, int64(len(records)))
 
+			// Record the actual rows inserted for rows-per-second metrics
+			atomic.AddInt64(&metrics.RowsModified, int64(len(records)))
+			metrics.RecordTimeSeriesQuery("INSERT", int64(len(records)))
+
 			// Record latency with proper storage for percentile calculations
 			latencyNs := duration.Nanoseconds()
 			metrics.RecordLatencyWithLimit(latencyNs)

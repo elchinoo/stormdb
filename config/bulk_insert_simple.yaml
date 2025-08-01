@@ -19,26 +19,19 @@ test_metadata:
 # Bulk Insert workload configuration
 workload: "bulk_insert"
 scale: 100
+duration: "30s"                 # Short duration for testing
+workers: 2                     # Minimal workers for testing
+connections: 4                 # Small connection pool
 
-# Simple progressive test - 4 bands testing different batch sizes
+# Simple progressive test - disabled for quick testing
 progressive:
-  enabled: true
-  strategy: "linear"
-  min_workers: 1
-  max_workers: 2
-  min_connections: 2
-  max_connections: 4
-  test_duration: "1m"           # Short 1-minute tests
-  warmup_duration: "10s"
-  cooldown_duration: "5s"
-  bands: 4
-  enable_analysis: true
+  enabled: false
 
 # Simple batch size progression for testing
 workload_config:
   ring_buffer_size: 1000        # Small buffer for testing
   producer_threads: 1           # Single producer for simplicity
-  batch_sizes: [1, 10, 100, 1000]  # Small progression for quick testing
+  batch_sizes: [100, 1000]  # Test larger batch sizes for quick testing
   test_insert_method: true      # Test both INSERT and COPY
   data_seed: 42                 # Fixed seed for reproducible tests
   max_memory_mb: 64
