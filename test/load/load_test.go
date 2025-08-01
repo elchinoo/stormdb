@@ -318,8 +318,8 @@ func hasPluginFiles() bool {
 	for _, path := range pluginPaths {
 		if entries, err := os.ReadDir(path); err == nil {
 			for _, entry := range entries {
-				if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".so") || 
-					strings.HasSuffix(entry.Name(), ".dll") || 
+				if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".so") ||
+					strings.HasSuffix(entry.Name(), ".dll") ||
 					strings.HasSuffix(entry.Name(), ".dylib")) {
 					return true
 				}
