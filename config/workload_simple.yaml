@@ -52,6 +52,43 @@ plugins:
     - "./build/plugins"
   files: []
   auto_load: true
+  
+  # Enhanced Plugin Security Configuration
+  security:
+    enabled: true
+    require_manifest: false        # Disabled by default for compatibility
+    allow_untrusted: true          # Enabled by default for development
+    manifest_path: "plugins/manifest.json"
+    max_plugin_memory: "50MB"      # Lower limit for simple workloads
+    trusted_authors:
+      - "stormdb-team"
+      - "your-organization"
+    validation:
+      verify_checksums: false      # Disabled by default for development
+      max_file_size: "25MB"        # Smaller limit for simple plugins
+      
+  # Memory Management Configuration  
+  memory:
+    enabled: true
+    max_total_memory: "512MB"      # Lower limit for simple workloads
+    max_plugin_memory: "50MB"
+    check_interval: "30s"
+    enable_gc_tuning: true
+    retention:
+      enabled: true
+      default_ttl: "30m"          # Shorter retention for simple workloads
+      max_collection_size: 5000    # Smaller collection size
+      memory_warn_threshold: 0.8
+      memory_alert_threshold: 0.95
+      
+  # Context Management Configuration
+  context:
+    plugin_load_timeout: "15s"     # Shorter timeout for simple plugins
+    health_check_interval: "3m"
+    health_check_timeout: "5s"
+    max_concurrent_loads: 3
+    max_retry_attempts: 3
+    retry_backoff: "1s"
 
 # =============================================================================
 # EXAMPLE 1: BASIC CONNECTION TEST (Default - Active Configuration)
