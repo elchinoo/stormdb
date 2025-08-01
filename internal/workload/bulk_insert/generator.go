@@ -143,7 +143,7 @@ func (g *Generator) runProgressiveTest(ctx context.Context, db *pgxpool.Pool, cf
 					bandIndex, state.totalBands, method, batchSize, workers, connections)
 
 				// Run this band
-				if err := g.runBand(ctx, db, cfg, metrics, bulkCfg, state, method, batchSize, workers, connections); err != nil {
+				if err := g.runBand(ctx, db, cfg, metrics, bulkCfg, state, method, batchSize, workers, connections, bandIndex, state.totalBands); err != nil {
 					return fmt.Errorf("band %d failed: %w", bandIndex, err)
 				}
 
@@ -182,7 +182,7 @@ func (g *Generator) runStandardTest(ctx context.Context, db *pgxpool.Pool, cfg *
 			log.Printf("🔄 Testing %s method with batch size %d for %v", method, batchSize, testDuration)
 
 			// Run this test with calculated duration
-			if err := g.runBand(ctx, db, cfg, metrics, bulkCfg, state, method, batchSize, cfg.Workers, cfg.Connections); err != nil {
+			if err := g.runBand(ctx, db, cfg, metrics, bulkCfg, state, method, batchSize, cfg.Workers, cfg.Connections, 0, 0); err != nil {
 				return fmt.Errorf("test %s/%d failed: %w", method, batchSize, err)
 			}
 		}
@@ -192,7 +192,7 @@ func (g *Generator) runStandardTest(ctx context.Context, db *pgxpool.Pool, cfg *
 }
 
 // runBand executes a single test band
-func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics, bulkCfg *BulkInsertConfig, state *WorkloadState, method string, batchSize, workers, connections int) error {
+func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics, bulkCfg *BulkInsertConfig, state *WorkloadState, method string, batchSize, workers, connections, bandIndex, totalBands int) error {
 	// Create context for this band
 	var duration time.Duration
 	var err error
@@ -269,8 +269,15 @@ func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 
 	// Log band results
 	produced, consumed, waitTime, utilization := state.ringBuffer.Stats()
-	log.Printf("✅ Band completed: produced=%d, consumed=%d, utilization=%.2f%%, wait_time=%v",
-		produced, consumed, utilization*100, time.Duration(waitTime))
+	if totalBands > 0 {
+		// Progressive test - include band information
+		log.Printf("✅ Band %d/%d completed (%s method, batch size %d): produced=%d, consumed=%d, utilization=%.2f%%, wait_time=%v",
+			bandIndex, totalBands, method, batchSize, produced, consumed, utilization*100, time.Duration(waitTime))
+	} else {
+		// Standard test - include method and batch size information
+		log.Printf("✅ Test completed (%s method, batch size %d): produced=%d, consumed=%d, utilization=%.2f%%, wait_time=%v",
+			method, batchSize, produced, consumed, utilization*100, time.Duration(waitTime))
+	}
 
 	return nil
 }
