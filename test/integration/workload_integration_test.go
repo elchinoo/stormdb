@@ -66,6 +66,15 @@ func TestSimpleWorkloadSetup(t *testing.T) {
 		t.Fatalf("Failed to initialize factory: %v", err)
 	}
 
+	// Discover available plugins
+	pluginCount, err := factory.DiscoverPlugins()
+	if err != nil {
+		t.Fatalf("Failed to discover plugins: %v", err)
+	}
+	if pluginCount == 0 {
+		t.Skip("No plugins found, skipping workload test")
+	}
+
 	w, err := factory.Get("simple")
 	if err != nil {
 		t.Fatalf("Failed to get simple workload: %v", err)
@@ -121,6 +130,15 @@ func TestTPCCWorkloadSetup(t *testing.T) {
 
 	if err := factory.Initialize(); err != nil {
 		t.Fatalf("Failed to initialize factory: %v", err)
+	}
+
+	// Discover available plugins
+	pluginCount, err := factory.DiscoverPlugins()
+	if err != nil {
+		t.Fatalf("Failed to discover plugins: %v", err)
+	}
+	if pluginCount == 0 {
+		t.Skip("No plugins found, skipping workload test")
 	}
 
 	w, err := factory.Get("tpcc")
@@ -271,6 +289,15 @@ func TestWorkloadExecution(t *testing.T) {
 				t.Fatalf("Failed to initialize factory: %v", err)
 			}
 
+			// Discover available plugins
+			pluginCount, err := factory.DiscoverPlugins()
+			if err != nil {
+				t.Fatalf("Failed to discover plugins: %v", err)
+			}
+			if pluginCount == 0 {
+				t.Skip("No plugins found, skipping workload test")
+			}
+
 			w, err := factory.Get(tc.workload)
 			if err != nil {
 				t.Fatalf("Failed to get workload: %v", err)
@@ -327,6 +354,9 @@ func getTestConfig(_ *testing.T) *types.Config {
 		Workers:     1,
 		Connections: 2,
 	}
+
+	// Configure plugins for integration tests
+	cfg.Plugins.Paths = []string{"../../build/plugins", "../../plugins"}
 
 	return cfg
 }
