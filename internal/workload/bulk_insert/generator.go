@@ -14,6 +14,7 @@ import (
 	"github.com/elchinoo/stormdb/pkg/types"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/viper"
 )
 
 // Generator implements the bulk insert workload with progressive scaling
@@ -557,8 +558,33 @@ func (g *Generator) parseBulkInsertConfig(cfg *types.Config) *BulkInsertConfig {
 		CollectMetrics:   true,
 	}
 
-	// Configuration would typically be parsed from YAML/config files
-	// For now, using defaults
+	// Parse workload_config section from Viper if available
+	if viper.IsSet("workload_config") {
+		if ringBufferSize := viper.GetInt("workload_config.ring_buffer_size"); ringBufferSize > 0 {
+			bulkCfg.RingBufferSize = ringBufferSize
+		}
+		if producerThreads := viper.GetInt("workload_config.producer_threads"); producerThreads > 0 {
+			bulkCfg.ProducerThreads = producerThreads
+		}
+		if batchSizes := viper.GetIntSlice("workload_config.batch_sizes"); len(batchSizes) > 0 {
+			bulkCfg.BatchSizes = batchSizes
+		}
+		if viper.IsSet("workload_config.test_insert_method") {
+			bulkCfg.TestInsertMethod = viper.GetBool("workload_config.test_insert_method")
+		}
+		if dataSeed := viper.GetInt64("workload_config.data_seed"); dataSeed != 0 {
+			bulkCfg.DataSeed = dataSeed
+		}
+		if maxMemoryMB := viper.GetInt("workload_config.max_memory_mb"); maxMemoryMB > 0 {
+			bulkCfg.MaxMemoryMB = maxMemoryMB
+		}
+		if viper.IsSet("workload_config.collect_metrics") {
+			bulkCfg.CollectMetrics = viper.GetBool("workload_config.collect_metrics")
+		}
+
+		log.Printf("📊 Parsed workload config: buffer=%d, producers=%d, batch_sizes=%v, methods=%t, seed=%d, memory=%dMB",
+			bulkCfg.RingBufferSize, bulkCfg.ProducerThreads, bulkCfg.BatchSizes, bulkCfg.TestInsertMethod, bulkCfg.DataSeed, bulkCfg.MaxMemoryMB)
+	}
 
 	// Sort batch sizes
 	sort.Ints(bulkCfg.BatchSizes)
