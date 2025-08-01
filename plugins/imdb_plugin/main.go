@@ -16,6 +16,7 @@ func (p *IMDBPlugin) GetMetadata() *plugin.PluginMetadata {
 	return &plugin.PluginMetadata{
 		Name:        "imdb",
 		Version:     "1.0.0",
+		APIVersion:  "1.0",
 		Description: "IMDB movie database workloads with complex queries and realistic data patterns",
 		Author:      "StormDB Team",
 		WorkloadTypes: []string{

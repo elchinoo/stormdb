@@ -17,6 +17,7 @@ func (p *VectorPlugin) GetMetadata() *plugin.PluginMetadata {
 	return &plugin.PluginMetadata{
 		Name:        "vector",
 		Version:     "2.0.0",
+		APIVersion:  "1.0",
 		Description: "Comprehensive pgvector testing with ingestion, updates, reads, indexes, and accuracy analysis",
 		Author:      "StormDB Team",
 		WorkloadTypes: []string{

@@ -78,13 +78,38 @@ func (g *Generator) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 
 // Run executes the bulk insert workload with progressive scaling
 func (g *Generator) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics) error {
+	// Validate inputs to prevent nil pointer dereferences
+	if ctx == nil {
+		return fmt.Errorf("context is nil")
+	}
+	if db == nil {
+		return fmt.Errorf("database pool is nil")
+	}
+	if cfg == nil {
+		return fmt.Errorf("config is nil")
+	}
+	if metrics == nil {
+		return fmt.Errorf("metrics is nil")
+	}
+
 	// Parse bulk insert specific configuration
 	bulkCfg := g.parseBulkInsertConfig(cfg)
+	if bulkCfg == nil {
+		return fmt.Errorf("failed to parse bulk insert configuration")
+	}
 
 	// Initialize workload state
 	state := &WorkloadState{
 		dataGenerator: NewDataGenerator(bulkCfg.DataSeed),
 		ringBuffer:    NewRingBuffer(bulkCfg.RingBufferSize),
+	}
+
+	// Validate state components
+	if state.dataGenerator == nil {
+		return fmt.Errorf("failed to create data generator")
+	}
+	if state.ringBuffer == nil {
+		return fmt.Errorf("failed to create ring buffer")
 	}
 
 	// Clear table before starting
@@ -108,11 +133,26 @@ func (g *Generator) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.Config
 
 // runProgressiveTest executes the workload with progressive scaling
 func (g *Generator) runProgressiveTest(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics, bulkCfg *BulkInsertConfig, state *WorkloadState) error {
+	// Validate inputs
+	if state == nil {
+		return fmt.Errorf("workload state is nil")
+	}
+	if bulkCfg == nil {
+		return fmt.Errorf("bulk config is nil")
+	}
+
 	progressiveCfg := cfg.Progressive
 
 	// Calculate test matrix: methods × batch sizes
 	methods := g.getTestMethodsList(bulkCfg)
 	batchSizes := bulkCfg.BatchSizes
+
+	if len(methods) == 0 {
+		return fmt.Errorf("no test methods configured")
+	}
+	if len(batchSizes) == 0 {
+		return fmt.Errorf("no batch sizes configured")
+	}
 
 	totalCombinations := len(methods) * len(batchSizes)
 	bandsPerCombination := progressiveCfg.Bands / totalCombinations
@@ -165,9 +205,24 @@ func (g *Generator) runProgressiveTest(ctx context.Context, db *pgxpool.Pool, cf
 
 // runStandardTest executes a standard (non-progressive) test
 func (g *Generator) runStandardTest(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics, bulkCfg *BulkInsertConfig, state *WorkloadState) error {
+	// Validate inputs
+	if state == nil {
+		return fmt.Errorf("workload state is nil")
+	}
+	if bulkCfg == nil {
+		return fmt.Errorf("bulk config is nil")
+	}
+
 	// For standard test, test all combinations sequentially
 	methods := g.getTestMethodsList(bulkCfg)
 	batchSizes := bulkCfg.BatchSizes
+
+	if len(methods) == 0 {
+		return fmt.Errorf("no test methods configured")
+	}
+	if len(batchSizes) == 0 {
+		return fmt.Errorf("no batch sizes configured")
+	}
 
 	durationPer, err := time.ParseDuration(cfg.Duration)
 	if err != nil {
@@ -194,6 +249,23 @@ func (g *Generator) runStandardTest(ctx context.Context, db *pgxpool.Pool, cfg *
 
 // runBand executes a single test band
 func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics, bulkCfg *BulkInsertConfig, state *WorkloadState, method string, batchSize, workers, connections, bandIndex, totalBands int) error {
+	// Validate inputs
+	if state == nil {
+		return fmt.Errorf("workload state is nil")
+	}
+	if state.ringBuffer == nil {
+		return fmt.Errorf("ring buffer is nil")
+	}
+	if bulkCfg == nil {
+		return fmt.Errorf("bulk config is nil")
+	}
+	if workers <= 0 {
+		return fmt.Errorf("invalid worker count: %d", workers)
+	}
+	if batchSize <= 0 {
+		return fmt.Errorf("invalid batch size: %d", batchSize)
+	}
+
 	// Create context for this band
 	var duration time.Duration
 	var err error
@@ -226,6 +298,9 @@ func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 		// Create a separate data generator for each producer thread to avoid race conditions
 		// since math/rand.Rand is not thread-safe
 		producerDataGen := NewDataGenerator(bulkCfg.DataSeed + int64(i))
+		if producerDataGen == nil {
+			return fmt.Errorf("failed to create producer data generator for thread %d", i)
+		}
 		go g.producer(producerCtx, state, bulkCfg, &state.producerWg, producerDataGen)
 	}
 
@@ -287,6 +362,20 @@ func (g *Generator) runBand(ctx context.Context, db *pgxpool.Pool, cfg *types.Co
 func (g *Generator) producer(ctx context.Context, state *WorkloadState, bulkCfg *BulkInsertConfig, wg *sync.WaitGroup, dataGen *DataGenerator) {
 	defer wg.Done()
 
+	// Validate inputs to prevent panics
+	if state == nil {
+		log.Printf("❌ Producer error: state is nil")
+		return
+	}
+	if state.ringBuffer == nil {
+		log.Printf("❌ Producer error: ring buffer is nil")
+		return
+	}
+	if dataGen == nil {
+		log.Printf("❌ Producer error: data generator is nil")
+		return
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -313,6 +402,24 @@ func (g *Generator) producer(ctx context.Context, state *WorkloadState, bulkCfg 
 func (g *Generator) consumer(ctx context.Context, dbCtx context.Context, db *pgxpool.Pool, state *WorkloadState, method string, batchSize int, metrics *types.Metrics, wg *sync.WaitGroup, workerID int) {
 	defer wg.Done()
 
+	// Validate inputs to prevent panics
+	if state == nil {
+		log.Printf("❌ Worker %d error: state is nil", workerID)
+		return
+	}
+	if state.ringBuffer == nil {
+		log.Printf("❌ Worker %d error: ring buffer is nil", workerID)
+		return
+	}
+	if db == nil {
+		log.Printf("❌ Worker %d error: database pool is nil", workerID)
+		return
+	}
+	if metrics == nil {
+		log.Printf("❌ Worker %d error: metrics is nil", workerID)
+		return
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -331,6 +438,10 @@ func (g *Generator) consumer(ctx context.Context, dbCtx context.Context, db *pgx
 
 		// Create defensive copies to prevent memory corruption issues
 		safeRecords := g.copyRecords(records)
+		if safeRecords == nil {
+			log.Printf("❌ Worker %d error: failed to create safe record copies", workerID)
+			continue
+		}
 
 		// Perform the insert operation using dbCtx which doesn't expire during test
 		start := time.Now()
@@ -347,7 +458,7 @@ func (g *Generator) consumer(ctx context.Context, dbCtx context.Context, db *pgx
 
 		duration := time.Since(start)
 
-		// Update metrics
+		// Update metrics with proper nil checking
 		if insertErr != nil {
 			atomic.AddInt64(&metrics.Errors, 1)
 			log.Printf("❌ Worker %d insert error: %v", workerID, insertErr)
@@ -518,6 +629,7 @@ func (g *Generator) performCopyInsert(ctx context.Context, db *pgxpool.Pool, rec
 // Helper functions
 
 func (g *Generator) parseBulkInsertConfig(cfg *types.Config) *BulkInsertConfig {
+	// Create default configuration to prevent nil pointer issues
 	bulkCfg := &BulkInsertConfig{
 		RingBufferSize:   100000,
 		ProducerThreads:  2,
@@ -554,6 +666,17 @@ func (g *Generator) parseBulkInsertConfig(cfg *types.Config) *BulkInsertConfig {
 
 		log.Printf("📊 Parsed workload config: buffer=%d, producers=%d, batch_sizes=%v, methods=%t, seed=%d, memory=%dMB",
 			bulkCfg.RingBufferSize, bulkCfg.ProducerThreads, bulkCfg.BatchSizes, bulkCfg.TestInsertMethod, bulkCfg.DataSeed, bulkCfg.MaxMemoryMB)
+	}
+
+	// Validate and sanitize configuration
+	if bulkCfg.RingBufferSize <= 0 {
+		bulkCfg.RingBufferSize = 100000
+	}
+	if bulkCfg.ProducerThreads <= 0 {
+		bulkCfg.ProducerThreads = 2
+	}
+	if len(bulkCfg.BatchSizes) == 0 {
+		bulkCfg.BatchSizes = []int{1, 100, 1000, 10000, 50000}
 	}
 
 	// Sort batch sizes
@@ -596,6 +719,9 @@ func (g *Generator) formatStringArray(tags []string) interface{} {
 }
 
 func (g *Generator) getTestMethods(bulkCfg *BulkInsertConfig) string {
+	if bulkCfg == nil {
+		return "INSERT only"
+	}
 	if bulkCfg.TestInsertMethod {
 		return "INSERT and COPY"
 	}
@@ -603,6 +729,9 @@ func (g *Generator) getTestMethods(bulkCfg *BulkInsertConfig) string {
 }
 
 func (g *Generator) getTestMethodsList(bulkCfg *BulkInsertConfig) []string {
+	if bulkCfg == nil {
+		return []string{"insert"}
+	}
 	if bulkCfg.TestInsertMethod {
 		return []string{"insert", "copy"}
 	}

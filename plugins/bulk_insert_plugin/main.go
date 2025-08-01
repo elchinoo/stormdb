@@ -25,6 +25,7 @@ func (p *BulkInsertWorkloadPlugin) GetMetadata() *plugin.PluginMetadata {
 	return &plugin.PluginMetadata{
 		Name:        "bulk_insert_plugin",
 		Version:     "1.0.0",
+		APIVersion:  "1.0",
 		Description: "High-throughput bulk insert performance testing with progressive scaling and bottleneck identification",
 		Author:      "StormDB Team",
 		WorkloadTypes: []string{
@@ -41,8 +42,15 @@ func (p *BulkInsertWorkloadPlugin) CreateWorkload(workloadType string) (plugin.W
 	if workloadType != "bulk_insert" {
 		return nil, fmt.Errorf("unsupported workload type: %s", workloadType)
 	}
+
+	// Create a new generator instance to avoid nil pointer issues
+	generator := &Generator{}
+	if generator == nil {
+		return nil, fmt.Errorf("failed to create generator instance")
+	}
+
 	return &BulkInsertWorkloadWrapper{
-		generator: &Generator{},
+		generator: generator,
 	}, nil
 } // Initialize performs plugin initialization
 func (p *BulkInsertWorkloadPlugin) Initialize() error {
@@ -63,15 +71,39 @@ type BulkInsertWorkloadWrapper struct {
 
 // Cleanup drops tables and reloads data (called only with --rebuild)
 func (w *BulkInsertWorkloadWrapper) Cleanup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
+	if w.generator == nil {
+		return fmt.Errorf("generator is nil")
+	}
 	return w.generator.Cleanup(ctx, db, cfg)
 }
 
 // Setup ensures schema exists (called with --setup or --rebuild)
 func (w *BulkInsertWorkloadWrapper) Setup(ctx context.Context, db *pgxpool.Pool, cfg *types.Config) error {
+	if w.generator == nil {
+		return fmt.Errorf("generator is nil")
+	}
 	return w.generator.Setup(ctx, db, cfg)
 }
 
 // Run executes the load test
 func (w *BulkInsertWorkloadWrapper) Run(ctx context.Context, db *pgxpool.Pool, cfg *types.Config, metrics *types.Metrics) error {
+	if w.generator == nil {
+		return fmt.Errorf("generator is nil")
+	}
+	if db == nil {
+		return fmt.Errorf("database pool is nil")
+	}
+	if cfg == nil {
+		return fmt.Errorf("config is nil")
+	}
+	if metrics == nil {
+		return fmt.Errorf("metrics is nil")
+	}
 	return w.generator.Run(ctx, db, cfg, metrics)
+}
+
+// main function is required for Go plugins
+func main() {
+	// This function is required for Go plugins to build properly
+	// It's not actually called when used as a plugin
 }

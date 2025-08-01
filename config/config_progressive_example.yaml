@@ -1,0 +1,104 @@
+# Progressive Scaling Test Configuration Example
+# This configuration demonstrates how to set up comprehensive progressive scaling tests
+# with mathematical analysis and advanced metrics collection.
+
+version: "1.0.0"
+
+# Database connection configuration
+database:
+  type: postgres
+  host: localhost
+  port: 5432
+  database: stormdb_test
+  username: postgres
+  password: password
+  sslmode: disable
+  
+  # Connection pool settings for progressive scaling
+  max_connections: 200
+  min_connections: 1
+  max_conn_lifetime: "1h"
+  max_conn_idle_time: "15m"
+  health_check_period: "5m"
+  connect_timeout: "30s"
+
+# Workload configuration
+workload:
+  type: "imdb"
+  duration: "5m"
+  workers: 50
+  connections: 50
+  scale: 1
+  summary_interval: "10s"
+  
+  # Progressive scaling configuration
+  progressive:
+    enabled: true
+    
+    # Scaling strategy: linear, exponential, or fibonacci
+    strategy: "linear"
+    
+    # Test progression parameters
+    bands: 5
+    min_workers: 10
+    max_workers: 100
+    min_connections: 10
+    max_connections: 200
+    
+    # Timing configuration
+    test_duration: "2m"
+    warmup_duration: "30s"
+    cooldown_duration: "15s"
+    
+    # Analysis and monitoring
+    enable_analysis: true
+    max_latency_samples: 10000
+    memory_limit_mb: 1024
+
+# Plugin configuration
+plugins:
+  paths:
+    - "./build/plugins"
+  auto_load: true
+  health_check_enabled: true
+  health_check_interval: "30s"
+  max_load_attempts: 3
+  load_timeout: "30s"
+
+# Metrics collection
+metrics:
+  enabled: true
+  interval: "5s"
+  latency_percentiles: [50, 90, 95, 99]
+  collect_pg_stats: true
+  pg_stats_statements: true
+  export_format: "json"
+  
+# Advanced configuration
+advanced:
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    timeout: "30s"
+    max_requests: 100
+    
+  resource_limits:
+    max_memory_mb: 2048
+    max_goroutines: 1000
+    max_file_descriptors: 1024
+    
+  error_handling:
+    max_retry_attempts: 3
+    retry_delay: "1s"
+    circuit_breaker_enabled: true
+    
+  observability:
+    tracing_enabled: false
+    metrics_enabled: true
+    health_check_interval: "30s"
+
+# Logging configuration
+logger:
+  level: "info"
+  format: "json"
+  development: false
