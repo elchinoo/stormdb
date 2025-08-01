@@ -39,6 +39,9 @@ type RingBuffer struct {
 	writeIndex int64 // Next position to write
 	readIndex  int64 // Next position to read
 
+	// Write completion flags - one per buffer slot
+	writeComplete []int32 // 1 when write is complete, 0 when in progress
+
 	// Statistics
 	produced   int64 // Total records produced
 	consumed   int64 // Total records consumed
@@ -62,9 +65,10 @@ func NewRingBuffer(capacity int) *RingBuffer {
 	}
 
 	return &RingBuffer{
-		buffer:   make([]DataRecord, capacity),
-		capacity: int64(capacity),
-		mask:     int64(capacity - 1),
+		buffer:        make([]DataRecord, capacity),
+		capacity:      int64(capacity),
+		mask:          int64(capacity - 1),
+		writeComplete: make([]int32, capacity),
 	}
 }
 
@@ -82,8 +86,18 @@ func (rb *RingBuffer) Push(record DataRecord) bool {
 
 		// Try to claim the write position
 		if atomic.CompareAndSwapInt64(&rb.writeIndex, writeIdx, writeIdx+1) {
-			// Successfully claimed position, write the data
-			rb.buffer[writeIdx&rb.mask] = record
+			// Successfully claimed position
+			pos := writeIdx & rb.mask
+
+			// Mark as write in progress (not complete)
+			atomic.StoreInt32(&rb.writeComplete[pos], 0)
+
+			// Write the data
+			rb.buffer[pos] = record
+
+			// Mark write as complete
+			atomic.StoreInt32(&rb.writeComplete[pos], 1)
+
 			atomic.AddInt64(&rb.produced, 1)
 			return true
 		}
@@ -103,10 +117,22 @@ func (rb *RingBuffer) Pop() (DataRecord, bool) {
 			return DataRecord{}, false
 		}
 
+		// Check if the write at this position is complete
+		pos := readIdx & rb.mask
+		if atomic.LoadInt32(&rb.writeComplete[pos]) == 0 {
+			// Write not complete yet, wait briefly and retry
+			time.Sleep(time.Nanosecond * 10)
+			continue
+		}
+
 		// Try to claim the read position
 		if atomic.CompareAndSwapInt64(&rb.readIndex, readIdx, readIdx+1) {
 			// Successfully claimed position, read the data
-			record := rb.buffer[readIdx&rb.mask]
+			record := rb.buffer[pos]
+
+			// Mark slot as available for reuse (optional optimization)
+			atomic.StoreInt32(&rb.writeComplete[pos], 0)
+
 			atomic.AddInt64(&rb.consumed, 1)
 			return record, true
 		}
