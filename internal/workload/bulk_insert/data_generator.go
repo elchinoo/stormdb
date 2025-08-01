@@ -168,30 +168,34 @@ func (dg *DataGenerator) generateBlob() []byte {
 	return blob
 }
 
-// Valid enum values that match the database schema
-var validStatusEnums = []string{"pending", "processing", "completed", "failed", "cancelled"}
-
 // isValidStatusEnum checks if the given status is valid
 func (dg *DataGenerator) isValidStatusEnum(status string) bool {
-	for _, valid := range validStatusEnums {
-		if status == valid {
-			return true
-		}
+	// Use explicit comparisons with string literals
+	switch status {
+	case "pending", "processing", "completed", "failed", "cancelled":
+		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // generateStatusEnum returns a random status value
 func (dg *DataGenerator) generateStatusEnum() string {
-	// Create a local copy to avoid any potential race conditions on shared data
-	localEnums := []string{"pending", "processing", "completed", "failed", "cancelled"}
-	
-	// Use simple random selection
-	idx := dg.rng.Intn(len(localEnums))
-	selected := localEnums[idx]
-	
-	// Additional safety: create a new string instance to avoid memory sharing
-	return string([]byte(selected))
+	// Use switch statement with hardcoded literals to eliminate any memory corruption
+	switch dg.rng.Intn(5) {
+	case 0:
+		return "pending"
+	case 1:
+		return "processing"
+	case 2:
+		return "completed"
+	case 3:
+		return "failed"
+	case 4:
+		return "cancelled"
+	default:
+		return "pending" // Should never happen, but safe fallback
+	}
 }
 
 // generateTags creates an array of tag strings

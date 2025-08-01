@@ -395,38 +395,45 @@ func (g *Generator) copyRecords(records []DataRecord) []DataRecord {
 
 // validateAndCopyStatusEnum ensures the status enum is valid and creates a safe copy
 func (g *Generator) validateAndCopyStatusEnum(status string) string {
-	validEnums := []string{"pending", "processing", "completed", "failed", "cancelled"}
-
-	// Create defensive copy
-	safeCopy := string([]byte(status))
-
-	// Validate the status
-	for _, valid := range validEnums {
-		if safeCopy == valid {
-			return safeCopy
-		}
+	// Use explicit comparisons with string literals to avoid any corruption
+	switch status {
+	case "pending":
+		return "pending"
+	case "processing":
+		return "processing"
+	case "completed":
+		return "completed"
+	case "failed":
+		return "failed"
+	case "cancelled":
+		return "cancelled"
+	default:
+		// If invalid, log and return a safe default
+		log.Printf("⚠️  Invalid status enum detected: %q, using 'pending' as fallback", status)
+		return "pending"
 	}
-
-	// If invalid, log and return a safe default
-	log.Printf("⚠️  Invalid status enum detected: %q, using 'pending' as fallback", safeCopy)
-	return "pending"
 }
 
 // validateStatusEnumForSQL performs final validation before SQL execution
 func (g *Generator) validateStatusEnumForSQL(status string) string {
-	validEnums := []string{"pending", "processing", "completed", "failed", "cancelled"}
-
-	// Validate the status
-	for _, valid := range validEnums {
-		if status == valid {
-			return status
-		}
+	// Use explicit comparisons with string literals for maximum safety
+	switch status {
+	case "pending":
+		return "pending"
+	case "processing":
+		return "processing"
+	case "completed":
+		return "completed"
+	case "failed":
+		return "failed"
+	case "cancelled":
+		return "cancelled"
+	default:
+		// If invalid, log error and return safe default
+		log.Printf("❌ Critical: Invalid enum at SQL execution: %q, substituting 'pending'", status)
+		return "pending"
 	}
-
-	// If invalid, log error and return safe default
-	log.Printf("❌ Critical: Invalid enum at SQL execution: %q, substituting 'pending'", status)
-	return "pending"
-}// performBatchInsert executes a batch INSERT operation
+} // performBatchInsert executes a batch INSERT operation
 func (g *Generator) performBatchInsert(ctx context.Context, db *pgxpool.Pool, records []DataRecord) error {
 	if len(records) == 0 {
 		return nil
