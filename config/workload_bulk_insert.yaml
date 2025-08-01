@@ -5,9 +5,9 @@ database:
   type: postgres
   host: "localhost"
   port: 5432
-  dbname: "stormdb_test"
+  dbname: "storm"
   username: "storm_usr"
-  password: "password"
+  password: "storm_pwd"
   sslmode: "disable"
 
 # Results backend configuration for comprehensive analytics
@@ -17,7 +17,7 @@ results_backend:
   port: 5432
   database: "stormdb_results"
   username: "storm_usr"
-  password: "password"
+  password: "storm_pwd"
   sslmode: "disable"
   retention_days: 30
   store_raw_metrics: true

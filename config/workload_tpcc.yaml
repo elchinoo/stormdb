@@ -24,7 +24,7 @@ database:
 #   port: 5432
 #   database: "stormdb_results"
 #   username: "storm_usr"
-#   password: "postgres"
+#   password: "storm_pwd"
 #   sslmode: "disable"
 #   retention_days: 90
 #   store_raw_metrics: true
@@ -62,10 +62,10 @@ workload: "tpcc"
 # =============================================================================
 # Small scale test for development and validation
 scale: 5                    # Number of warehouses (small scale for testing)
-duration: "5m"              # Short duration for quick tests
+duration: "2m"              # Short duration for quick tests
 workers: 4                  # Conservative worker count
 connections: 8              # Connection pool size
-summary_interval: "30s"     # Frequent progress updates
+summary_interval: "10s"     # Frequent progress updates
 
 # =============================================================================
 # EXAMPLE 2: PERFORMANCE TPC-C TEST (Commented)
