@@ -53,6 +53,43 @@ plugins:
   files:
     - "./build/plugins/vector_plugin.so"
   auto_load: true
+  
+  # Enhanced Plugin Security Configuration
+  security:
+    enabled: true
+    require_manifest: false        # Disabled by default for compatibility
+    allow_untrusted: true          # Enabled by default for development
+    manifest_path: "plugins/manifest.json"
+    max_plugin_memory: "200MB"     # Higher limit for vector operations
+    trusted_authors:
+      - "stormdb-team"
+      - "your-organization"
+    validation:
+      verify_checksums: false      # Disabled by default for development
+      max_file_size: "50MB"
+      
+  # Memory Management Configuration  
+  memory:
+    enabled: true
+    max_total_memory: "3GB"        # Higher limit for vector processing
+    max_plugin_memory: "200MB"
+    check_interval: "30s"
+    enable_gc_tuning: true
+    retention:
+      enabled: true
+      default_ttl: "1h"
+      max_collection_size: 15000   # Larger for vector similarity results
+      memory_warn_threshold: 0.85  # Higher threshold for vector workloads
+      memory_alert_threshold: 0.95
+      
+  # Context Management Configuration
+  context:
+    plugin_load_timeout: "60s"     # Longer timeout for vector plugin
+    health_check_interval: "5m"
+    health_check_timeout: "20s"    # Longer timeout for vector operations
+    max_concurrent_loads: 2        # Lower concurrency for memory-intensive operations
+    max_retry_attempts: 3
+    retry_backoff: "3s"
 
 # =============================================================================
 # EXAMPLE 1: VECTOR COSINE SIMILARITY (Default - Active Configuration)

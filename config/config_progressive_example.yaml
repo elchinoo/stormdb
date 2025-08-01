@@ -64,6 +64,44 @@ plugins:
   health_check_interval: "30s"
   max_load_attempts: 3
   load_timeout: "30s"
+  
+  # Enhanced Plugin Security Configuration - Progressive Example
+  security:
+    enabled: true
+    require_manifest: false        # Disabled for example flexibility
+    allow_untrusted: true          # Enabled for example purposes
+    manifest_path: "plugins/manifest.json"
+    max_plugin_memory: "150MB"
+    trusted_authors:
+      - "stormdb-team"
+      - "example-team"
+      - "progressive-testing-team"
+    validation:
+      verify_checksums: false      # Disabled for example flexibility
+      max_file_size: "75MB"
+      
+  # Memory Management Configuration - Progressive Example
+  memory:
+    enabled: true
+    max_total_memory: "2GB"
+    max_plugin_memory: "150MB"
+    check_interval: "15s"
+    enable_gc_tuning: true
+    retention:
+      enabled: true
+      default_ttl: "30m"
+      max_collection_size: 10000   # Moderate size for examples
+      memory_warn_threshold: 0.70  # Lower threshold for example alerts
+      memory_alert_threshold: 0.85
+      
+  # Context Management Configuration - Progressive Example
+  context:
+    plugin_load_timeout: "45s"
+    health_check_interval: "1m"
+    health_check_timeout: "10s"
+    max_concurrent_loads: 6
+    max_retry_attempts: 3
+    retry_backoff: "1.5s"
 
 # Metrics collection
 metrics:

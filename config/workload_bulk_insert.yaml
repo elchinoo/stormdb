@@ -39,6 +39,44 @@ plugins:
     - "./plugins"
     - "./build/plugins"
   auto_load: true
+  
+  # Enhanced Plugin Security Configuration - Bulk Insert Production
+  security:
+    enabled: true
+    require_manifest: true         # Required for bulk insert production
+    allow_untrusted: false         # Strict security for production
+    manifest_path: "plugins/manifest.json"
+    max_plugin_memory: "500MB"     # Higher limit for bulk operations
+    trusted_authors:
+      - "stormdb-team"
+      - "bulk-operations-team"
+      - "data-engineering-team"
+    validation:
+      verify_checksums: true       # Required for production bulk operations
+      max_file_size: "200MB"       # Larger plugins for bulk operations
+      
+  # Memory Management Configuration - Bulk Insert Optimized
+  memory:
+    enabled: true
+    max_total_memory: "8GB"        # Much higher limit for bulk operations
+    max_plugin_memory: "500MB"
+    check_interval: "5s"           # Frequent checks during bulk operations
+    enable_gc_tuning: true
+    retention:
+      enabled: true
+      default_ttl: "2h"            # Longer retention for bulk operations
+      max_collection_size: 50000   # Large collections for bulk data
+      memory_warn_threshold: 0.75
+      memory_alert_threshold: 0.90
+      
+  # Context Management Configuration - Bulk Insert Optimized
+  context:
+    plugin_load_timeout: "120s"    # Much longer timeout for bulk plugins
+    health_check_interval: "1m"    
+    health_check_timeout: "30s"    # Longer health check timeout
+    max_concurrent_loads: 12       # More concurrent loads for bulk operations
+    max_retry_attempts: 5          # More retries for reliability
+    retry_backoff: "3s"
 
 # Bulk Insert workload configuration
 workload: "bulk_insert"        # Use the bulk insert workload
