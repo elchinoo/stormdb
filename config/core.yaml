@@ -1,0 +1,30 @@
+# StormDB v0.4-alpha Core Configuration
+database:
+  host: "localhost"
+  port: 5432
+  database: "stormdb"
+  username: "postgres"
+  password: "postgres"
+  ssl_mode: "disable"
+  max_connections: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+
+api:
+  host: "localhost"
+  port: 8080
+  grpc:
+    enabled: true
+    port: 9090
+
+logging:
+  level: "info"
+  format: "text"  # "text" or "json"aa
+  output: "stdout"  # "stdout", "stderr", or file path
+
+scheduler:
+  worker_pool_size: 10
+
+plugin_dirs:
+  - "./build/plugins"
+  - "/usr/local/lib/stormdb/plugins"

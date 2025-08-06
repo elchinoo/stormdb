@@ -1,0 +1,156 @@
+# Bulk Load Plugin Configuration Examples
+
+# Quick Test Configuration
+quick_test:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  username: "stormdb"
+  password: "stormdb_password"
+  ssl_mode: "disable"
+  batch_sizes: [1, 100, 1000]
+  connections: 10
+  duration: "2m"
+  warmup_time: "10s"
+  think_time: "5ms"
+  table_name: "quick_bulk_test"
+  drop_table: true
+  generate_data: true
+  data_columns: 5
+  verbose: true
+
+# Standard Bulk Load Test
+standard_test:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  username: "stormdb"
+  password: "stormdb_password"
+  ssl_mode: "disable"
+  batch_sizes: [1, 1000, 10000, 50000]
+  connections: 20
+  duration: "5m"
+  warmup_time: "30s"
+  think_time: "10ms"
+  table_name: "bulk_test_data"
+  drop_table: true
+  generate_data: true
+  data_columns: 10
+  index_columns: ["data_int_4", "data_text_1"]
+  verbose: false
+
+# Large Scale Test
+large_scale_test:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  username: "stormdb"
+  password: "stormdb_password"
+  ssl_mode: "disable"
+  batch_sizes: [1000, 10000, 50000, 100000]
+  connections: 50
+  duration: "10m"
+  warmup_time: "1m"
+  think_time: "5ms"
+  table_name: "large_bulk_test"
+  drop_table: true
+  generate_data: true
+  data_columns: 20
+  index_columns: ["data_int_4", "data_text_1", "data_float_6"]
+  verbose: false
+
+# Performance Comparison Test
+perf_comparison_test:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  username: "stormdb"
+  password: "stormdb_password"
+  ssl_mode: "disable"
+  batch_sizes: [1, 10, 100, 500, 1000, 5000, 10000, 25000, 50000]
+  connections: 20
+  duration: "3m"
+  warmup_time: "30s"
+  think_time: "10ms"
+  table_name: "perf_bulk_test"
+  drop_table: true
+  generate_data: true
+  data_columns: 8
+  verbose: false
+
+# Minimal Configuration (using defaults)
+minimal_test:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  username: "stormdb"
+  password: "stormdb_password"
+  # All other settings will use defaults:
+  # batch_sizes: [1, 1000, 10000, 50000]
+  # connections: 20
+  # duration: "5m"
+  # warmup_time: "30s"
+  # think_time: "10ms"
+  # table_name: "bulk_test_data"
+  # drop_table: true
+  # generate_data: true
+  # data_columns: 10
+  # ssl_mode: "disable"
+
+# Production Environment Test
+production_test:
+  host: "prod-db.example.com"
+  port: 5432
+  database: "production_db"
+  username: "bulk_test_user"
+  password: "${BULK_TEST_PASSWORD}"  # Use environment variable
+  ssl_mode: "require"
+  batch_sizes: [1000, 10000, 50000]
+  connections: 30
+  duration: "15m"
+  warmup_time: "2m"
+  think_time: "100ms"
+  table_name: "bulk_performance_test"
+  drop_table: false  # Don't drop table in production
+  generate_data: true
+  data_columns: 15
+  index_columns: ["data_int_4", "data_text_1", "data_float_6", "created_at"]
+  verbose: false
+
+# Memory Optimized Test (smaller batches, more connections)
+memory_optimized_test:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  username: "stormdb"
+  password: "stormdb_password"
+  ssl_mode: "disable"
+  batch_sizes: [10, 100, 1000, 5000]
+  connections: 100
+  duration: "5m"
+  warmup_time: "30s"
+  think_time: "1ms"
+  table_name: "memory_bulk_test"
+  drop_table: true
+  generate_data: true
+  data_columns: 5
+  verbose: false
+
+# Latency Focused Test (emphasis on response times)
+latency_test:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  username: "stormdb"
+  password: "stormdb_password"
+  ssl_mode: "disable"
+  batch_sizes: [1, 10, 100, 1000]
+  connections: 5
+  duration: "10m"
+  warmup_time: "1m"
+  think_time: "50ms"
+  table_name: "latency_bulk_test"
+  drop_table: true
+  generate_data: true
+  data_columns: 3
+  verbose: true

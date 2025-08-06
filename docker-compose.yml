@@ -1,115 +1,145 @@
+# StormDB v2 Docker Compose - Development and Testing Environment
 version: '3.8'
 
 services:
   # PostgreSQL database for testing
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     container_name: stormdb-postgres
     environment:
-      POSTGRES_DB: storm
-      POSTGRES_USER: stormdb
-      POSTGRES_PASSWORD: stormdb123
-      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+      POSTGRES_DB: tpcc_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./test/fixtures:/docker-entrypoint-initdb.d
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - stormdb-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stormdb -d storm"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - stormdb
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=1000
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
 
-  # PostgreSQL with pgvector extension for vector workloads
-  postgres-vector:
-    image: pgvector/pgvector:pg16
-    container_name: stormdb-postgres-vector
-    environment:
-      POSTGRES_DB: storm_vector
-      POSTGRES_USER: stormdb
-      POSTGRES_PASSWORD: stormdb123
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_vector_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stormdb -d storm_vector"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - stormdb
-
-  # StormDB application (for testing)
+  # StormDB v2 application
   stormdb:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: stormdb-app
+    container_name: stormdb-v2
+    ports:
+      - "8080:8080"
+    environment:
+      # Database connection
+      STORMDB_DATABASE_HOST: postgres
+      STORMDB_DATABASE_PORT: 5432
+      STORMDB_DATABASE_NAME: tpcc_test
+      STORMDB_DATABASE_USER: postgres
+      STORMDB_DATABASE_PASSWORD: postgres
+      STORMDB_DATABASE_SSL_MODE: disable
+      STORMDB_DATABASE_MAX_CONNECTIONS: 50
+      
+      # API configuration
+      STORMDB_API_HOST: 0.0.0.0
+      STORMDB_API_PORT: 8080
+      
+      # Logging
+      STORMDB_LOGGING_LEVEL: info
+      STORMDB_LOGGING_FORMAT: json
+      STORMDB_LOGGING_OUTPUT: stdout
+      
+      # Scheduler
+      STORMDB_SCHEDULER_ENABLED: true
+      STORMDB_SCHEDULER_WORKER_POOL_SIZE: 10
+      
+      # Plugin directory
+      STORMDB_PLUGIN_DIR: /var/lib/stormdb/plugins
+    volumes:
+      - stormdb_data:/app/data
+      - stormdb_logs:/app/logs
+      - ./config:/app/config
+    networks:
+      - stormdb-network
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./config:/app/config:ro
-      - ./data:/app/data
-      - stormdb_logs:/app/logs
-    environment:
-      - STORMDB_DB_HOST=postgres
-      - STORMDB_DB_PORT=5432
-      - STORMDB_DB_NAME=storm
-      - STORMDB_DB_USER=stormdb
-      - STORMDB_DB_PASSWORD=stormdb123
-    networks:
-      - stormdb
-    command: ["--config", "/app/config/config_simple_connection.yaml"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
 
-  # Monitoring stack (optional)
+  # Grafana for monitoring (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: stormdb-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    networks:
+      - stormdb-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Prometheus for metrics collection (optional)
   prometheus:
     image: prom/prometheus:latest
     container_name: stormdb-prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     networks:
-      - stormdb
-    profiles:
-      - monitoring
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: stormdb-grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    networks:
-      - stormdb
+      - stormdb-network
+    restart: unless-stopped
     profiles:
       - monitoring
 
 volumes:
   postgres_data:
-  postgres_vector_data:
+    driver: local
+  stormdb_data:
+    driver: local
   stormdb_logs:
-  prometheus_data:
+    driver: local
   grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
 
 networks:
-  stormdb:
+  stormdb-network:
     driver: bridge
+
+# Environment profiles:
+# Default: docker-compose up (stormdb + postgres)
+# With monitoring: docker-compose --profile monitoring up
+# Development: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
