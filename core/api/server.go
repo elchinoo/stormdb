@@ -169,8 +169,9 @@ func (s *Server) handleListPlugins(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetPlugin(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
+	version := r.URL.Query().Get("version") // Get version from query param
 
-	plugin, err := s.coreServices.Plugin.GetPlugin(name)
+	plugin, err := s.coreServices.Plugin.GetPlugin(name, version)
 	if err != nil {
 		s.writeErrorResponse(w, http.StatusNotFound, "plugin not found", err)
 		return
@@ -205,10 +206,12 @@ func (s *Server) handleReloadPlugins(w http.ResponseWriter, r *http.Request) {
 // Create test run endpoint
 func (s *Server) handleCreateTestRun(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		PluginName  string                 `json:"plugin_name"`
-		Name        string                 `json:"name"`
-		Description string                 `json:"description"`
-		Config      map[string]interface{} `json:"config"`
+		PluginName    string                 `json:"plugin_name"`
+		PluginVersion string                 `json:"plugin_version"` // Optional
+		Name          string                 `json:"name"`
+		Description   string                 `json:"description"`
+		Config        map[string]interface{} `json:"config"`
+		Rebuild       bool                   `json:"rebuild"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -222,9 +225,22 @@ func (s *Server) handleCreateTestRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Schedule test
+	// Get the specific plugin version if provided, otherwise get the latest
+	plugin, err := s.coreServices.Plugin.GetPlugin(req.PluginName, req.PluginVersion)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "plugin not found", err)
+		return
+	}
+
+	// Add rebuild flag to config
+	if req.Config == nil {
+		req.Config = make(map[string]interface{})
+	}
+	req.Config["rebuild"] = req.Rebuild
+
+	// Schedule test with the specific plugin instance
 	ctx := r.Context()
-	runID, err := s.coreServices.Scheduler.ScheduleTest(ctx, req.PluginName, req.Config)
+	runID, err := s.coreServices.Scheduler.ScheduleTest(ctx, plugin, req.Config)
 	if err != nil {
 		s.writeErrorResponse(w, http.StatusInternalServerError, "failed to schedule test", err)
 		return

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Core service status enumeration
+// Service status enumeration
 type ServiceStatus string
 
 const (
@@ -76,6 +76,7 @@ type SchedulerConfig struct {
 
 // PluginMetadata contains plugin registration information
 type PluginMetadata struct {
+	ID           int               `json:"id,omitempty"`
 	Name         string            `yaml:"name" json:"name"`
 	Version      string            `yaml:"version" json:"version"`
 	Description  string            `yaml:"description" json:"description"`
@@ -92,7 +93,6 @@ type TestRun struct {
 	ID          int64                  `json:"id"`
 	TestTypeID  int                    `json:"test_type_id"`
 	PluginID    int                    `json:"plugin_id"`
-	PluginVer   string                 `json:"plugin_version"`
 	Host        string                 `json:"host"`
 	Port        int                    `json:"port"`
 	DBName      string                 `json:"db_name"`
@@ -107,13 +107,13 @@ type TestRun struct {
 
 // TestResult represents a single measurement from a test execution
 type TestResult struct {
-	ID        int64     `json:"id"`
-	TestRunID int64     `json:"test_run_id"`
-	MetricID  int       `json:"metric_id"`
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
-	Value     float64   `json:"value"`
-	Tags      string    `json:"tags"` // JSON string for flexible metadata
+	ID        int64                  `json:"id"`
+	TestRunID int64                  `json:"test_run_id"`
+	MetricID  int                    `json:"metric_id"`
+	StartTime time.Time              `json:"start_time"`
+	EndTime   time.Time              `json:"end_time"`
+	Value     float64                `json:"value"`
+	Tags      map[string]interface{} `json:"tags,omitempty"` // Flexible metadata, stored as JSONB
 }
 
 // TestType represents a category of tests (e.g., bulk_insert, read_latency)
@@ -257,7 +257,7 @@ type SchedulerManager interface {
 	CancelTask(taskID string) error
 
 	// Test execution orchestration
-	ScheduleTest(ctx context.Context, pluginName string, config map[string]interface{}) (int64, error)
+	ScheduleTest(ctx context.Context, plugin Plugin, config map[string]interface{}) (int64, error)
 	CancelTest(ctx context.Context, runID int64) error
 	GetRunStatus(ctx context.Context, runID int64) (ServiceStatus, error)
 	ListActiveRuns(ctx context.Context) ([]TestRun, error)
@@ -271,7 +271,7 @@ type PluginManager interface {
 	UnloadPlugins() error
 
 	// Plugin registry
-	GetPlugin(name string) (Plugin, error)
+	GetPlugin(name string, version string) (Plugin, error)
 	GetLoadedPlugins() []Plugin
 	ListPlugins() []PluginMetadata
 

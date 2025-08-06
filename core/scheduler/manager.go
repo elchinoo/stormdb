@@ -41,12 +41,12 @@ type scheduledTask struct {
 
 // TestExecutionTask implements the Task interface for test execution
 type TestExecutionTask struct {
-	id         string
-	pluginName string
-	config     map[string]interface{}
-	storage    core.StorageManager
-	plugin     core.PluginManager
-	logger     core.Logger
+	id      string
+	plugin  core.Plugin
+	config  map[string]interface{}
+	storage core.StorageManager
+	logger  core.Logger
+	runID   int64
 }
 
 // NewManager creates a new scheduler manager
@@ -243,23 +243,43 @@ func (m *Manager) CancelTask(taskID string) error {
 }
 
 // ScheduleTest schedules a test execution
-func (m *Manager) ScheduleTest(ctx context.Context, pluginName string, config map[string]interface{}) (int64, error) {
-	// Get plugin
-	plugin, err := m.pluginManager.GetPlugin(pluginName)
+func (m *Manager) ScheduleTest(ctx context.Context, plugin core.Plugin, config map[string]interface{}) (int64, error) {
+	pluginMeta := plugin.Metadata()
+
+	// Ensure plugin has an ID from the database.
+	if pluginMeta.ID == 0 {
+		// If the ID is missing, it means the plugin wasn't registered correctly.
+		// Attempt to look it up from storage.
+		p, err := m.storage.GetPlugin(ctx, pluginMeta.Name, pluginMeta.Version)
+		if err != nil {
+			return 0, fmt.Errorf("plugin '%s v%s' is not registered in the database and could not be found: %w", pluginMeta.Name, pluginMeta.Version, err)
+		}
+		pluginMeta.ID = p.ID
+	}
+
+	// Get the primary test type for the plugin
+	if len(pluginMeta.TestTypes) == 0 {
+		return 0, fmt.Errorf("plugin %s has no declared test types", pluginMeta.Name)
+	}
+	primaryTestTypeCode := pluginMeta.TestTypes[0]
+
+	// Look up the test type ID from storage
+	testType, err := m.storage.GetTestType(ctx, primaryTestTypeCode)
 	if err != nil {
-		return 0, fmt.Errorf("plugin %s not found: %w", pluginName, err)
+		return 0, fmt.Errorf("failed to get test type '%s': %w. It should have been auto-registered when the plugin was loaded", primaryTestTypeCode, err)
 	}
 
 	// Create test run record
 	testRun := &core.TestRun{
-		Name:        fmt.Sprintf("Test run %s", time.Now().Format("2006-01-02 15:04:05")),
-		Description: fmt.Sprintf("Scheduled test execution for plugin %s", pluginName),
+		Name:        fmt.Sprintf("Test run for %s v%s", pluginMeta.Name, pluginMeta.Version),
+		Description: fmt.Sprintf("Scheduled test execution for plugin %s", pluginMeta.Name),
 		Status:      core.StatusPending,
 		Config:      config,
-		PluginVer:   plugin.Metadata().Version,
-		Host:        "localhost", // Default, should come from config
-		Port:        5432,        // Default, should come from config
-		DBName:      "test",      // Default, should come from config
+		PluginID:    pluginMeta.ID, // Use the now-guaranteed-to-be-correct ID
+		TestTypeID:  testType.ID,   // Use the looked-up ID
+		Host:        "localhost",   // Default, should come from config
+		Port:        5432,          // Default, should come from config
+		DBName:      "test",        // Default, should come from config
 	}
 
 	runID, err := m.storage.CreateTestRun(ctx, testRun)
@@ -269,22 +289,31 @@ func (m *Manager) ScheduleTest(ctx context.Context, pluginName string, config ma
 
 	// Create execution task
 	task := &TestExecutionTask{
-		id:         fmt.Sprintf("test-%d", runID),
-		pluginName: pluginName,
-		config:     config,
-		storage:    m.storage,
-		plugin:     m.pluginManager,
-		logger:     m.logger,
+		id:      fmt.Sprintf("test-%d", runID),
+		plugin:  plugin,
+		config:  config,
+		storage: m.storage,
+		logger:  m.logger,
+		runID:   runID,
 	}
 
 	// Submit for execution
 	if err := m.SubmitTask(task); err != nil {
+		// Rollback test run creation
+		// It's important to handle this to avoid orphaned test_run records
+		if rollbackErr := m.storage.UpdateTestRunStatus(ctx, runID, core.StatusFailed); rollbackErr != nil {
+			m.logger.Error("failed to rollback test run status",
+				core.Field{Key: "test_run_id", Value: runID},
+				core.Field{Key: "error", Value: rollbackErr.Error()},
+			)
+		}
 		return 0, fmt.Errorf("failed to submit test task: %w", err)
 	}
 
 	m.logger.Info("test scheduled",
 		core.Field{Key: "test_run_id", Value: runID},
-		core.Field{Key: "plugin", Value: pluginName},
+		core.Field{Key: "plugin", Value: plugin.Metadata().Name},
+		core.Field{Key: "version", Value: plugin.Metadata().Version},
 	)
 
 	return runID, nil
@@ -452,23 +481,48 @@ func (t *TestExecutionTask) Type() string {
 func (t *TestExecutionTask) Execute(ctx context.Context) error {
 	t.logger.Info("executing test",
 		core.Field{Key: "task_id", Value: t.id},
-		core.Field{Key: "plugin", Value: t.pluginName},
+		core.Field{Key: "plugin", Value: t.plugin.Metadata().Name},
+		core.Field{Key: "run_id", Value: t.runID},
 	)
 
-	// Get plugin
-	plugin, err := t.plugin.GetPlugin(t.pluginName)
-	if err != nil {
-		return fmt.Errorf("failed to get plugin: %w", err)
+	// Update status to running
+	if err := t.storage.UpdateTestRunStatus(ctx, t.runID, core.StatusRunning); err != nil {
+		t.logger.Error("failed to update test run status to running",
+			core.Field{Key: "run_id", Value: t.runID},
+			core.Field{Key: "error", Value: err.Error()},
+		)
+		return fmt.Errorf("failed to update test run status: %w", err)
 	}
 
 	// Execute plugin
-	if err := plugin.Execute(ctx, t.config); err != nil {
-		return fmt.Errorf("plugin execution failed: %w", err)
+	err := t.plugin.Execute(ctx, t.config)
+
+	// Update status based on execution result
+	var finalStatus core.ServiceStatus
+	if err != nil {
+		finalStatus = core.StatusFailed
+		t.logger.Error("plugin execution failed",
+			core.Field{Key: "task_id", Value: t.id},
+			core.Field{Key: "error", Value: err.Error()},
+		)
+	} else {
+		finalStatus = core.StatusSucceeded
+		t.logger.Info("test execution completed successfully",
+			core.Field{Key: "task_id", Value: t.id},
+		)
 	}
 
-	t.logger.Info("test execution completed",
-		core.Field{Key: "task_id", Value: t.id},
-	)
+	if statusErr := t.storage.UpdateTestRunStatus(ctx, t.runID, finalStatus); statusErr != nil {
+		t.logger.Error("failed to update final test run status",
+			core.Field{Key: "run_id", Value: t.runID},
+			core.Field{Key: "error", Value: statusErr.Error()},
+		)
+		// Return original error if it exists, otherwise return status update error
+		if err != nil {
+			return fmt.Errorf("plugin execution failed (%v) and status update failed (%v)", err, statusErr)
+		}
+		return fmt.Errorf("failed to update test run status: %w", statusErr)
+	}
 
-	return nil
+	return err
 }

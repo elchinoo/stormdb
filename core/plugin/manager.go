@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"plugin"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -94,12 +95,28 @@ func (m *Manager) LoadPlugin(path string) (core.Plugin, error) {
 
 	// Register in storage
 	if m.storage != nil {
-		_, err := m.storage.RegisterPlugin(context.Background(), metadata)
+		pluginID, err := m.storage.RegisterPlugin(context.Background(), metadata)
 		if err != nil {
 			m.logger.Warn("failed to register plugin in storage",
 				core.Field{Key: "plugin", Value: metadata.Name},
 				core.Field{Key: "error", Value: err.Error()},
 			)
+		} else {
+			// After registering the plugin, also register its declared test types
+			for _, testTypeCode := range metadata.TestTypes {
+				// A more robust implementation might fetch name/description from a central registry
+				// For now, we use the code as the name and provide a default description.
+				_, err := m.storage.RegisterTestType(context.Background(), testTypeCode, testTypeCode, "Auto-registered test type for plugin "+metadata.Name)
+				if err != nil {
+					m.logger.Warn("failed to auto-register test type for plugin",
+						core.Field{Key: "plugin", Value: metadata.Name},
+						core.Field{Key: "test_type", Value: testTypeCode},
+						core.Field{Key: "error", Value: err.Error()},
+					)
+				}
+			}
+			// IMPORTANT: Update the in-memory metadata with the ID from the database
+			metadata.ID = pluginID
 		}
 	}
 
@@ -204,24 +221,45 @@ func (m *Manager) UnloadPlugins() error {
 	return nil
 }
 
-// GetPlugin retrieves a loaded plugin by name (latest version)
-func (m *Manager) GetPlugin(name string) (core.Plugin, error) {
+// GetPlugin retrieves a loaded plugin by name and optional version.
+// If version is empty, it returns the latest available version.
+func (m *Manager) GetPlugin(name string, version string) (core.Plugin, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Look for exact match first
-	if plugin, exists := m.plugins[name]; exists {
-		return plugin, nil
+	// If version is specified, look for an exact match.
+	if version != "" {
+		pluginKey := fmt.Sprintf("%s@%s", name, version)
+		if plugin, exists := m.plugins[pluginKey]; exists {
+			return plugin, nil
+		}
+		return nil, fmt.Errorf("plugin %s with version %s not found", name, version)
 	}
 
-	// Look for name@version pattern
+	// If version is not specified, find the latest version.
+	var latestPlugin core.Plugin
+	var latestVersion string
+
 	for key, plugin := range m.plugins {
 		if strings.HasPrefix(key, name+"@") {
-			return plugin, nil
+			parts := strings.Split(key, "@")
+			if len(parts) != 2 {
+				continue // Should not happen with our key format
+			}
+			currentVersion := parts[1]
+
+			if latestPlugin == nil || isNewerVersion(currentVersion, latestVersion) {
+				latestVersion = currentVersion
+				latestPlugin = plugin
+			}
 		}
 	}
 
-	return nil, fmt.Errorf("plugin %s not found", name)
+	if latestPlugin == nil {
+		return nil, fmt.Errorf("plugin %s not found", name)
+	}
+
+	return latestPlugin, nil
 }
 
 // GetLoadedPlugins returns all loaded plugins
@@ -414,6 +452,32 @@ func (m *Manager) calculateSHA256(filePath string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+}
+
+// isNewerVersion compares two semantic version strings.
+// It returns true if v1 is newer than v2.
+// This is a simplified implementation for formats like X.Y.Z.
+func isNewerVersion(v1, v2 string) bool {
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+
+	for i := 0; i < len(parts1) && i < len(parts2); i++ {
+		// For simplicity, we ignore non-numeric parts for now.
+		// A proper implementation would use a semantic versioning library.
+		n1, _ := strconv.Atoi(parts1[i])
+		n2, _ := strconv.Atoi(parts2[i])
+
+		if n1 > n2 {
+			return true
+		}
+		if n1 < n2 {
+			return false
+		}
+	}
+
+	// If all parts are equal, the one with more parts is newer
+	// e.g., 1.0.1 is newer than 1.0
+	return len(parts1) > len(parts2)
 }
 
 // isValidVersion performs basic semantic version validation

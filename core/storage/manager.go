@@ -35,8 +35,8 @@ func (m *Manager) CreateTestRun(ctx context.Context, run *core.TestRun) (int64, 
 
 	query := `
 		INSERT INTO test_run 
-		(test_type_id, plugin_id, plugin_ver, host, port, db_name, name, description, status, config)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		(test_type_id, plugin_id, host, port, db_name, name, description, status, config)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
 	`
 
@@ -49,7 +49,6 @@ func (m *Manager) CreateTestRun(ctx context.Context, run *core.TestRun) (int64, 
 	err = db.QueryRowContext(ctx, query,
 		run.TestTypeID,
 		run.PluginID,
-		run.PluginVer,
 		run.Host,
 		run.Port,
 		run.DBName,
@@ -119,7 +118,7 @@ func (m *Manager) UpdateTestRunStatus(ctx context.Context, runID int64, status c
 // GetTestRun retrieves a test run by ID
 func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, error) {
 	query := `
-		SELECT id, test_type_id, plugin_id, plugin_ver, host, port, db_name, 
+		SELECT id, test_type_id, plugin_id, host, port, db_name, 
 		       name, description, status, config, created_at, start_time, end_time
 		FROM test_run 
 		WHERE id = $1
@@ -138,7 +137,6 @@ func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, e
 		&run.ID,
 		&run.TestTypeID,
 		&run.PluginID,
-		&run.PluginVer,
 		&run.Host,
 		&run.Port,
 		&run.DBName,
@@ -177,7 +175,7 @@ func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, e
 // ListTestRuns retrieves test runs with pagination
 func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.TestRun, error) {
 	query := `
-		SELECT id, test_type_id, plugin_id, plugin_ver, host, port, db_name, 
+		SELECT id, test_type_id, plugin_id, host, port, db_name, 
 		       name, description, status, config, created_at, start_time, end_time
 		FROM test_run 
 		ORDER BY created_at DESC
@@ -205,7 +203,6 @@ func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.T
 			&run.ID,
 			&run.TestTypeID,
 			&run.PluginID,
-			&run.PluginVer,
 			&run.Host,
 			&run.Port,
 			&run.DBName,
@@ -341,7 +338,11 @@ func (m *Manager) GetResults(ctx context.Context, runID int64) ([]core.TestResul
 		}
 
 		// Unmarshal tags
-		result.Tags = string(tagsJSON)
+		if tagsJSON != nil {
+			if err := json.Unmarshal(tagsJSON, &result.Tags); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
+			}
+		}
 
 		results = append(results, result)
 	}
@@ -389,7 +390,11 @@ func (m *Manager) GetResultsByMetric(ctx context.Context, metricCode string, lim
 			return nil, fmt.Errorf("failed to scan result: %w", err)
 		}
 
-		result.Tags = string(tagsJSON)
+		if tagsJSON != nil {
+			if err := json.Unmarshal(tagsJSON, &result.Tags); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
+			}
+		}
 		results = append(results, result)
 	}
 
@@ -473,8 +478,7 @@ func (m *Manager) RegisterPlugin(ctx context.Context, metadata core.PluginMetada
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (name, version) DO UPDATE SET 
 			sha256 = EXCLUDED.sha256,
-			metadata = EXCLUDED.metadata,
-			updated_at = now()
+			metadata = EXCLUDED.metadata
 		RETURNING id
 	`
 
@@ -501,7 +505,7 @@ func (m *Manager) RegisterPlugin(ctx context.Context, metadata core.PluginMetada
 // GetPlugin retrieves a plugin by name and version
 func (m *Manager) GetPlugin(ctx context.Context, name, version string) (*core.PluginMetadata, error) {
 	query := `
-		SELECT metadata
+		SELECT id, metadata
 		FROM plugin 
 		WHERE name = $1 AND version = $2 AND is_active = true
 	`
@@ -512,7 +516,8 @@ func (m *Manager) GetPlugin(ctx context.Context, name, version string) (*core.Pl
 	}
 
 	var metadataJSON []byte
-	err = db.QueryRowContext(ctx, query, name, version).Scan(&metadataJSON)
+	var metadata core.PluginMetadata
+	err = db.QueryRowContext(ctx, query, name, version).Scan(&metadata.ID, &metadataJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("plugin %s v%s not found", name, version)
@@ -520,7 +525,6 @@ func (m *Manager) GetPlugin(ctx context.Context, name, version string) (*core.Pl
 		return nil, fmt.Errorf("failed to get plugin: %w", err)
 	}
 
-	var metadata core.PluginMetadata
 	if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
 	}
