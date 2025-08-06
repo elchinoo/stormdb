@@ -23,6 +23,10 @@ SOURCES := $(wildcard *.go)
 .PHONY: all
 all: build
 
+# Alias for consistency with other plugins
+.PHONY: plugin
+plugin: build
+
 # Build the plugin
 .PHONY: build
 build: $(PLUGIN_OUTPUT)
