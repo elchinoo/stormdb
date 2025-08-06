@@ -31,6 +31,12 @@ type BulkLoadPlugin struct {
 	workersMu      sync.RWMutex   // Protect access to currentWorkers
 	currentBatch   int            // Current batch size being tested
 	currentBatchMu sync.RWMutex   // Protect access to currentBatch
+
+	// Previous metrics for delta calculation
+	prevTransactions int64         // Previous total transactions
+	prevRows         int64         // Previous total rows
+	prevSaveTime     time.Time     // Previous save time for rate calculation
+	prevMetricsMu    sync.RWMutex  // Protect access to previous metrics
 }
 
 // BulkLoadConfig defines the configuration for bulk load tests
@@ -482,6 +488,13 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 	p.currentBatch = 0
 	p.currentBatchMu.Unlock()
 
+	// Reset previous metrics tracking
+	p.prevMetricsMu.Lock()
+	p.prevTransactions = 0
+	p.prevRows = 0
+	p.prevSaveTime = time.Time{}
+	p.prevMetricsMu.Unlock()
+
 	return nil
 }
 
@@ -655,6 +668,13 @@ func (p *BulkLoadPlugin) runBatchTest(ctx context.Context, batchSize int) (*Batc
 	p.currentBatchMu.Lock()
 	p.currentBatch = batchSize
 	p.currentBatchMu.Unlock()
+
+	// Initialize previous metrics for delta calculation
+	p.prevMetricsMu.Lock()
+	p.prevTransactions = 0
+	p.prevRows = 0
+	p.prevSaveTime = time.Time{} // Reset to zero value
+	p.prevMetricsMu.Unlock()
 
 	// Warmup phase
 	p.logger.Info("Starting warmup phase", core.Field{Key: "duration", Value: p.config.WarmupTime})
@@ -985,97 +1005,113 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 		return nil
 	}
 
-	// Calculate current live metrics from active workers
+	// Calculate current live totals from active workers
 	var liveTransactions, liveRows int64
 	var totalLatency time.Duration
-	var minLatency, maxLatency time.Duration = time.Hour, 0
+	var operationCount int64
 
 	for _, worker := range currentWorkers {
 		if worker != nil {
 			transactions := atomic.LoadInt64(&worker.Transactions)
 			rows := atomic.LoadInt64(&worker.RowsInserted)
-
+			
 			liveTransactions += transactions
 			liveRows += rows
 			totalLatency += worker.TotalLatency
-
-			if worker.MinLatency < minLatency && worker.MinLatency > 0 {
-				minLatency = worker.MinLatency
-			}
-			if worker.MaxLatency > maxLatency {
-				maxLatency = worker.MaxLatency
-			}
+			operationCount += transactions
 		}
 	}
 
-	// Only save if we have actual data
-	if liveTransactions > 0 {
-		// Calculate rates (per second since last save)
-		secondsSinceStart := now.Sub(p.testStarted).Seconds()
-		if secondsSinceStart > 0 {
-			transactionRate := float64(liveTransactions) / secondsSinceStart
-			rowRate := float64(liveRows) / secondsSinceStart
+	// Get previous values for delta calculation
+	p.prevMetricsMu.Lock()
+	prevTransactions := p.prevTransactions
+	prevRows := p.prevRows
+	prevTime := p.prevSaveTime
+	
+	// Calculate deltas (incremental values since last save)
+	deltaTransactions := liveTransactions - prevTransactions
+	deltaRows := liveRows - prevRows
+	timeDelta := now.Sub(prevTime).Seconds()
+	
+	// Update previous values for next iteration
+	p.prevTransactions = liveTransactions
+	p.prevRows = liveRows
+	p.prevSaveTime = now
+	p.prevMetricsMu.Unlock()
 
-			// Store current transaction rate
-			results = append(results, core.TestResult{
-				TestRunID:         testRunID,
-				MetricID:          throughputMetric.ID,
-				StartTime:         p.testStarted,
-				EndTime:           now,
-				Value:             transactionRate,
-				ActiveConnections: &activeConnections,
-				ActiveWorkers:     &activeWorkers,
-				Tags: map[string]interface{}{
-					"metric_type":        "current_transaction_rate",
-					"iteration":          iteration,
-					"connections":        p.config.Connections,
-					"batch_size":         currentBatchSize,
-					"total_transactions": liveTransactions,
-					"total_rows":         liveRows,
-					"test_phase":         "measurement",
-				},
-			})
+	// Skip first iteration since we don't have previous values yet
+	if prevTime.IsZero() || timeDelta <= 0 {
+		return nil
+	}
 
-			// Store current row insertion rate
-			results = append(results, core.TestResult{
-				TestRunID:         testRunID,
-				MetricID:          rowInsertMetric.ID,
-				StartTime:         p.testStarted,
-				EndTime:           now,
-				Value:             rowRate,
-				ActiveConnections: &activeConnections,
-				ActiveWorkers:     &activeWorkers,
-				Tags: map[string]interface{}{
-					"metric_type":        "current_row_rate",
-					"iteration":          iteration,
-					"connections":        p.config.Connections,
-					"batch_size":         currentBatchSize,
-					"total_transactions": liveTransactions,
-					"total_rows":         liveRows,
-					"test_phase":         "measurement",
-				},
-			})
-		}
+	// Only save if we have incremental data
+	if deltaTransactions > 0 && timeDelta > 0 {
+		// Calculate rates per second for this interval
+		transactionRate := float64(deltaTransactions) / timeDelta
+		rowRate := float64(deltaRows) / timeDelta
 
-		// Calculate and store current average latency
-		if liveTransactions > 0 {
-			avgLatencyMs := float64(totalLatency.Nanoseconds()) / float64(liveTransactions) / 1000000.0
+		// Store incremental transaction rate
+		results = append(results, core.TestResult{
+			TestRunID:         testRunID,
+			MetricID:          throughputMetric.ID,
+			StartTime:         prevTime,
+			EndTime:           now,
+			Value:             transactionRate,
+			ActiveConnections: &activeConnections,
+			ActiveWorkers:     &activeWorkers,
+			Tags: map[string]interface{}{
+				"metric_type":        "interval_transaction_rate",
+				"iteration":          iteration,
+				"connections":        p.config.Connections,
+				"batch_size":         currentBatchSize,
+				"interval_transactions": deltaTransactions,
+				"interval_rows":      deltaRows,
+				"interval_seconds":   timeDelta,
+				"test_phase":         "measurement",
+			},
+		})
+
+		// Store incremental row insertion rate
+		results = append(results, core.TestResult{
+			TestRunID:         testRunID,
+			MetricID:          rowInsertMetric.ID,
+			StartTime:         prevTime,
+			EndTime:           now,
+			Value:             rowRate,
+			ActiveConnections: &activeConnections,
+			ActiveWorkers:     &activeWorkers,
+			Tags: map[string]interface{}{
+				"metric_type":        "interval_row_rate",
+				"iteration":          iteration,
+				"connections":        p.config.Connections,
+				"batch_size":         currentBatchSize,
+				"interval_transactions": deltaTransactions,
+				"interval_rows":      deltaRows,
+				"interval_seconds":   timeDelta,
+				"test_phase":         "measurement",
+			},
+		})
+
+		// Calculate average latency for this interval (using current running average)
+		if operationCount > 0 {
+			avgLatencyMs := float64(totalLatency.Nanoseconds()) / float64(operationCount) / 1000000.0
 
 			results = append(results, core.TestResult{
 				TestRunID:         testRunID,
 				MetricID:          latencyAvgMetric.ID,
-				StartTime:         p.testStarted,
+				StartTime:         prevTime,
 				EndTime:           now,
 				Value:             avgLatencyMs,
 				ActiveConnections: &activeConnections,
 				ActiveWorkers:     &activeWorkers,
 				Tags: map[string]interface{}{
-					"metric_type":        "current_avg_latency",
+					"metric_type":        "interval_avg_latency",
 					"iteration":          iteration,
 					"connections":        p.config.Connections,
 					"batch_size":         currentBatchSize,
-					"total_transactions": liveTransactions,
-					"total_rows":         liveRows,
+					"interval_transactions": deltaTransactions,
+					"interval_rows":      deltaRows,
+					"interval_seconds":   timeDelta,
 					"test_phase":         "measurement",
 				},
 			})
@@ -1083,20 +1119,19 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 	}
 
 	if len(results) > 0 {
-		p.logger.Debug("Saving current batch metrics",
+		p.logger.Debug("Saving interval metrics",
 			core.Field{Key: "test_run_id", Value: testRunID},
 			core.Field{Key: "result_count", Value: len(results)},
 			core.Field{Key: "iteration", Value: iteration},
 			core.Field{Key: "batch_size", Value: currentBatchSize},
-			core.Field{Key: "live_transactions", Value: liveTransactions})
+			core.Field{Key: "delta_transactions", Value: deltaTransactions},
+			core.Field{Key: "interval_seconds", Value: timeDelta})
 
 		return p.core.Storage.StoreResults(ctx, results)
 	}
 
 	return nil
-}
-
-// storeResults converts plugin metrics to core.TestResult and stores them in the database
+}// storeResults converts plugin metrics to core.TestResult and stores them in the database
 func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 	if p.core == nil || p.core.Storage == nil {
 		return fmt.Errorf("core services not available")
