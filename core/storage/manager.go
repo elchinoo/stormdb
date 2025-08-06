@@ -314,8 +314,15 @@ func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.T
 // StoreResults stores test results in batch
 func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) error {
 	if len(results) == 0 {
+		m.logger.Warn("StoreResults called with empty results array")
 		return nil
 	}
+
+	m.logger.Info("StoreResults called",
+		core.Field{Key: "result_count", Value: len(results)},
+		core.Field{Key: "first_test_run_id", Value: results[0].TestRunID},
+		core.Field{Key: "first_metric_id", Value: results[0].MetricID},
+	)
 
 	db, err := m.db.GetConnection(ctx)
 	if err != nil {
@@ -342,11 +349,18 @@ func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) e
 	defer stmt.Close()
 
 	// Insert each result
-	for _, result := range results {
+	for i, result := range results {
 		tagsJSON, err := json.Marshal(result.Tags)
 		if err != nil {
-			return fmt.Errorf("failed to marshal tags: %w", err)
+			return fmt.Errorf("failed to marshal tags for result %d: %w", i, err)
 		}
+
+		m.logger.Debug("Inserting result",
+			core.Field{Key: "index", Value: i},
+			core.Field{Key: "test_run_id", Value: result.TestRunID},
+			core.Field{Key: "metric_id", Value: result.MetricID},
+			core.Field{Key: "value", Value: result.Value},
+		)
 
 		_, err = stmt.ExecContext(ctx,
 			result.TestRunID,
@@ -357,7 +371,7 @@ func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) e
 			tagsJSON,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to insert result: %w", err)
+			return fmt.Errorf("failed to insert result %d: %w", i, err)
 		}
 	}
 
@@ -365,9 +379,8 @@ func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) e
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	m.logger.Info("test results stored",
-		core.Field{Key: "result_count", Value: len(results)},
-		core.Field{Key: "test_run_id", Value: results[0].TestRunID},
+	m.logger.Info("Successfully stored results to database",
+		core.Field{Key: "stored_count", Value: len(results)},
 	)
 
 	return nil

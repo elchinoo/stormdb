@@ -1116,12 +1116,19 @@ func (p *TPCCPlugin) storeResults(ctx context.Context) error {
 		testRunID = 0
 	}
 
+	// Look up metric IDs from database instead of using hardcoded values
+	throughputMetric, err := p.core.Storage.GetMetric(ctx, "THROUGHPUT")
+	if err != nil {
+		return fmt.Errorf("failed to get THROUGHPUT metric: %w", err)
+	}
+
+	latencyAvgMetric, err := p.core.Storage.GetMetric(ctx, "LATENCY_AVG")
+	if err != nil {
+		return fmt.Errorf("failed to get LATENCY_AVG metric: %w", err)
+	}
+
 	var results []core.TestResult
 	now := time.Now()
-
-	// Get metric IDs (we should really look these up, but for now use hardcoded IDs)
-	transactionMetricID := 2 // TRANSACTION_RATE
-	latencyMetricID := 7     // LATENCY_AVG
 
 	p.metrics.mu.RLock()
 	defer p.metrics.mu.RUnlock()
@@ -1134,7 +1141,7 @@ func (p *TPCCPlugin) storeResults(ctx context.Context) error {
 		// Store total transaction rate
 		results = append(results, core.TestResult{
 			TestRunID: testRunID,
-			MetricID:  transactionMetricID,
+			MetricID:  throughputMetric.ID,
 			StartTime: p.testStarted,
 			EndTime:   now,
 			Value:     float64(totalTxns),
@@ -1149,7 +1156,7 @@ func (p *TPCCPlugin) storeResults(ctx context.Context) error {
 		avgLatencyMs := float64(p.metrics.TotalLatency.Nanoseconds()) / float64(totalTxns) / 1000000.0
 		results = append(results, core.TestResult{
 			TestRunID: testRunID,
-			MetricID:  latencyMetricID,
+			MetricID:  latencyAvgMetric.ID,
 			StartTime: p.testStarted,
 			EndTime:   now,
 			Value:     avgLatencyMs,
@@ -1173,7 +1180,7 @@ func (p *TPCCPlugin) storeResults(ctx context.Context) error {
 			if count > 0 {
 				results = append(results, core.TestResult{
 					TestRunID: testRunID,
-					MetricID:  transactionMetricID,
+					MetricID:  throughputMetric.ID,
 					StartTime: p.testStarted,
 					EndTime:   now,
 					Value:     float64(count),
@@ -1187,6 +1194,12 @@ func (p *TPCCPlugin) storeResults(ctx context.Context) error {
 			}
 		}
 	}
+
+	p.logger.Info("Storing TPCC test results",
+		core.Field{Key: "test_run_id", Value: testRunID},
+		core.Field{Key: "result_count", Value: len(results)},
+		core.Field{Key: "total_transactions", Value: totalTxns},
+	)
 
 	// Store all results
 	return p.core.Storage.StoreResults(ctx, results)

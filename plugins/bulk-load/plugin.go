@@ -449,6 +449,8 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 	if err := p.storeResults(ctx); err != nil {
 		p.logger.Error("Failed to store test results", core.Field{Key: "error", Value: err.Error()})
 		// Don't fail the entire test, just log the error
+	} else {
+		p.logger.Info("Test results stored successfully")
 	}
 
 	return nil
@@ -820,19 +822,26 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 		testRunID = 0
 	}
 
+	// Look up metric IDs from database instead of using hardcoded values
+	rowInsertMetric, err := p.core.Storage.GetMetric(ctx, "ROW_INSERT")
+	if err != nil {
+		return fmt.Errorf("failed to get ROW_INSERT metric: %w", err)
+	}
+
+	latencyAvgMetric, err := p.core.Storage.GetMetric(ctx, "LATENCY_AVG")
+	if err != nil {
+		return fmt.Errorf("failed to get LATENCY_AVG metric: %w", err)
+	}
+
 	var results []core.TestResult
 	now := time.Now()
-
-	// Get metric IDs (we should really look these up, but for now use hardcoded IDs)
-	rowInsertMetricID := 1 // ROW_INSERT
-	latencyMetricID := 7   // LATENCY_AVG
 
 	// Convert each batch result to database format
 	for _, batch := range p.metrics.BatchResults {
 		// Store transaction rate
 		results = append(results, core.TestResult{
 			TestRunID: testRunID,
-			MetricID:  rowInsertMetricID,
+			MetricID:  rowInsertMetric.ID,
 			StartTime: p.metrics.StartTime,
 			EndTime:   now,
 			Value:     batch.TransactionsPerSec,
@@ -846,7 +855,7 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 		// Store rows per second
 		results = append(results, core.TestResult{
 			TestRunID: testRunID,
-			MetricID:  rowInsertMetricID,
+			MetricID:  rowInsertMetric.ID,
 			StartTime: p.metrics.StartTime,
 			EndTime:   now,
 			Value:     batch.RowsPerSec,
@@ -860,7 +869,7 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 		// Store average latency
 		results = append(results, core.TestResult{
 			TestRunID: testRunID,
-			MetricID:  latencyMetricID,
+			MetricID:  latencyAvgMetric.ID,
 			StartTime: p.metrics.StartTime,
 			EndTime:   now,
 			Value:     batch.AvgLatencyMs,
@@ -872,8 +881,27 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 		})
 	}
 
+	p.logger.Info("Storing test results",
+		core.Field{Key: "test_run_id", Value: testRunID},
+		core.Field{Key: "result_count", Value: len(results)},
+		core.Field{Key: "batch_count", Value: len(p.metrics.BatchResults)},
+		core.Field{Key: "metrics_start_time", Value: p.metrics.StartTime},
+		core.Field{Key: "metrics_end_time", Value: p.metrics.EndTime},
+		core.Field{Key: "total_transactions", Value: p.metrics.TotalTransactions},
+		core.Field{Key: "total_rows", Value: p.metrics.TotalRowsInserted},
+	)
+
 	// Store all results
-	return p.core.Storage.StoreResults(ctx, results)
+	storeErr := p.core.Storage.StoreResults(ctx, results)
+	if storeErr != nil {
+		p.logger.Error("Failed to store results to database", core.Field{Key: "error", Value: storeErr.Error()})
+		return storeErr
+	}
+
+	p.logger.Info("Successfully stored test results to database",
+		core.Field{Key: "stored_results", Value: len(results)},
+	)
+	return nil
 }
 
 // NewPlugin returns the plugin instance (required for plugin loading)
