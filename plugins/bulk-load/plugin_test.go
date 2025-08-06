@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 )
 
 // MockLogger implements the core.Logger interface for testing

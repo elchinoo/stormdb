@@ -1,4 +1,4 @@
-// Package bulkload implements a bulk load performance test plugin for StormDB v2
+// Package bulkload implements a bulk load performance test plugin for StormDB v0.4-alpha.1
 // This plugin tests different batch sizes with a fixed number of connections
 package main
 
@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 	_ "github.com/lib/pq"
 )
 

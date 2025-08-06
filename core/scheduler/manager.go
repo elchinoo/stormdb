@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 )
 
 // Manager implements the SchedulerManager interface

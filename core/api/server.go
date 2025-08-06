@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 	"github.com/gorilla/mux"
 )
 

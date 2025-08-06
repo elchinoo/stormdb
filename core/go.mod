@@ -1,4 +1,4 @@
-module github.com/elchinoo/stormdb/v2/core
+module github.com/elchinoo/stormdb/core
 
 go 1.21
 

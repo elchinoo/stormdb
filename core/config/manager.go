@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 	"gopkg.in/yaml.v3"
 )
 

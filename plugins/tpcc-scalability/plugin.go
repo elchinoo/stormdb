@@ -1,4 +1,4 @@
-// Package tpcc implements a TPC-C inspired scalability test plugin for StormDB v2
+// Package tpcc implements a TPC-C inspired scalability test plugin for StormDB v0.4-alpha.1
 // This plugin performs incremental connection testing with configurable parameters
 package main
 
@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 	_ "github.com/lib/pq"
 )
 

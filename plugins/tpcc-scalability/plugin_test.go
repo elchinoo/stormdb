@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 	_ "github.com/lib/pq"
 )
 

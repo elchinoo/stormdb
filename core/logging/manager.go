@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 )
 
 // Manager implements the Logger interface

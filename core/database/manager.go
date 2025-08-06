@@ -1,4 +1,4 @@
-// Package database provides database connection management for StormDB v2
+// Package database provides database connection management for StormDB v0.4-alpha.1
 // Handles connection pooling, health monitoring, and schema migration
 package database
 
@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 

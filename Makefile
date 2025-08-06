@@ -1,4 +1,4 @@
-# StormDB v2 Makefile
+# StormDB v0.4-alpha.1 Makefile
 
 .PHONY: build clean test install deps run dev plugins build-all test-all
 
@@ -146,12 +146,12 @@ security:
 # Docker build
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t stormdb:v2 .
+	docker build -t stormdb:v0.4-alpha.1 .
 
 # Docker run
 docker-run:
 	@echo "Running Docker container..."
-	docker run -p 8080:8080 -p 5432:5432 stormdb:v2
+	docker run -p 8080:8080 -p 5432:5432 stormdb:v0.4-alpha.1
 
 # Development setup
 setup-dev:

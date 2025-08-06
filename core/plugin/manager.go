@@ -1,4 +1,4 @@
-// Package plugin provides dynamic plugin loading for StormDB v2
+// Package plugin provides dynamic plugin loading for StormDB v0.4-alpha.1
 // Handles plugin discovery, loading, validation, and lifecycle management
 package plugin
 
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/elchinoo/stormdb/v2/core"
+	"github.com/elchinoo/stormdb/core"
 )
 
 // Manager implements the PluginManager interface

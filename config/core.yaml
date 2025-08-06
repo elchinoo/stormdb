@@ -1,4 +1,4 @@
-# StormDB v2 Core Configuration
+# StormDB v0.4-alpha.1 Core Configuration
 database:
   host: "localhost"
   port: 5432
