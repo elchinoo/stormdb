@@ -33,10 +33,10 @@ type BulkLoadPlugin struct {
 	currentBatchMu sync.RWMutex   // Protect access to currentBatch
 
 	// Previous metrics for delta calculation
-	prevTransactions int64         // Previous total transactions
-	prevRows         int64         // Previous total rows
-	prevSaveTime     time.Time     // Previous save time for rate calculation
-	prevMetricsMu    sync.RWMutex  // Protect access to previous metrics
+	prevTransactions int64        // Previous total transactions
+	prevRows         int64        // Previous total rows
+	prevSaveTime     time.Time    // Previous save time for rate calculation
+	prevMetricsMu    sync.RWMutex // Protect access to previous metrics
 }
 
 // BulkLoadConfig defines the configuration for bulk load tests
@@ -1014,7 +1014,7 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 		if worker != nil {
 			transactions := atomic.LoadInt64(&worker.Transactions)
 			rows := atomic.LoadInt64(&worker.RowsInserted)
-			
+
 			liveTransactions += transactions
 			liveRows += rows
 			totalLatency += worker.TotalLatency
@@ -1027,12 +1027,12 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 	prevTransactions := p.prevTransactions
 	prevRows := p.prevRows
 	prevTime := p.prevSaveTime
-	
+
 	// Calculate deltas (incremental values since last save)
 	deltaTransactions := liveTransactions - prevTransactions
 	deltaRows := liveRows - prevRows
 	timeDelta := now.Sub(prevTime).Seconds()
-	
+
 	// Update previous values for next iteration
 	p.prevTransactions = liveTransactions
 	p.prevRows = liveRows
@@ -1060,14 +1060,14 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 			ActiveConnections: &activeConnections,
 			ActiveWorkers:     &activeWorkers,
 			Tags: map[string]interface{}{
-				"metric_type":        "interval_transaction_rate",
-				"iteration":          iteration,
-				"connections":        p.config.Connections,
-				"batch_size":         currentBatchSize,
+				"metric_type":           "interval_transaction_rate",
+				"iteration":             iteration,
+				"connections":           p.config.Connections,
+				"batch_size":            currentBatchSize,
 				"interval_transactions": deltaTransactions,
-				"interval_rows":      deltaRows,
-				"interval_seconds":   timeDelta,
-				"test_phase":         "measurement",
+				"interval_rows":         deltaRows,
+				"interval_seconds":      timeDelta,
+				"test_phase":            "measurement",
 			},
 		})
 
@@ -1081,14 +1081,14 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 			ActiveConnections: &activeConnections,
 			ActiveWorkers:     &activeWorkers,
 			Tags: map[string]interface{}{
-				"metric_type":        "interval_row_rate",
-				"iteration":          iteration,
-				"connections":        p.config.Connections,
-				"batch_size":         currentBatchSize,
+				"metric_type":           "interval_row_rate",
+				"iteration":             iteration,
+				"connections":           p.config.Connections,
+				"batch_size":            currentBatchSize,
 				"interval_transactions": deltaTransactions,
-				"interval_rows":      deltaRows,
-				"interval_seconds":   timeDelta,
-				"test_phase":         "measurement",
+				"interval_rows":         deltaRows,
+				"interval_seconds":      timeDelta,
+				"test_phase":            "measurement",
 			},
 		})
 
@@ -1105,14 +1105,14 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 				ActiveConnections: &activeConnections,
 				ActiveWorkers:     &activeWorkers,
 				Tags: map[string]interface{}{
-					"metric_type":        "interval_avg_latency",
-					"iteration":          iteration,
-					"connections":        p.config.Connections,
-					"batch_size":         currentBatchSize,
+					"metric_type":           "interval_avg_latency",
+					"iteration":             iteration,
+					"connections":           p.config.Connections,
+					"batch_size":            currentBatchSize,
 					"interval_transactions": deltaTransactions,
-					"interval_rows":      deltaRows,
-					"interval_seconds":   timeDelta,
-					"test_phase":         "measurement",
+					"interval_rows":         deltaRows,
+					"interval_seconds":      timeDelta,
+					"test_phase":            "measurement",
 				},
 			})
 		}
@@ -1131,7 +1131,7 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 	}
 
 	return nil
-}// storeResults converts plugin metrics to core.TestResult and stores them in the database
+} // storeResults converts plugin metrics to core.TestResult and stores them in the database
 func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 	if p.core == nil || p.core.Storage == nil {
 		return fmt.Errorf("core services not available")
@@ -1191,7 +1191,6 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 				"batch_size":         batch.BatchSize,
 				"total_transactions": batch.TotalTransactions,
 				"total_rows":         batch.TotalRowsInserted,
-				"batch_count":        len(p.metrics.BatchResults),
 				"test_phase":         "final_results",
 			},
 		})
@@ -1212,7 +1211,6 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 				"batch_size":         batch.BatchSize,
 				"total_transactions": batch.TotalTransactions,
 				"total_rows":         batch.TotalRowsInserted,
-				"batch_count":        len(p.metrics.BatchResults),
 				"test_phase":         "final_results",
 			},
 		})
@@ -1233,7 +1231,6 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 				"batch_size":         batch.BatchSize,
 				"total_transactions": batch.TotalTransactions,
 				"total_rows":         batch.TotalRowsInserted,
-				"batch_count":        len(p.metrics.BatchResults),
 				"test_phase":         "final_results",
 			},
 		})
