@@ -99,7 +99,7 @@ index_columns: []
 
 #### Request
 ```bash
-curl -X POST http://localhost:8080/api/v1/test-runs \
+curl -X POST http://localhost:8080/test-runs \
   -H "Content-Type: application/json" \
   -d '{
     "plugin_name": "bulk-copy",
@@ -155,7 +155,7 @@ curl -X POST http://localhost:8080/api/v1/test-runs \
 
 #### Request
 ```bash
-curl -X GET http://localhost:8080/api/v1/test-runs/12345
+curl -X GET http://localhost:8080/test-runs/12345
 ```
 
 #### Response
@@ -189,7 +189,7 @@ curl -X GET http://localhost:8080/api/v1/test-runs/12345
 
 #### Request
 ```bash
-curl -X GET http://localhost:8080/api/v1/test-runs/12345/results
+curl -X GET http://localhost:8080/test-runs/12345/results
 ```
 
 #### Response
@@ -244,15 +244,14 @@ curl -X GET http://localhost:8080/api/v1/test-runs/12345/results
 
 #### Request
 ```bash
-curl -X DELETE http://localhost:8080/api/v1/test-runs/12345
+curl -X POST http://localhost:8080/test-runs/12345/cancel
 ```
 
 #### Response
 ```json
 {
-  "id": 12345,
-  "status": "aborted",
-  "message": "Test run cancelled successfully"
+  "message": "test run cancelled",
+  "id": 12345
 }
 ```
 
@@ -514,33 +513,19 @@ table_name: "memory_stress_test"
 ### Real-time Metrics Query
 ```bash
 # Get real-time metrics for a running test
-curl -X GET "http://localhost:8080/api/v1/test-runs/12345/results?metric=interval_transaction_rate&limit=10"
+curl -X GET "http://localhost:8080/test-runs/12345/results?metric=interval_transaction_rate&limit=10"
 ```
 
 ### Performance Comparison Query
 ```bash
-# Compare performance across different batch sizes
-curl -X GET "http://localhost:8080/api/v1/metrics/analysis" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "test_run_ids": [12345, 12346, 12347],
-    "metrics": ["transactions_per_sec", "rows_per_sec", "avg_latency_ms"],
-    "group_by": ["batch_size", "copy_format"]
-  }'
+# Get results by metric type for comparison
+curl -X GET "http://localhost:8080/metrics/interval_transaction_rate/results?limit=100"
 ```
 
-### Historical Trends Query
+### Historical Results Query
 ```bash
-# Get historical performance trends
-curl -X GET "http://localhost:8080/api/v1/metrics/trends" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "plugin_name": "bulk-copy",
-    "metric": "rows_per_sec",
-    "time_range": "7d",
-    "aggregation": "avg",
-    "group_by": "day"
-  }'
+# Get historical results for row insertion rate
+curl -X GET "http://localhost:8080/metrics/interval_row_rate/results?limit=200"
 ```
 
 ## Integration Examples
