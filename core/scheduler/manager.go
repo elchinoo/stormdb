@@ -494,8 +494,9 @@ func (t *TestExecutionTask) Execute(ctx context.Context) error {
 		return fmt.Errorf("failed to update test run status: %w", err)
 	}
 
-	// Execute plugin
-	err := t.plugin.Execute(ctx, t.config)
+	// Execute plugin with test run ID in context
+	ctxWithRunID := context.WithValue(ctx, "test_run_id", t.runID)
+	err := t.plugin.Execute(ctxWithRunID, t.config)
 
 	// Update status based on execution result
 	var finalStatus core.ServiceStatus

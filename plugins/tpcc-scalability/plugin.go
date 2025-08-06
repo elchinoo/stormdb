@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -166,6 +165,11 @@ func (p *TPCCPlugin) Validate(config map[string]interface{}) error {
 		return fmt.Errorf("transaction percentages must sum to 100, got %d", totalPct)
 	}
 
+	// Validate that all transaction types have some percentage (TPC-C requirement)
+	if cfg.NewOrderPct <= 0 || cfg.PaymentPct <= 0 || cfg.OrderStatusPct <= 0 || cfg.DeliveryPct <= 0 || cfg.StockLevelPct <= 0 {
+		return fmt.Errorf("all transaction types must have positive percentages for valid TPC-C test")
+	}
+
 	// Validate duration
 	if cfg.Duration <= 0 {
 		return fmt.Errorf("test duration must be positive")
@@ -179,6 +183,11 @@ func (p *TPCCPlugin) Validate(config map[string]interface{}) error {
 func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{}) error {
 	if err := p.Validate(config); err != nil {
 		return fmt.Errorf("configuration validation failed: %w", err)
+	}
+
+	// Extract test run ID from context and add to logger
+	if testRunID, ok := ctx.Value("test_run_id").(int64); ok {
+		p.logger = p.logger.WithFields(core.Field{Key: "test_run_id", Value: testRunID})
 	}
 
 	if !atomic.CompareAndSwapInt64(&p.isRunning, 0, 1) {
@@ -215,8 +224,14 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 		return fmt.Errorf("failed to populate test data: %w", err)
 	}
 
-	// The test run is created by the scheduler. The plugin's job is to execute
-	// the test logic for each connection level.
+	// Extract test run ID from context for result storage
+	testRunID, ok := ctx.Value("test_run_id").(int64)
+	if !ok {
+		p.logger.Warn("test run ID not found in context, results may not be associated correctly")
+		testRunID = 0
+	}
+
+	// Run tests for each connection level
 	for i, connCount := range p.config.Connections {
 		p.logger.Info("starting connection level test",
 			core.Field{Key: "level", Value: i + 1},
@@ -226,13 +241,7 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 		p.metrics.CurrentConnections = connCount
 		p.metrics.TestPhase = fmt.Sprintf("Level %d/%d", i+1, len(p.config.Connections))
 
-		// We need a run ID to store results, but the plugin doesn't own the run.
-		// This is a temporary solution. In a real scenario, the run ID would be
-		// passed into the Execute method via the context.
-		// For now, we'll use a placeholder.
-		const placeholderRunID = 1
-
-		if err := p.runConnectionLevel(ctx, placeholderRunID, connCount); err != nil {
+		if err := p.runConnectionLevel(ctx, testRunID, connCount); err != nil {
 			p.logger.Error("connection level test failed",
 				core.Field{Key: "level", Value: i + 1},
 				core.Field{Key: "connections", Value: connCount},
@@ -244,6 +253,12 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 				break
 			}
 		}
+	}
+
+	// Store aggregate results in database
+	if err := p.storeResults(ctx); err != nil {
+		p.logger.Error("Failed to store test results", core.Field{Key: "error", Value: err.Error()})
+		// Don't fail the entire test, just log the error
 	}
 
 	p.logger.Info("TPC-C scalability test completed",
@@ -343,14 +358,145 @@ func parseConfig(config map[string]interface{}) (*TPCCConfig, error) {
 	// Start with defaults
 	cfg := defaultConfig
 
-	// Marshal to JSON and back to populate struct
-	data, err := json.Marshal(config)
-	if err != nil {
-		return nil, err
+	// Manual parsing to handle duration strings properly
+	if host, ok := config["host"]; ok {
+		if hostStr, ok := host.(string); ok {
+			cfg.Host = hostStr
+		}
+	}
+	if port, ok := config["port"]; ok {
+		if portFloat, ok := port.(float64); ok {
+			cfg.Port = int(portFloat)
+		} else if portInt, ok := port.(int); ok {
+			cfg.Port = portInt
+		}
+	}
+	if database, ok := config["database"]; ok {
+		if dbStr, ok := database.(string); ok {
+			cfg.Database = dbStr
+		}
+	}
+	if username, ok := config["username"]; ok {
+		if userStr, ok := username.(string); ok {
+			cfg.Username = userStr
+		}
+	}
+	if password, ok := config["password"]; ok {
+		if passStr, ok := password.(string); ok {
+			cfg.Password = passStr
+		}
+	}
+	if sslMode, ok := config["ssl_mode"]; ok {
+		if sslStr, ok := sslMode.(string); ok {
+			cfg.SSLMode = sslStr
+		}
+	}
+	if rebuild, ok := config["rebuild"]; ok {
+		if rebuildBool, ok := rebuild.(bool); ok {
+			cfg.Rebuild = rebuildBool
+		}
+	}
+	if scale, ok := config["scale"]; ok {
+		if scaleFloat, ok := scale.(float64); ok {
+			cfg.Scale = int(scaleFloat)
+		} else if scaleInt, ok := scale.(int); ok {
+			cfg.Scale = scaleInt
+		}
 	}
 
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+	// Parse connections array
+	if connections, ok := config["connections"]; ok {
+		if connArray, ok := connections.([]interface{}); ok {
+			cfg.Connections = nil // reset
+			for _, conn := range connArray {
+				if connFloat, ok := conn.(float64); ok {
+					cfg.Connections = append(cfg.Connections, int(connFloat))
+				} else if connInt, ok := conn.(int); ok {
+					cfg.Connections = append(cfg.Connections, connInt)
+				}
+			}
+		} else if connIntArray, ok := connections.([]int); ok {
+			cfg.Connections = connIntArray
+		}
+	}
+
+	// Parse duration strings
+	if duration, ok := config["duration"]; ok {
+		if durStr, ok := duration.(string); ok {
+			if dur, err := time.ParseDuration(durStr); err == nil {
+				cfg.Duration = dur
+			}
+		}
+	}
+	if warmupTime, ok := config["warmup_time"]; ok {
+		if warmupStr, ok := warmupTime.(string); ok {
+			if warmup, err := time.ParseDuration(warmupStr); err == nil {
+				cfg.WarmupTime = warmup
+			}
+		}
+	}
+	if thinkTime, ok := config["think_time"]; ok {
+		if thinkStr, ok := thinkTime.(string); ok {
+			if think, err := time.ParseDuration(thinkStr); err == nil {
+				cfg.ThinkTime = think
+			}
+		}
+	}
+
+	// Parse percentage fields
+	if newOrderPct, ok := config["new_order_pct"]; ok {
+		if pctFloat, ok := newOrderPct.(float64); ok {
+			cfg.NewOrderPct = int(pctFloat)
+		} else if pctInt, ok := newOrderPct.(int); ok {
+			cfg.NewOrderPct = pctInt
+		}
+	}
+	if paymentPct, ok := config["payment_pct"]; ok {
+		if pctFloat, ok := paymentPct.(float64); ok {
+			cfg.PaymentPct = int(pctFloat)
+		} else if pctInt, ok := paymentPct.(int); ok {
+			cfg.PaymentPct = pctInt
+		}
+	}
+	if orderStatusPct, ok := config["order_status_pct"]; ok {
+		if pctFloat, ok := orderStatusPct.(float64); ok {
+			cfg.OrderStatusPct = int(pctFloat)
+		} else if pctInt, ok := orderStatusPct.(int); ok {
+			cfg.OrderStatusPct = pctInt
+		}
+	}
+	if deliveryPct, ok := config["delivery_pct"]; ok {
+		if pctFloat, ok := deliveryPct.(float64); ok {
+			cfg.DeliveryPct = int(pctFloat)
+		} else if pctInt, ok := deliveryPct.(int); ok {
+			cfg.DeliveryPct = pctInt
+		}
+	}
+	if stockLevelPct, ok := config["stock_level_pct"]; ok {
+		if pctFloat, ok := stockLevelPct.(float64); ok {
+			cfg.StockLevelPct = int(pctFloat)
+		} else if pctInt, ok := stockLevelPct.(int); ok {
+			cfg.StockLevelPct = pctInt
+		}
+	}
+
+	// Parse other fields
+	if batchSize, ok := config["batch_size"]; ok {
+		if bsFloat, ok := batchSize.(float64); ok {
+			cfg.BatchSize = int(bsFloat)
+		} else if bsInt, ok := batchSize.(int); ok {
+			cfg.BatchSize = bsInt
+		}
+	}
+	if enableMetrics, ok := config["enable_metrics"]; ok {
+		if emBool, ok := enableMetrics.(bool); ok {
+			cfg.EnableMetrics = emBool
+		}
+	}
+	if logTransactions, ok := config["log_transactions"]; ok {
+		if ltBool, ok := logTransactions.(bool); ok {
+			cfg.LogTransactions = ltBool
+		}
 	}
 
 	return &cfg, nil
@@ -955,6 +1101,95 @@ func (p *TPCCPlugin) logConnectionLevelSummary(connCount int, duration time.Dura
 		core.Field{Key: "delivery", Value: p.metrics.DeliveryCount},
 		core.Field{Key: "stock_level", Value: p.metrics.StockLevelCount},
 	)
+}
+
+// storeResults converts plugin metrics to core.TestResult and stores them in the database
+func (p *TPCCPlugin) storeResults(ctx context.Context) error {
+	if p.core == nil || p.core.Storage == nil {
+		return fmt.Errorf("core services not available")
+	}
+
+	// Extract test run ID from context
+	testRunID, ok := ctx.Value("test_run_id").(int64)
+	if !ok {
+		p.logger.Warn("test run ID not found in context, results may not be associated correctly")
+		testRunID = 0
+	}
+
+	var results []core.TestResult
+	now := time.Now()
+
+	// Get metric IDs (we should really look these up, but for now use hardcoded IDs)
+	transactionMetricID := 2 // TRANSACTION_RATE
+	latencyMetricID := 7     // LATENCY_AVG
+
+	p.metrics.mu.RLock()
+	defer p.metrics.mu.RUnlock()
+
+	// Calculate overall metrics
+	totalTxns := p.metrics.NewOrderCount + p.metrics.PaymentCount +
+		p.metrics.OrderStatusCount + p.metrics.DeliveryCount + p.metrics.StockLevelCount
+
+	if totalTxns > 0 {
+		// Store total transaction rate
+		results = append(results, core.TestResult{
+			TestRunID: testRunID,
+			MetricID:  transactionMetricID,
+			StartTime: p.testStarted,
+			EndTime:   now,
+			Value:     float64(totalTxns),
+			Tags: map[string]interface{}{
+				"connections": p.metrics.CurrentConnections,
+				"metric_type": "total_transactions",
+				"test_phase":  p.metrics.TestPhase,
+			},
+		})
+
+		// Store average latency
+		avgLatencyMs := float64(p.metrics.TotalLatency.Nanoseconds()) / float64(totalTxns) / 1000000.0
+		results = append(results, core.TestResult{
+			TestRunID: testRunID,
+			MetricID:  latencyMetricID,
+			StartTime: p.testStarted,
+			EndTime:   now,
+			Value:     avgLatencyMs,
+			Tags: map[string]interface{}{
+				"connections": p.metrics.CurrentConnections,
+				"metric_type": "avg_latency_ms",
+				"test_phase":  p.metrics.TestPhase,
+			},
+		})
+
+		// Store individual transaction type metrics
+		txTypes := map[string]int64{
+			"new_order":    p.metrics.NewOrderCount,
+			"payment":      p.metrics.PaymentCount,
+			"order_status": p.metrics.OrderStatusCount,
+			"delivery":     p.metrics.DeliveryCount,
+			"stock_level":  p.metrics.StockLevelCount,
+		}
+
+		for txType, count := range txTypes {
+			if count > 0 {
+				results = append(results, core.TestResult{
+					TestRunID: testRunID,
+					MetricID:  transactionMetricID,
+					StartTime: p.testStarted,
+					EndTime:   now,
+					Value:     float64(count),
+					Tags: map[string]interface{}{
+						"connections":      p.metrics.CurrentConnections,
+						"metric_type":      "transaction_count",
+						"transaction_type": txType,
+						"test_phase":       p.metrics.TestPhase,
+					},
+				})
+			}
+		}
+	}
+
+	// Store all results
+	return p.core.Storage.StoreResults(ctx, results)
 }
 
 func getConfigSchema() string {

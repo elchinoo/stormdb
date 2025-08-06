@@ -12,12 +12,13 @@ import (
 // MockLogger implements the core.Logger interface for testing
 type MockLogger struct{}
 
-func (m *MockLogger) Debug(msg string, fields ...core.Field)      {}
-func (m *MockLogger) Info(msg string, fields ...core.Field)       {}
-func (m *MockLogger) Warn(msg string, fields ...core.Field)       {}
-func (m *MockLogger) Error(msg string, fields ...core.Field)      {}
-func (m *MockLogger) WithFields(fields ...core.Field) core.Logger { return m }
-func (m *MockLogger) WithPlugin(pluginName string) core.Logger    { return m }
+func (m *MockLogger) Debug(msg string, fields ...core.Field)                        {}
+func (m *MockLogger) Info(msg string, fields ...core.Field)                         {}
+func (m *MockLogger) Warn(msg string, fields ...core.Field)                         {}
+func (m *MockLogger) Error(msg string, fields ...core.Field)                        {}
+func (m *MockLogger) WithFields(fields ...core.Field) core.Logger                   { return m }
+func (m *MockLogger) WithPlugin(pluginName string) core.Logger                      { return m }
+func (m *MockLogger) WithStorage(storage core.StorageManager) core.Logger           { return m }
 
 // MockCoreServices provides mock implementations for testing
 type MockCoreServices struct {

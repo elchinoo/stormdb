@@ -353,6 +353,11 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 		return fmt.Errorf("configuration validation failed: %w", err)
 	}
 
+	// Extract test run ID from context and add to logger
+	if testRunID, ok := ctx.Value("test_run_id").(int64); ok {
+		p.logger = p.logger.WithFields(core.Field{Key: "test_run_id", Value: testRunID})
+	}
+
 	// Set running state
 	if !atomic.CompareAndSwapInt64(&p.isRunning, 0, 1) {
 		return fmt.Errorf("test is already running")
@@ -439,6 +444,12 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 		core.Field{Key: "total_transactions", Value: p.metrics.TotalTransactions},
 		core.Field{Key: "total_rows", Value: p.metrics.TotalRowsInserted},
 	)
+
+	// Store results in database
+	if err := p.storeResults(ctx); err != nil {
+		p.logger.Error("Failed to store test results", core.Field{Key: "error", Value: err.Error()})
+		// Don't fail the entire test, just log the error
+	}
 
 	return nil
 }
@@ -794,6 +805,75 @@ func (p *BulkLoadPlugin) executeBulkInsert(batchSize int) error {
 
 	_, err := p.db.Exec(insertSQL, values...)
 	return err
+}
+
+// storeResults converts plugin metrics to core.TestResult and stores them in the database
+func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
+	if p.core == nil || p.core.Storage == nil {
+		return fmt.Errorf("core services not available")
+	}
+
+	// Extract test run ID from context
+	testRunID, ok := ctx.Value("test_run_id").(int64)
+	if !ok {
+		p.logger.Warn("test run ID not found in context, results may not be associated correctly")
+		testRunID = 0
+	}
+
+	var results []core.TestResult
+	now := time.Now()
+
+	// Get metric IDs (we should really look these up, but for now use hardcoded IDs)
+	rowInsertMetricID := 1 // ROW_INSERT
+	latencyMetricID := 7   // LATENCY_AVG
+
+	// Convert each batch result to database format
+	for _, batch := range p.metrics.BatchResults {
+		// Store transaction rate
+		results = append(results, core.TestResult{
+			TestRunID: testRunID,
+			MetricID:  rowInsertMetricID,
+			StartTime: p.metrics.StartTime,
+			EndTime:   now,
+			Value:     batch.TransactionsPerSec,
+			Tags: map[string]interface{}{
+				"batch_size":  batch.BatchSize,
+				"connections": batch.Connections,
+				"metric_type": "transactions_per_sec",
+			},
+		})
+
+		// Store rows per second
+		results = append(results, core.TestResult{
+			TestRunID: testRunID,
+			MetricID:  rowInsertMetricID,
+			StartTime: p.metrics.StartTime,
+			EndTime:   now,
+			Value:     batch.RowsPerSec,
+			Tags: map[string]interface{}{
+				"batch_size":  batch.BatchSize,
+				"connections": batch.Connections,
+				"metric_type": "rows_per_sec",
+			},
+		})
+
+		// Store average latency
+		results = append(results, core.TestResult{
+			TestRunID: testRunID,
+			MetricID:  latencyMetricID,
+			StartTime: p.metrics.StartTime,
+			EndTime:   now,
+			Value:     batch.AvgLatencyMs,
+			Tags: map[string]interface{}{
+				"batch_size":  batch.BatchSize,
+				"connections": batch.Connections,
+				"metric_type": "avg_latency_ms",
+			},
+		})
+	}
+
+	// Store all results
+	return p.core.Storage.StoreResults(ctx, results)
 }
 
 // NewPlugin returns the plugin instance (required for plugin loading)
