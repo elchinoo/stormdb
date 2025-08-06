@@ -1032,7 +1032,6 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 					"batch_size":         currentBatchSize,
 					"total_transactions": liveTransactions,
 					"total_rows":         liveRows,
-					"batch_count":        nil, // Not applicable for live metrics
 					"test_phase":         "measurement",
 				},
 			})
@@ -1053,7 +1052,6 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 					"batch_size":         currentBatchSize,
 					"total_transactions": liveTransactions,
 					"total_rows":         liveRows,
-					"batch_count":        nil, // Not applicable for live metrics
 					"test_phase":         "measurement",
 				},
 			})
@@ -1078,7 +1076,6 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 					"batch_size":         currentBatchSize,
 					"total_transactions": liveTransactions,
 					"total_rows":         liveRows,
-					"batch_count":        nil, // Not applicable for live metrics
 					"test_phase":         "measurement",
 				},
 			})
