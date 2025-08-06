@@ -1,4 +1,4 @@
-// Package bulkload implements a bulk load performance test plugin for StormDB v0.4-alpha
+// Package bulkinsert implements a bulk insert performance test plugin for StormDB v0.4-alpha
 // This plugin tests different batch sizes with a fixed number of connections
 package main
 
@@ -16,16 +16,16 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// BulkLoadPlugin implements the bulk load performance test
-type BulkLoadPlugin struct {
+// BulkInsertPlugin implements the bulk insert performance test
+type BulkInsertPlugin struct {
 	core           *core.CoreServices
 	logger         core.Logger
 	db             *sql.DB
-	config         *BulkLoadConfig
+	config         *BulkInsertConfig
 	isRunning      int64
 	stopChan       chan struct{}
 	wg             sync.WaitGroup
-	metrics        *BulkLoadMetrics
+	metrics        *BulkInsertMetrics
 	testStarted    time.Time
 	currentWorkers []*WorkerStats // Live worker stats for real-time metrics
 	workersMu      sync.RWMutex   // Protect access to currentWorkers
@@ -39,8 +39,8 @@ type BulkLoadPlugin struct {
 	prevMetricsMu    sync.RWMutex // Protect access to previous metrics
 }
 
-// BulkLoadConfig defines the configuration for bulk load tests
-type BulkLoadConfig struct {
+// BulkInsertConfig defines the configuration for bulk insert tests
+type BulkInsertConfig struct {
 	// Database connection
 	Host     string `json:"host" yaml:"host"`
 	Port     int    `json:"port" yaml:"port"`
@@ -64,8 +64,8 @@ type BulkLoadConfig struct {
 	Verbose      bool          `json:"verbose" yaml:"verbose"`             // Enable verbose logging
 }
 
-// BulkLoadMetrics tracks performance metrics for bulk load tests
-type BulkLoadMetrics struct {
+// BulkInsertMetrics tracks performance metrics for bulk insert tests
+type BulkInsertMetrics struct {
 	mu                sync.RWMutex
 	BatchResults      []BatchResult `json:"batch_results"`
 	TotalTransactions int64         `json:"total_transactions"`
@@ -105,11 +105,11 @@ type WorkerStats struct {
 // Plugin interface implementation
 
 // Metadata returns plugin information
-func (p *BulkLoadPlugin) Metadata() core.PluginMetadata {
+func (p *BulkInsertPlugin) Metadata() core.PluginMetadata {
 	return core.PluginMetadata{
-		Name:        "bulk-load",
+		Name:        "bulk-insert",
 		Version:     "1.0.0",
-		Description: "Bulk load performance testing with different batch sizes",
+		Description: "Bulk insert performance testing with different batch sizes",
 		Author:      "StormDB Team",
 		License:     "Apache-2.0",
 		TestTypes:   []string{"bulk_insert", "batch_performance", "load_testing"},
@@ -129,7 +129,7 @@ func (p *BulkLoadPlugin) Metadata() core.PluginMetadata {
 				"duration": {"type": "string", "pattern": "^[0-9]+[smh]$", "default": "5m"},
 				"warmup_time": {"type": "string", "pattern": "^[0-9]+[smh]$", "default": "30s"},
 				"think_time": {"type": "string", "pattern": "^[0-9]+[smh]$", "default": "10ms"},
-				"table_name": {"type": "string", "default": "bulk_test_data"},
+				"table_name": {"type": "string", "default": "bulk_insert_test_data"},
 				"drop_table": {"type": "boolean", "default": true},
 				"generate_data": {"type": "boolean", "default": true},
 				"data_columns": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
@@ -145,21 +145,21 @@ func (p *BulkLoadPlugin) Metadata() core.PluginMetadata {
 }
 
 // Initialize sets up the plugin with core services
-func (p *BulkLoadPlugin) Initialize(ctx context.Context, coreServices *core.CoreServices) error {
+func (p *BulkInsertPlugin) Initialize(ctx context.Context, coreServices *core.CoreServices) error {
 	p.core = coreServices
-	p.logger = coreServices.Logger.WithPlugin("bulk-load")
+	p.logger = coreServices.Logger.WithPlugin("bulk-insert")
 	p.stopChan = make(chan struct{})
-	p.metrics = &BulkLoadMetrics{
+	p.metrics = &BulkInsertMetrics{
 		BatchResults: make([]BatchResult, 0),
 	}
 
-	p.logger.Info("Bulk load plugin initialized successfully")
+	p.logger.Info("Bulk insert plugin initialized successfully")
 	return nil
 }
 
 // Validate checks the configuration
-func (p *BulkLoadPlugin) Validate(config map[string]interface{}) error {
-	var bulkConfig BulkLoadConfig
+func (p *BulkInsertPlugin) Validate(config map[string]interface{}) error {
+	var bulkConfig BulkInsertConfig
 
 	// Manual parsing to handle duration strings properly
 	if host, ok := config["host"]; ok {
@@ -298,7 +298,7 @@ func (p *BulkLoadPlugin) Validate(config map[string]interface{}) error {
 		bulkConfig.ThinkTime = 10 * time.Millisecond
 	}
 	if bulkConfig.TableName == "" {
-		bulkConfig.TableName = "bulk_test_data"
+		bulkConfig.TableName = "bulk_insert_test_data"
 	}
 	if bulkConfig.DataColumns == 0 {
 		bulkConfig.DataColumns = 10
@@ -358,7 +358,7 @@ func (p *BulkLoadPlugin) Validate(config map[string]interface{}) error {
 }
 
 // Execute runs the bulk load performance test
-func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interface{}) error {
+func (p *BulkInsertPlugin) Execute(ctx context.Context, config map[string]interface{}) error {
 	if err := p.Validate(config); err != nil {
 		return fmt.Errorf("configuration validation failed: %w", err)
 	}
@@ -469,7 +469,7 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 	}
 
 	p.metrics.EndTime = time.Now()
-	p.logger.Info("Bulk load performance test completed",
+	p.logger.Info("Bulk insert performance test completed",
 		core.Field{Key: "total_duration", Value: p.metrics.EndTime.Sub(p.metrics.StartTime)},
 		core.Field{Key: "total_transactions", Value: p.metrics.TotalTransactions},
 		core.Field{Key: "total_rows", Value: p.metrics.TotalRowsInserted},
@@ -499,7 +499,7 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 }
 
 // Cleanup performs any necessary cleanup
-func (p *BulkLoadPlugin) Cleanup(ctx context.Context) error {
+func (p *BulkInsertPlugin) Cleanup(ctx context.Context) error {
 	// Stop any running operations
 	close(p.stopChan)
 	p.wg.Wait()
@@ -509,13 +509,13 @@ func (p *BulkLoadPlugin) Cleanup(ctx context.Context) error {
 		p.db.Close()
 	}
 
-	p.logger.Info("Bulk load plugin cleanup completed")
+	p.logger.Info("Bulk insert plugin cleanup completed")
 	return nil
 }
 
 // Helper methods
 
-func (p *BulkLoadPlugin) rebuildDatabase() error {
+func (p *BulkInsertPlugin) rebuildDatabase() error {
 	p.logger.Info("Rebuilding database", core.Field{Key: "database", Value: p.config.Database})
 
 	// Connect to the default 'postgres' database to drop the target database
@@ -555,7 +555,7 @@ func (p *BulkLoadPlugin) rebuildDatabase() error {
 }
 
 // connectDatabase establishes database connection
-func (p *BulkLoadPlugin) connectDatabase() error {
+func (p *BulkInsertPlugin) connectDatabase() error {
 	connStr := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
 		p.config.Host, p.config.Port, p.config.Database,
 		p.config.Username, p.config.Password, p.config.SSLMode)
@@ -588,7 +588,7 @@ func (p *BulkLoadPlugin) connectDatabase() error {
 }
 
 // setupTestTable creates or prepares the test table
-func (p *BulkLoadPlugin) setupTestTable() error {
+func (p *BulkInsertPlugin) setupTestTable() error {
 	tableName := p.config.TableName
 
 	// Drop table if configured
@@ -647,7 +647,7 @@ func (p *BulkLoadPlugin) setupTestTable() error {
 }
 
 // clearTableData truncates the test table
-func (p *BulkLoadPlugin) clearTableData() error {
+func (p *BulkInsertPlugin) clearTableData() error {
 	truncateSQL := fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY", p.config.TableName)
 	if _, err := p.db.Exec(truncateSQL); err != nil {
 		return fmt.Errorf("failed to truncate table: %w", err)
@@ -657,7 +657,7 @@ func (p *BulkLoadPlugin) clearTableData() error {
 }
 
 // runBatchTest executes the test for a specific batch size
-func (p *BulkLoadPlugin) runBatchTest(ctx context.Context, batchSize int) (*BatchResult, error) {
+func (p *BulkInsertPlugin) runBatchTest(ctx context.Context, batchSize int) (*BatchResult, error) {
 	result := &BatchResult{
 		BatchSize:    batchSize,
 		Connections:  p.config.Connections,
@@ -751,7 +751,7 @@ func (p *BulkLoadPlugin) runBatchTest(ctx context.Context, batchSize int) (*Batc
 }
 
 // runWorkers executes concurrent workers for the test
-func (p *BulkLoadPlugin) runWorkers(ctx context.Context, batchSize int, workerStats []*WorkerStats) {
+func (p *BulkInsertPlugin) runWorkers(ctx context.Context, batchSize int, workerStats []*WorkerStats) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < p.config.Connections; i++ {
@@ -772,7 +772,7 @@ func (p *BulkLoadPlugin) runWorkers(ctx context.Context, batchSize int, workerSt
 }
 
 // worker performs bulk insert operations
-func (p *BulkLoadPlugin) worker(ctx context.Context, workerID, batchSize int, stats *WorkerStats) {
+func (p *BulkInsertPlugin) worker(ctx context.Context, workerID, batchSize int, stats *WorkerStats) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -821,7 +821,7 @@ func (p *BulkLoadPlugin) worker(ctx context.Context, workerID, batchSize int, st
 }
 
 // executeBulkInsert performs a single bulk insert operation
-func (p *BulkLoadPlugin) executeBulkInsert(batchSize int) error {
+func (p *BulkInsertPlugin) executeBulkInsert(batchSize int) error {
 	// Build bulk insert SQL
 	var valuePlaceholders []string
 	var values []interface{}
@@ -875,7 +875,7 @@ func (p *BulkLoadPlugin) executeBulkInsert(batchSize int) error {
 
 // backgroundMetricsSaver continuously saves metrics every second while test is running
 // Enhanced version with real-time worker statistics and comprehensive logging
-func (p *BulkLoadPlugin) backgroundMetricsSaver(ctx context.Context, done chan<- struct{}) {
+func (p *BulkInsertPlugin) backgroundMetricsSaver(ctx context.Context, done chan<- struct{}) {
 	defer close(done)
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -959,7 +959,7 @@ func (p *BulkLoadPlugin) backgroundMetricsSaver(ctx context.Context, done chan<-
 }
 
 // saveCurrentMetrics saves current accumulated metrics to database
-func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) error {
+func (p *BulkInsertPlugin) saveCurrentMetrics(ctx context.Context, iteration int) error {
 	if p.core == nil || p.core.Storage == nil {
 		return fmt.Errorf("core services not available")
 	}
@@ -1132,7 +1132,7 @@ func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) 
 
 	return nil
 } // storeResults converts plugin metrics to core.TestResult and stores them in the database
-func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
+func (p *BulkInsertPlugin) storeResults(ctx context.Context) error {
 	if p.core == nil || p.core.Storage == nil {
 		return fmt.Errorf("core services not available")
 	}
@@ -1261,7 +1261,7 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 
 // NewPlugin returns the plugin instance (required for plugin loading)
 func NewPlugin() core.Plugin {
-	return &BulkLoadPlugin{}
+	return &BulkInsertPlugin{}
 }
 
 // Main function for standalone testing

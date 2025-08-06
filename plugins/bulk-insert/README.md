@@ -1,10 +1,10 @@
-# Bulk Load Performance Test Plugin
+# Bulk Insert Performance Test Plugin
 
-A high-performance bulk load testing plugin for StormDB v2 that evaluates database performance across different batch sizes with a fixed number of connections.
+A high-performance bulk insert testing plugin for StormDB v2 that evaluates database performance across different batch sizes with a fixed number of connections.
 
 ## Overview
 
-The Bulk Load plugin is designed to help database administrators and performance engineers understand how different batch sizes affect bulk insert performance. Unlike connection scaling tests, this plugin focuses on finding the optimal batch size for bulk operations while maintaining a consistent connection count.
+The Bulk Insert plugin is designed to help database administrators and performance engineers understand how different batch sizes affect bulk insert performance. Unlike connection scaling tests, this plugin focuses on finding the optimal batch size for bulk operations while maintaining a consistent connection count.
 
 ## Key Features
 
@@ -27,11 +27,11 @@ The Bulk Load plugin is designed to help database administrators and performance
 ### Build the Plugin
 
 ```bash
-cd plugins/bulk-load
+cd plugins/bulk-insert
 make plugin
 ```
 
-This creates `bulk-load.so` which can be loaded by StormDB v2.
+This creates `bulk-insert.so` which can be loaded by StormDB v2.
 
 ### Install to StormDB
 
@@ -66,7 +66,7 @@ password: "stormdb_password"
 | `duration` | string | `"5m"` | Duration per batch size test |
 | `warmup_time` | string | `"30s"` | Warmup period before measurements |
 | `think_time` | string | `"10ms"` | Delay between batch operations |
-| `table_name` | string | `"bulk_test_data"` | Test table name |
+| `table_name` | string | `"bulk_insert_test_data"` | Test table name |
 | `drop_table` | boolean | `true` | Drop/recreate table between tests |
 | `generate_data` | boolean | `true` | Generate random test data |
 | `data_columns` | integer | `10` | Number of data columns to create |
@@ -108,8 +108,8 @@ index_columns: ["data_int_4", "data_text_1", "data_float_6"]
 curl -X POST "http://localhost:8080/test-runs" \
   -H "Content-Type: application/json" \
   -d '{
-    "plugin_name": "bulk-load",
-    "name": "Bulk Load Performance Test",
+    "plugin_name": "bulk-insert",
+    "name": "Bulk Insert Performance Test",
     "config": {
       "host": "localhost",
       "port": 5432,
@@ -187,7 +187,7 @@ The plugin collects comprehensive performance metrics for each batch size:
 The plugin creates a configurable test table with the following structure:
 
 ```sql
-CREATE TABLE bulk_test_data (
+CREATE TABLE bulk_insert_test_data (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_int_1 INTEGER,

@@ -25,12 +25,12 @@ type MockCoreServices struct {
 	Logger core.Logger
 }
 
-func TestBulkLoadPlugin_Metadata(t *testing.T) {
-	plugin := &BulkLoadPlugin{}
+func TestBulkInsertPlugin_Metadata(t *testing.T) {
+	plugin := &BulkInsertPlugin{}
 	metadata := plugin.Metadata()
 
-	if metadata.Name != "bulk-load" {
-		t.Errorf("Expected plugin name 'bulk-load', got '%s'", metadata.Name)
+	if metadata.Name != "bulk-insert" {
+		t.Errorf("Expected plugin name 'bulk-insert', got '%s'", metadata.Name)
 	}
 
 	if metadata.Version != "1.0.0" {
@@ -55,8 +55,8 @@ func TestBulkLoadPlugin_Metadata(t *testing.T) {
 	}
 }
 
-func TestBulkLoadPlugin_Initialize(t *testing.T) {
-	plugin := &BulkLoadPlugin{}
+func TestBulkInsertPlugin_Initialize(t *testing.T) {
+	plugin := &BulkInsertPlugin{}
 	coreServices := &MockCoreServices{
 		Logger: &MockLogger{},
 	}
@@ -83,8 +83,8 @@ func TestBulkLoadPlugin_Initialize(t *testing.T) {
 	}
 }
 
-func TestBulkLoadPlugin_Validate(t *testing.T) {
-	plugin := &BulkLoadPlugin{}
+func TestBulkInsertPlugin_Validate(t *testing.T) {
+	plugin := &BulkInsertPlugin{}
 	coreServices := &MockCoreServices{
 		Logger: &MockLogger{},
 	}
@@ -238,8 +238,8 @@ func TestBulkLoadPlugin_Validate(t *testing.T) {
 	}
 }
 
-func TestBulkLoadPlugin_ConfigDefaults(t *testing.T) {
-	plugin := &BulkLoadPlugin{}
+func TestBulkInsertPlugin_ConfigDefaults(t *testing.T) {
+	plugin := &BulkInsertPlugin{}
 	coreServices := &MockCoreServices{
 		Logger: &MockLogger{},
 	}
@@ -290,8 +290,8 @@ func TestBulkLoadPlugin_ConfigDefaults(t *testing.T) {
 		t.Errorf("Expected default think time 10ms, got %v", plugin.config.ThinkTime)
 	}
 
-	if plugin.config.TableName != "bulk_test_data" {
-		t.Errorf("Expected default table name 'bulk_test_data', got '%s'", plugin.config.TableName)
+	if plugin.config.TableName != "bulk_insert_test_data" {
+		t.Errorf("Expected default table name 'bulk_insert_test_data', got '%s'", plugin.config.TableName)
 	}
 
 	if plugin.config.DataColumns != 10 {
@@ -303,8 +303,8 @@ func TestBulkLoadPlugin_ConfigDefaults(t *testing.T) {
 	}
 }
 
-func TestBulkLoadPlugin_Cleanup(t *testing.T) {
-	plugin := &BulkLoadPlugin{}
+func TestBulkInsertPlugin_Cleanup(t *testing.T) {
+	plugin := &BulkInsertPlugin{}
 	coreServices := &MockCoreServices{
 		Logger: &MockLogger{},
 	}
@@ -370,7 +370,7 @@ func TestBatchResult(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkConfigValidation(b *testing.B) {
-	plugin := &BulkLoadPlugin{}
+	plugin := &BulkInsertPlugin{}
 	coreServices := &MockCoreServices{
 		Logger: &MockLogger{},
 	}
@@ -397,7 +397,7 @@ func BenchmarkConfigValidation(b *testing.B) {
 }
 
 func BenchmarkMetricsUpdate(b *testing.B) {
-	metrics := &BulkLoadMetrics{
+	metrics := &BulkInsertMetrics{
 		BatchResults: make([]BatchResult, 0),
 	}
 

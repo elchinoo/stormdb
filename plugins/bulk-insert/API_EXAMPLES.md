@@ -1,20 +1,20 @@
-# Bulk Load Plugin API Examples
+# Bulk Insert Plugin API Examples
 
-This document provides examples of how to use the Bulk Load plugin via the StormDB v2 REST API.
+This document provides examples of how to use the Bulk Insert plugin via the StormDB v2 REST API.
 
 ## Base URL
 
 All API calls assume StormDB v2 is running on `http://localhost:8080`
 
-## 1. Create and Start a Bulk Load Test
+## 1. Create and Start a Bulk Insert Test
 
 ### Quick Test (Small Batches)
 ```bash
 curl -X POST "http://localhost:8080/test-runs" \
   -H "Content-Type: application/json" \
   -d '{
-    "plugin_name": "bulk-load",
-    "name": "Quick Bulk Load Test",
+    "plugin_name": "bulk-insert",
+    "name": "Quick Bulk Insert Test",
     "description": "Testing small batch sizes with minimal duration",
     "config": {
       "host": "localhost",
@@ -36,13 +36,13 @@ curl -X POST "http://localhost:8080/test-runs" \
   }'
 ```
 
-### Standard Bulk Load Test
+### Standard Bulk Insert Test
 ```bash
 curl -X POST "http://localhost:8080/test-runs" \
   -H "Content-Type: application/json" \
   -d '{
-    "plugin_name": "bulk-load",
-    "name": "Standard Bulk Load Performance Test",
+    "plugin_name": "bulk-insert",
+    "name": "Standard Bulk Insert Performance Test",
     "description": "Testing standard batch sizes: 1, 1000, 10000, 50000 rows",
     "config": {
       "host": "localhost",
@@ -66,8 +66,8 @@ curl -X POST "http://localhost:8080/test-runs" \
 curl -X POST "http://localhost:8080/test-runs" \
   -H "Content-Type: application/json" \
   -d '{
-    "plugin_name": "bulk-load",
-    "name": "Large Scale Bulk Load Test",
+    "plugin_name": "bulk-insert",
+    "name": "Large Scale Bulk Insert Test",
     "description": "Testing large batch sizes with high connection count",
     "config": {
       "host": "localhost",
@@ -168,9 +168,9 @@ curl -X DELETE "http://localhost:8080/test-runs/{run_id}"
 curl "http://localhost:8080/test-runs"
 ```
 
-### Get Recent Bulk Load Tests
+### Get Recent Bulk Insert Tests
 ```bash
-curl "http://localhost:8080/test-runs?plugin_name=bulk-load&limit=10"
+curl "http://localhost:8080/test-runs?plugin_name=bulk-insert&limit=10"
 ```
 
 ### Get Failed Tests
@@ -304,7 +304,7 @@ export BULK_DB_PASSWORD="your_secure_password"
 curl -X POST "http://localhost:8080/test-runs" \
   -H "Content-Type: application/json" \
   -d '{
-    "plugin_name": "bulk-load",
+    "plugin_name": "bulk-insert",
     "config": {
       "host": "localhost",
       "port": 5432,
@@ -320,12 +320,12 @@ curl -X POST "http://localhost:8080/test-runs" \
 
 ### Check Plugin Availability
 ```bash
-curl "http://localhost:8080/plugins" | jq '.[] | select(.name == "bulk-load")'
+curl "http://localhost:8080/plugins" | jq '.[] | select(.name == "bulk-insert")'
 ```
 
 ### Validate Configuration Before Creating Test
 ```bash
-curl -X POST "http://localhost:8080/plugins/bulk-load/validate" \
+curl -X POST "http://localhost:8080/plugins/bulk-insert/validate" \
   -H "Content-Type: application/json" \
   -d '{
     "host": "localhost",

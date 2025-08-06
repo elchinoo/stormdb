@@ -1,6 +1,6 @@
-# Makefile for Bulk Load Plugin
+# Makefile for Bulk Insert Plugin
 
-PLUGIN_NAME = bulk-load
+PLUGIN_NAME = bulk-insert
 PLUGIN_SO = ../../build/plugins/$(PLUGIN_NAME).so
 GO_FILES = $(wildcard *.go)
 
@@ -18,7 +18,7 @@ all: plugin
 plugin: $(PLUGIN_SO)
 
 $(PLUGIN_SO): $(GO_FILES)
-	@echo "Building bulk load plugin..."
+	@echo "Building bulk insert plugin..."
 	@mkdir -p ../../build/plugins
 	CGO_ENABLED=$(CGO_ENABLED) go build -buildmode=plugin -o $(PLUGIN_SO) .
 	@echo "Plugin built successfully: $(PLUGIN_SO)"

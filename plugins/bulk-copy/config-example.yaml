@@ -1,0 +1,73 @@
+# Example configuration for StormDB bulk-copy plugin
+
+host: "localhost"
+port: 5432
+database: "stormdb_test"
+username: "stormdb_user"
+password: "stormdb_pass"
+ssl_mode: "disable"
+
+# Test configuration
+rebuild: false                          # Set to true to drop/recreate database
+batch_sizes: [5000, 25000, 100000, 500000]  # Larger batch sizes for COPY optimization
+connections: 20                         # Number of concurrent connections
+duration: "5m"                          # Duration per batch size test
+warmup_time: "30s"                      # Warmup before measurements
+think_time: "1ms"                       # Delay between batches (minimal for COPY)
+
+# Table configuration
+table_name: "bulk_copy_test_data"       # Table name for bulk copy operations
+drop_table: true                        # Drop/recreate table between tests
+generate_data: true                     # Generate random test data
+data_columns: 10                        # Number of data columns (excluding id, created_at)
+index_columns: []                       # Columns to create indexes on (empty for max speed)
+
+# COPY protocol specific settings
+copy_format: "CSV"                      # CSV, TEXT, or BINARY
+copy_header: false                      # Include header row for CSV format
+copy_delimiter: ","                     # Delimiter for CSV format
+
+# Logging
+verbose: false                          # Enable verbose logging
+
+# Example configurations for different scenarios:
+
+# High-throughput scenario (minimal overhead)
+high_throughput_example:
+  batch_sizes: [100000, 500000, 1000000]
+  connections: 50
+  duration: "10m"
+  think_time: "0s"
+  copy_format: "BINARY"
+  index_columns: []
+  data_columns: 5
+
+# Balanced performance scenario
+balanced_example:
+  batch_sizes: [10000, 50000, 200000]
+  connections: 25
+  duration: "3m"
+  think_time: "5ms"
+  copy_format: "CSV"
+  index_columns: ["data_int_1"]
+  data_columns: 15
+
+# Small batch testing scenario
+small_batch_example:
+  batch_sizes: [1000, 5000, 20000]
+  connections: 10
+  duration: "2m"
+  think_time: "10ms"
+  copy_format: "TEXT"
+  index_columns: ["data_int_1", "data_text_2"]
+  data_columns: 8
+
+# Memory-intensive scenario
+memory_intensive_example:
+  batch_sizes: [50000, 250000]
+  connections: 15
+  duration: "8m"
+  think_time: "2ms"
+  copy_format: "CSV"
+  index_columns: []
+  data_columns: 25

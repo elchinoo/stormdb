@@ -27,10 +27,10 @@ type TPCCPlugin struct {
 	metrics     *TPCCMetrics
 	testStarted time.Time
 
-	// Previous metrics for delta calculation  
-	prevTotalTxns int64         // Previous total transactions
-	prevSaveTime  time.Time     // Previous save time for rate calculation
-	prevMetricsMu sync.RWMutex  // Protect access to previous metrics
+	// Previous metrics for delta calculation
+	prevTotalTxns int64        // Previous total transactions
+	prevSaveTime  time.Time    // Previous save time for rate calculation
+	prevMetricsMu sync.RWMutex // Protect access to previous metrics
 }
 
 // TPCCConfig defines the configuration for TPC-C scalability tests
@@ -1246,13 +1246,13 @@ func (p *TPCCPlugin) saveCurrentTPCCMetrics(ctx context.Context, iteration int) 
 			ActiveConnections: &activeConnections,
 			ActiveWorkers:     &activeWorkers,
 			Tags: map[string]interface{}{
-				"metric_type":          "interval_tps",
-				"iteration":            iteration,
-				"connections":          activeConnections,
+				"metric_type":           "interval_tps",
+				"iteration":             iteration,
+				"connections":           activeConnections,
 				"interval_transactions": deltaTxns,
-				"interval_seconds":     timeDelta,
-				"test_phase":           testPhase,
-				"scale_factor":         p.config.Scale,
+				"interval_seconds":      timeDelta,
+				"test_phase":            testPhase,
+				"scale_factor":          p.config.Scale,
 			},
 		})
 
@@ -1269,13 +1269,13 @@ func (p *TPCCPlugin) saveCurrentTPCCMetrics(ctx context.Context, iteration int) 
 				ActiveConnections: &activeConnections,
 				ActiveWorkers:     &activeWorkers,
 				Tags: map[string]interface{}{
-					"metric_type":          "interval_avg_latency",
-					"iteration":            iteration,
-					"connections":          activeConnections,
+					"metric_type":           "interval_avg_latency",
+					"iteration":             iteration,
+					"connections":           activeConnections,
 					"interval_transactions": deltaTxns,
-					"interval_seconds":     timeDelta,
-					"test_phase":           testPhase,
-					"scale_factor":         p.config.Scale,
+					"interval_seconds":      timeDelta,
+					"test_phase":            testPhase,
+					"scale_factor":          p.config.Scale,
 				},
 			})
 		}
