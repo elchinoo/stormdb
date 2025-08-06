@@ -196,6 +196,16 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 	defer atomic.StoreInt64(&p.isRunning, 0)
 
 	p.testStarted = time.Now()
+	
+	// Start background metrics saver goroutine
+	metricsCtx, cancelMetrics := context.WithCancel(ctx)
+	metricsDone := make(chan struct{})
+	go p.backgroundMetricsSaver(metricsCtx, metricsDone)
+	defer func() {
+		cancelMetrics()
+		<-metricsDone // Wait for goroutine to finish
+	}()
+	
 	p.logger.Info("starting TPC-C scalability test",
 		core.Field{Key: "scale", Value: p.config.Scale},
 		core.Field{Key: "connection_levels", Value: len(p.config.Connections)},
@@ -1101,6 +1111,172 @@ func (p *TPCCPlugin) logConnectionLevelSummary(connCount int, duration time.Dura
 		core.Field{Key: "delivery", Value: p.metrics.DeliveryCount},
 		core.Field{Key: "stock_level", Value: p.metrics.StockLevelCount},
 	)
+}
+
+// backgroundMetricsSaver continuously saves metrics every second while test is running
+func (p *TPCCPlugin) backgroundMetricsSaver(ctx context.Context, done chan<- struct{}) {
+	defer close(done)
+	
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	lastSavedTransactions := int64(0)
+	saveCounter := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			p.logger.Info("Background metrics saver stopping")
+			return
+		case <-ticker.C:
+			saveCounter++
+			
+			// Get current metrics snapshot
+			p.metrics.mu.RLock()
+			totalTxns := p.metrics.NewOrderCount + p.metrics.PaymentCount +
+				p.metrics.OrderStatusCount + p.metrics.DeliveryCount + p.metrics.StockLevelCount
+			currentConnections := p.metrics.CurrentConnections
+			testPhase := p.metrics.TestPhase
+			p.metrics.mu.RUnlock()
+
+			// Only save if we have new data
+			if totalTxns > lastSavedTransactions {
+				err := p.saveCurrentTPCCMetrics(ctx, saveCounter)
+				if err != nil {
+					p.logger.Error("Failed to save TPCC metrics in background",
+						core.Field{Key: "error", Value: err.Error()},
+						core.Field{Key: "save_iteration", Value: saveCounter})
+				} else {
+					p.logger.Info("Background TPCC metrics saved",
+						core.Field{Key: "save_iteration", Value: saveCounter},
+						core.Field{Key: "total_transactions", Value: totalTxns},
+						core.Field{Key: "connections", Value: currentConnections},
+						core.Field{Key: "test_phase", Value: testPhase})
+					
+					lastSavedTransactions = totalTxns
+				}
+			} else {
+				p.logger.Debug("No new TPCC metrics to save", 
+					core.Field{Key: "save_iteration", Value: saveCounter})
+			}
+		}
+	}
+}
+
+// saveCurrentTPCCMetrics saves current accumulated metrics to database
+func (p *TPCCPlugin) saveCurrentTPCCMetrics(ctx context.Context, iteration int) error {
+	if p.core == nil || p.core.Storage == nil {
+		return fmt.Errorf("core services not available")
+	}
+
+	// Extract test run ID from context
+	testRunID, ok := ctx.Value("test_run_id").(int64)
+	if !ok {
+		return fmt.Errorf("test_run_id not found in context")
+	}
+
+	// Get metric IDs
+	throughputMetric, err := p.core.Storage.GetMetric(ctx, "THROUGHPUT")
+	if err != nil {
+		return fmt.Errorf("failed to get THROUGHPUT metric: %w", err)
+	}
+
+	latencyAvgMetric, err := p.core.Storage.GetMetric(ctx, "LATENCY_AVG")
+	if err != nil {
+		return fmt.Errorf("failed to get LATENCY_AVG metric: %w", err)
+	}
+
+	now := time.Now()
+	var results []core.TestResult
+
+	p.metrics.mu.RLock()
+	defer p.metrics.mu.RUnlock()
+
+	// Calculate total transactions
+	totalTxns := p.metrics.NewOrderCount + p.metrics.PaymentCount +
+		p.metrics.OrderStatusCount + p.metrics.DeliveryCount + p.metrics.StockLevelCount
+
+	if totalTxns > 0 {
+		// Calculate elapsed time for rates
+		elapsed := now.Sub(p.testStarted).Seconds()
+		if elapsed > 0 {
+			transactionRate := float64(totalTxns) / elapsed
+
+			// Store transaction rate
+			results = append(results, core.TestResult{
+				TestRunID: testRunID,
+				MetricID:  throughputMetric.ID,
+				StartTime: p.testStarted,
+				EndTime:   now,
+				Value:     transactionRate,
+				Tags: map[string]interface{}{
+					"metric_type":        "cumulative_tps",
+					"iteration":          iteration,
+					"connections":        p.metrics.CurrentConnections,
+					"test_phase":         p.metrics.TestPhase,
+					"total_transactions": totalTxns,
+				},
+			})
+		}
+
+		// Calculate and store average latency
+		if totalTxns > 0 {
+			avgLatencyMs := float64(p.metrics.TotalLatency.Nanoseconds()) / float64(totalTxns) / 1000000.0
+			
+			results = append(results, core.TestResult{
+				TestRunID: testRunID,
+				MetricID:  latencyAvgMetric.ID,
+				StartTime: p.testStarted,
+				EndTime:   now,
+				Value:     avgLatencyMs,
+				Tags: map[string]interface{}{
+					"metric_type":     "cumulative_avg_latency",
+					"iteration":       iteration,
+					"connections":     p.metrics.CurrentConnections,
+					"test_phase":      p.metrics.TestPhase,
+				},
+			})
+		}
+
+		// Store individual transaction type counts
+		txTypes := map[string]int64{
+			"new_order":    p.metrics.NewOrderCount,
+			"payment":      p.metrics.PaymentCount,
+			"order_status": p.metrics.OrderStatusCount,
+			"delivery":     p.metrics.DeliveryCount,
+			"stock_level":  p.metrics.StockLevelCount,
+		}
+
+		for txType, count := range txTypes {
+			if count > 0 {
+				results = append(results, core.TestResult{
+					TestRunID: testRunID,
+					MetricID:  throughputMetric.ID,
+					StartTime: p.testStarted,
+					EndTime:   now,
+					Value:     float64(count),
+					Tags: map[string]interface{}{
+						"metric_type":        "transaction_count",
+						"transaction_type":   txType,
+						"iteration":          iteration,
+						"connections":        p.metrics.CurrentConnections,
+						"test_phase":         p.metrics.TestPhase,
+					},
+				})
+			}
+		}
+	}
+
+	if len(results) > 0 {
+		p.logger.Debug("Saving background TPCC metrics",
+			core.Field{Key: "test_run_id", Value: testRunID},
+			core.Field{Key: "result_count", Value: len(results)},
+			core.Field{Key: "iteration", Value: iteration})
+
+		return p.core.Storage.StoreResults(ctx, results)
+	}
+
+	return nil
 }
 
 // storeResults converts plugin metrics to core.TestResult and stores them in the database

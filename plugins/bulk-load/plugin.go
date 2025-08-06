@@ -370,6 +370,15 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 	p.testStarted = time.Now()
 	p.metrics.StartTime = p.testStarted
 
+	// Start background metrics saver goroutine
+	metricsCtx, cancelMetrics := context.WithCancel(ctx)
+	metricsDone := make(chan struct{})
+	go p.backgroundMetricsSaver(metricsCtx, metricsDone)
+	defer func() {
+		cancelMetrics()
+		<-metricsDone // Wait for goroutine to finish
+	}()
+
 	p.logger.Info("Starting bulk load performance test",
 		core.Field{Key: "batch_sizes", Value: p.config.BatchSizes},
 		core.Field{Key: "connections", Value: p.config.Connections},
@@ -818,6 +827,172 @@ func (p *BulkLoadPlugin) executeBulkInsert(batchSize int) error {
 
 	_, err := p.db.Exec(insertSQL, values...)
 	return err
+}
+
+// backgroundMetricsSaver continuously saves metrics every second while test is running
+func (p *BulkLoadPlugin) backgroundMetricsSaver(ctx context.Context, done chan<- struct{}) {
+	defer close(done)
+	
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	lastSavedTransactions := int64(0)
+	lastSavedRows := int64(0)
+	saveCounter := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			p.logger.Info("Background metrics saver stopping")
+			return
+		case <-ticker.C:
+			saveCounter++
+			
+			// Get current metrics snapshot
+			p.metrics.mu.RLock()
+			currentTransactions := p.metrics.TotalTransactions
+			currentRows := p.metrics.TotalRowsInserted
+			batchCount := len(p.metrics.BatchResults)
+			p.metrics.mu.RUnlock()
+
+			// Only save if we have new data
+			if currentTransactions > lastSavedTransactions || currentRows > lastSavedRows {
+				err := p.saveCurrentMetrics(ctx, saveCounter)
+				if err != nil {
+					p.logger.Error("Failed to save metrics in background",
+						core.Field{Key: "error", Value: err.Error()},
+						core.Field{Key: "save_iteration", Value: saveCounter})
+				} else {
+					p.logger.Info("Background metrics saved",
+						core.Field{Key: "save_iteration", Value: saveCounter},
+						core.Field{Key: "total_transactions", Value: currentTransactions},
+						core.Field{Key: "total_rows", Value: currentRows},
+						core.Field{Key: "batch_count", Value: batchCount})
+					
+					lastSavedTransactions = currentTransactions
+					lastSavedRows = currentRows
+				}
+			} else {
+				p.logger.Debug("No new metrics to save", 
+					core.Field{Key: "save_iteration", Value: saveCounter})
+			}
+		}
+	}
+}
+
+// saveCurrentMetrics saves current accumulated metrics to database
+func (p *BulkLoadPlugin) saveCurrentMetrics(ctx context.Context, iteration int) error {
+	if p.core == nil || p.core.Storage == nil {
+		return fmt.Errorf("core services not available")
+	}
+
+	// Extract test run ID from context
+	testRunID, ok := ctx.Value("test_run_id").(int64)
+	if !ok {
+		return fmt.Errorf("test_run_id not found in context")
+	}
+
+	// Get metric IDs
+	rowInsertMetric, err := p.core.Storage.GetMetric(ctx, "ROW_INSERT")
+	if err != nil {
+		return fmt.Errorf("failed to get ROW_INSERT metric: %w", err)
+	}
+
+	latencyAvgMetric, err := p.core.Storage.GetMetric(ctx, "LATENCY_AVG")
+	if err != nil {
+		return fmt.Errorf("failed to get LATENCY_AVG metric: %w", err)
+	}
+
+	throughputMetric, err := p.core.Storage.GetMetric(ctx, "THROUGHPUT")
+	if err != nil {
+		return fmt.Errorf("failed to get THROUGHPUT metric: %w", err)
+	}
+
+	now := time.Now()
+	var results []core.TestResult
+
+	p.metrics.mu.RLock()
+	defer p.metrics.mu.RUnlock()
+
+	// Save cumulative metrics as snapshot
+	if p.metrics.TotalTransactions > 0 {
+		// Calculate elapsed time for rates
+		elapsed := now.Sub(p.metrics.StartTime).Seconds()
+		if elapsed > 0 {
+			transactionRate := float64(p.metrics.TotalTransactions) / elapsed
+			rowRate := float64(p.metrics.TotalRowsInserted) / elapsed
+
+			// Store transaction rate
+			results = append(results, core.TestResult{
+				TestRunID: testRunID,
+				MetricID:  throughputMetric.ID,
+				StartTime: p.metrics.StartTime,
+				EndTime:   now,
+				Value:     transactionRate,
+				Tags: map[string]interface{}{
+					"metric_type":        "cumulative_transaction_rate",
+					"iteration":          iteration,
+					"connections":        p.config.Connections,
+					"total_transactions": p.metrics.TotalTransactions,
+				},
+			})
+
+			// Store row insertion rate
+			results = append(results, core.TestResult{
+				TestRunID: testRunID,
+				MetricID:  rowInsertMetric.ID,
+				StartTime: p.metrics.StartTime,
+				EndTime:   now,
+				Value:     rowRate,
+				Tags: map[string]interface{}{
+					"metric_type":  "cumulative_row_rate",
+					"iteration":    iteration,
+					"connections":  p.config.Connections,
+					"total_rows":   p.metrics.TotalRowsInserted,
+				},
+			})
+		}
+
+		// Calculate average latency from batch results
+		if len(p.metrics.BatchResults) > 0 {
+			var totalLatency float64
+			var totalOperations int64
+			
+			for _, batch := range p.metrics.BatchResults {
+				totalLatency += batch.AvgLatencyMs * float64(batch.TotalTransactions)
+				totalOperations += batch.TotalTransactions
+			}
+			
+			if totalOperations > 0 {
+				avgLatency := totalLatency / float64(totalOperations)
+				
+				results = append(results, core.TestResult{
+					TestRunID: testRunID,
+					MetricID:  latencyAvgMetric.ID,
+					StartTime: p.metrics.StartTime,
+					EndTime:   now,
+					Value:     avgLatency,
+					Tags: map[string]interface{}{
+						"metric_type":     "cumulative_avg_latency",
+						"iteration":       iteration,
+						"connections":     p.config.Connections,
+						"batch_count":     len(p.metrics.BatchResults),
+					},
+				})
+			}
+		}
+	}
+
+	if len(results) > 0 {
+		p.logger.Debug("Saving background metrics",
+			core.Field{Key: "test_run_id", Value: testRunID},
+			core.Field{Key: "result_count", Value: len(results)},
+			core.Field{Key: "iteration", Value: iteration})
+
+		return p.core.Storage.StoreResults(ctx, results)
+	}
+
+	return nil
 }
 
 // storeResults converts plugin metrics to core.TestResult and stores them in the database
