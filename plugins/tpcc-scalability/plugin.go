@@ -196,7 +196,7 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 	defer atomic.StoreInt64(&p.isRunning, 0)
 
 	p.testStarted = time.Now()
-	
+
 	// Start background metrics saver goroutine
 	metricsCtx, cancelMetrics := context.WithCancel(ctx)
 	metricsDone := make(chan struct{})
@@ -205,7 +205,7 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 		cancelMetrics()
 		<-metricsDone // Wait for goroutine to finish
 	}()
-	
+
 	p.logger.Info("starting TPC-C scalability test",
 		core.Field{Key: "scale", Value: p.config.Scale},
 		core.Field{Key: "connection_levels", Value: len(p.config.Connections)},
@@ -1116,7 +1116,7 @@ func (p *TPCCPlugin) logConnectionLevelSummary(connCount int, duration time.Dura
 // backgroundMetricsSaver continuously saves metrics every second while test is running
 func (p *TPCCPlugin) backgroundMetricsSaver(ctx context.Context, done chan<- struct{}) {
 	defer close(done)
-	
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -1130,7 +1130,7 @@ func (p *TPCCPlugin) backgroundMetricsSaver(ctx context.Context, done chan<- str
 			return
 		case <-ticker.C:
 			saveCounter++
-			
+
 			// Get current metrics snapshot
 			p.metrics.mu.RLock()
 			totalTxns := p.metrics.NewOrderCount + p.metrics.PaymentCount +
@@ -1152,11 +1152,11 @@ func (p *TPCCPlugin) backgroundMetricsSaver(ctx context.Context, done chan<- str
 						core.Field{Key: "total_transactions", Value: totalTxns},
 						core.Field{Key: "connections", Value: currentConnections},
 						core.Field{Key: "test_phase", Value: testPhase})
-					
+
 					lastSavedTransactions = totalTxns
 				}
 			} else {
-				p.logger.Debug("No new TPCC metrics to save", 
+				p.logger.Debug("No new TPCC metrics to save",
 					core.Field{Key: "save_iteration", Value: saveCounter})
 			}
 		}
@@ -1196,6 +1196,10 @@ func (p *TPCCPlugin) saveCurrentTPCCMetrics(ctx context.Context, iteration int) 
 	totalTxns := p.metrics.NewOrderCount + p.metrics.PaymentCount +
 		p.metrics.OrderStatusCount + p.metrics.DeliveryCount + p.metrics.StockLevelCount
 
+	// Get connection and worker info
+	activeConnections := p.metrics.CurrentConnections
+	activeWorkers := activeConnections // For TPCC, number of workers typically equals connections
+
 	if totalTxns > 0 {
 		// Calculate elapsed time for rates
 		elapsed := now.Sub(p.testStarted).Seconds()
@@ -1204,17 +1208,23 @@ func (p *TPCCPlugin) saveCurrentTPCCMetrics(ctx context.Context, iteration int) 
 
 			// Store transaction rate
 			results = append(results, core.TestResult{
-				TestRunID: testRunID,
-				MetricID:  throughputMetric.ID,
-				StartTime: p.testStarted,
-				EndTime:   now,
-				Value:     transactionRate,
+				TestRunID:         testRunID,
+				MetricID:          throughputMetric.ID,
+				StartTime:         p.testStarted,
+				EndTime:           now,
+				Value:             transactionRate,
+				ActiveConnections: &activeConnections,
+				ActiveWorkers:     &activeWorkers,
 				Tags: map[string]interface{}{
 					"metric_type":        "cumulative_tps",
 					"iteration":          iteration,
 					"connections":        p.metrics.CurrentConnections,
-					"test_phase":         p.metrics.TestPhase,
+					"batch_size":         nil, // Not applicable for TPCC
 					"total_transactions": totalTxns,
+					"total_rows":         nil, // Not applicable for TPCC
+					"batch_count":        nil, // Not applicable for TPCC
+					"test_phase":         p.metrics.TestPhase,
+					"scale_factor":       p.config.Scale,
 				},
 			})
 		}
@@ -1222,18 +1232,25 @@ func (p *TPCCPlugin) saveCurrentTPCCMetrics(ctx context.Context, iteration int) 
 		// Calculate and store average latency
 		if totalTxns > 0 {
 			avgLatencyMs := float64(p.metrics.TotalLatency.Nanoseconds()) / float64(totalTxns) / 1000000.0
-			
+
 			results = append(results, core.TestResult{
-				TestRunID: testRunID,
-				MetricID:  latencyAvgMetric.ID,
-				StartTime: p.testStarted,
-				EndTime:   now,
-				Value:     avgLatencyMs,
+				TestRunID:         testRunID,
+				MetricID:          latencyAvgMetric.ID,
+				StartTime:         p.testStarted,
+				EndTime:           now,
+				Value:             avgLatencyMs,
+				ActiveConnections: &activeConnections,
+				ActiveWorkers:     &activeWorkers,
 				Tags: map[string]interface{}{
-					"metric_type":     "cumulative_avg_latency",
-					"iteration":       iteration,
-					"connections":     p.metrics.CurrentConnections,
-					"test_phase":      p.metrics.TestPhase,
+					"metric_type":        "cumulative_avg_latency",
+					"iteration":          iteration,
+					"connections":        p.metrics.CurrentConnections,
+					"batch_size":         nil, // Not applicable for TPCC
+					"total_transactions": totalTxns,
+					"total_rows":         nil, // Not applicable for TPCC
+					"batch_count":        nil, // Not applicable for TPCC
+					"test_phase":         p.metrics.TestPhase,
+					"scale_factor":       p.config.Scale,
 				},
 			})
 		}
@@ -1250,17 +1267,24 @@ func (p *TPCCPlugin) saveCurrentTPCCMetrics(ctx context.Context, iteration int) 
 		for txType, count := range txTypes {
 			if count > 0 {
 				results = append(results, core.TestResult{
-					TestRunID: testRunID,
-					MetricID:  throughputMetric.ID,
-					StartTime: p.testStarted,
-					EndTime:   now,
-					Value:     float64(count),
+					TestRunID:         testRunID,
+					MetricID:          throughputMetric.ID,
+					StartTime:         p.testStarted,
+					EndTime:           now,
+					Value:             float64(count),
+					ActiveConnections: &activeConnections,
+					ActiveWorkers:     &activeWorkers,
 					Tags: map[string]interface{}{
 						"metric_type":        "transaction_count",
-						"transaction_type":   txType,
 						"iteration":          iteration,
 						"connections":        p.metrics.CurrentConnections,
+						"batch_size":         nil, // Not applicable for TPCC
+						"total_transactions": totalTxns,
+						"total_rows":         nil, // Not applicable for TPCC
+						"batch_count":        nil, // Not applicable for TPCC
 						"test_phase":         p.metrics.TestPhase,
+						"scale_factor":       p.config.Scale,
+						"transaction_type":   txType,
 					},
 				})
 			}
@@ -1313,33 +1337,53 @@ func (p *TPCCPlugin) storeResults(ctx context.Context) error {
 	totalTxns := p.metrics.NewOrderCount + p.metrics.PaymentCount +
 		p.metrics.OrderStatusCount + p.metrics.DeliveryCount + p.metrics.StockLevelCount
 
+	// Connection and worker info for final results
+	activeConnections := p.metrics.CurrentConnections
+	activeWorkers := 0 // No workers active at completion
+
 	if totalTxns > 0 {
 		// Store total transaction rate
 		results = append(results, core.TestResult{
-			TestRunID: testRunID,
-			MetricID:  throughputMetric.ID,
-			StartTime: p.testStarted,
-			EndTime:   now,
-			Value:     float64(totalTxns),
+			TestRunID:         testRunID,
+			MetricID:          throughputMetric.ID,
+			StartTime:         p.testStarted,
+			EndTime:           now,
+			Value:             float64(totalTxns),
+			ActiveConnections: &activeConnections,
+			ActiveWorkers:     &activeWorkers,
 			Tags: map[string]interface{}{
-				"connections": p.metrics.CurrentConnections,
-				"metric_type": "total_transactions",
-				"test_phase":  p.metrics.TestPhase,
+				"metric_type":        "total_transactions",
+				"iteration":          nil, // Not applicable for final results
+				"connections":        p.metrics.CurrentConnections,
+				"batch_size":         nil, // Not applicable for TPCC
+				"total_transactions": totalTxns,
+				"total_rows":         nil, // Not applicable for TPCC
+				"batch_count":        nil, // Not applicable for TPCC
+				"test_phase":         "final_results",
+				"scale_factor":       p.config.Scale,
 			},
 		})
 
 		// Store average latency
 		avgLatencyMs := float64(p.metrics.TotalLatency.Nanoseconds()) / float64(totalTxns) / 1000000.0
 		results = append(results, core.TestResult{
-			TestRunID: testRunID,
-			MetricID:  latencyAvgMetric.ID,
-			StartTime: p.testStarted,
-			EndTime:   now,
-			Value:     avgLatencyMs,
+			TestRunID:         testRunID,
+			MetricID:          latencyAvgMetric.ID,
+			StartTime:         p.testStarted,
+			EndTime:           now,
+			Value:             avgLatencyMs,
+			ActiveConnections: &activeConnections,
+			ActiveWorkers:     &activeWorkers,
 			Tags: map[string]interface{}{
-				"connections": p.metrics.CurrentConnections,
-				"metric_type": "avg_latency_ms",
-				"test_phase":  p.metrics.TestPhase,
+				"metric_type":        "avg_latency_ms",
+				"iteration":          nil, // Not applicable for final results
+				"connections":        p.metrics.CurrentConnections,
+				"batch_size":         nil, // Not applicable for TPCC
+				"total_transactions": totalTxns,
+				"total_rows":         nil, // Not applicable for TPCC
+				"batch_count":        nil, // Not applicable for TPCC
+				"test_phase":         "final_results",
+				"scale_factor":       p.config.Scale,
 			},
 		})
 
@@ -1355,16 +1399,24 @@ func (p *TPCCPlugin) storeResults(ctx context.Context) error {
 		for txType, count := range txTypes {
 			if count > 0 {
 				results = append(results, core.TestResult{
-					TestRunID: testRunID,
-					MetricID:  throughputMetric.ID,
-					StartTime: p.testStarted,
-					EndTime:   now,
-					Value:     float64(count),
+					TestRunID:         testRunID,
+					MetricID:          throughputMetric.ID,
+					StartTime:         p.testStarted,
+					EndTime:           now,
+					Value:             float64(count),
+					ActiveConnections: &activeConnections,
+					ActiveWorkers:     &activeWorkers,
 					Tags: map[string]interface{}{
-						"connections":      p.metrics.CurrentConnections,
-						"metric_type":      "transaction_count",
-						"transaction_type": txType,
-						"test_phase":       p.metrics.TestPhase,
+						"metric_type":        "transaction_count",
+						"iteration":          nil, // Not applicable for final results
+						"connections":        p.metrics.CurrentConnections,
+						"batch_size":         nil, // Not applicable for TPCC
+						"total_transactions": totalTxns,
+						"total_rows":         nil, // Not applicable for TPCC
+						"batch_count":        nil, // Not applicable for TPCC
+						"test_phase":         "final_results",
+						"scale_factor":       p.config.Scale,
+						"transaction_type":   txType,
 					},
 				})
 			}

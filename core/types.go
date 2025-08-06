@@ -107,13 +107,15 @@ type TestRun struct {
 
 // TestResult represents a single measurement from a test execution
 type TestResult struct {
-	ID        int64                  `json:"id"`
-	TestRunID int64                  `json:"test_run_id"`
-	MetricID  int                    `json:"metric_id"`
-	StartTime time.Time              `json:"start_time"`
-	EndTime   time.Time              `json:"end_time"`
-	Value     float64                `json:"value"`
-	Tags      map[string]interface{} `json:"tags,omitempty"` // Flexible metadata, stored as JSONB
+	ID                int64                  `json:"id"`
+	TestRunID         int64                  `json:"test_run_id"`
+	MetricID          int                    `json:"metric_id"`
+	StartTime         time.Time              `json:"start_time"`
+	EndTime           time.Time              `json:"end_time"`
+	Value             float64                `json:"value"`
+	Tags              map[string]interface{} `json:"tags,omitempty"`               // Flexible metadata, stored as JSONB
+	ActiveConnections *int                   `json:"active_connections,omitempty"` // Number of active database connections
+	ActiveWorkers     *int                   `json:"active_workers,omitempty"`     // Number of active worker threads/processes
 }
 
 // TestType represents a category of tests (e.g., bulk_insert, read_latency)

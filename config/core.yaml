@@ -18,7 +18,7 @@ api:
     port: 9090
 
 logging:
-  level: "info"
+  level: "debug"
   format: "text"  # "text" or "json"aa
   output: "stdout"  # "stdout", "stderr", or file path
 

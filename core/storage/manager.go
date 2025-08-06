@@ -336,11 +336,11 @@ func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) e
 	}
 	defer tx.Rollback()
 
-	// Prepare insert statement
+	// Prepare insert statement with new connection and worker fields
 	query := `
 		INSERT INTO test_run_result 
-		(test_run_id, test_metric_id, start_time, end_time, value, tags)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		(test_run_id, test_metric_id, start_time, end_time, value, tags, active_connections, active_workers)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
@@ -360,6 +360,8 @@ func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) e
 			core.Field{Key: "test_run_id", Value: result.TestRunID},
 			core.Field{Key: "metric_id", Value: result.MetricID},
 			core.Field{Key: "value", Value: result.Value},
+			core.Field{Key: "active_connections", Value: result.ActiveConnections},
+			core.Field{Key: "active_workers", Value: result.ActiveWorkers},
 		)
 
 		_, err = stmt.ExecContext(ctx,
@@ -369,6 +371,8 @@ func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) e
 			result.EndTime,
 			result.Value,
 			tagsJSON,
+			result.ActiveConnections,
+			result.ActiveWorkers,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert result %d: %w", i, err)
@@ -389,7 +393,7 @@ func (m *Manager) StoreResults(ctx context.Context, results []core.TestResult) e
 // GetResults retrieves results for a test run
 func (m *Manager) GetResults(ctx context.Context, runID int64) ([]core.TestResult, error) {
 	query := `
-		SELECT id, test_run_id, test_metric_id, start_time, end_time, value, tags
+		SELECT id, test_run_id, test_metric_id, start_time, end_time, value, tags, active_connections, active_workers
 		FROM test_run_result 
 		WHERE test_run_id = $1
 		ORDER BY start_time
@@ -410,6 +414,7 @@ func (m *Manager) GetResults(ctx context.Context, runID int64) ([]core.TestResul
 	for rows.Next() {
 		var result core.TestResult
 		var tagsJSON []byte
+		var activeConnections, activeWorkers sql.NullInt32
 
 		err := rows.Scan(
 			&result.ID,
@@ -419,6 +424,8 @@ func (m *Manager) GetResults(ctx context.Context, runID int64) ([]core.TestResul
 			&result.EndTime,
 			&result.Value,
 			&tagsJSON,
+			&activeConnections,
+			&activeWorkers,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan result: %w", err)
@@ -431,6 +438,16 @@ func (m *Manager) GetResults(ctx context.Context, runID int64) ([]core.TestResul
 			}
 		}
 
+		// Handle nullable connection and worker counts
+		if activeConnections.Valid {
+			connections := int(activeConnections.Int32)
+			result.ActiveConnections = &connections
+		}
+		if activeWorkers.Valid {
+			workers := int(activeWorkers.Int32)
+			result.ActiveWorkers = &workers
+		}
+
 		results = append(results, result)
 	}
 
@@ -440,7 +457,7 @@ func (m *Manager) GetResults(ctx context.Context, runID int64) ([]core.TestResul
 // GetResultsByMetric retrieves recent results for a specific metric
 func (m *Manager) GetResultsByMetric(ctx context.Context, metricCode string, limit int) ([]core.TestResult, error) {
 	query := `
-		SELECT trr.id, trr.test_run_id, trr.test_metric_id, trr.start_time, trr.end_time, trr.value, trr.tags
+		SELECT trr.id, trr.test_run_id, trr.test_metric_id, trr.start_time, trr.end_time, trr.value, trr.tags, trr.active_connections, trr.active_workers
 		FROM test_run_result trr
 		JOIN test_metric tm ON trr.test_metric_id = tm.id
 		WHERE tm.code = $1
@@ -463,6 +480,7 @@ func (m *Manager) GetResultsByMetric(ctx context.Context, metricCode string, lim
 	for rows.Next() {
 		var result core.TestResult
 		var tagsJSON []byte
+		var activeConnections, activeWorkers sql.NullInt32
 
 		err := rows.Scan(
 			&result.ID,
@@ -472,6 +490,8 @@ func (m *Manager) GetResultsByMetric(ctx context.Context, metricCode string, lim
 			&result.EndTime,
 			&result.Value,
 			&tagsJSON,
+			&activeConnections,
+			&activeWorkers,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan result: %w", err)
@@ -482,6 +502,17 @@ func (m *Manager) GetResultsByMetric(ctx context.Context, metricCode string, lim
 				return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
 			}
 		}
+
+		// Handle nullable connection and worker counts
+		if activeConnections.Valid {
+			connections := int(activeConnections.Int32)
+			result.ActiveConnections = &connections
+		}
+		if activeWorkers.Valid {
+			workers := int(activeWorkers.Int32)
+			result.ActiveWorkers = &workers
+		}
+
 		results = append(results, result)
 	}
 
