@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS plugin (
     config_path TEXT,                         -- Path to configuration file
     metadata    JSONB NOT NULL,               -- Full plugin metadata
     created_at  TIMESTAMPTZ DEFAULT now(),
-    updated_at  TIMESTAMPTZ DEFAULT now(),
     is_active   BOOLEAN     DEFAULT true,
     UNIQUE(name, version)
 );
@@ -60,7 +59,6 @@ CREATE TABLE IF NOT EXISTS test_run (
     id            BIGSERIAL PRIMARY KEY,
     test_type_id  INT      REFERENCES test_type(id),
     plugin_id     INT      REFERENCES plugin(id),
-    plugin_ver    VARCHAR(20) NOT NULL,              -- Plugin version used
     host          VARCHAR(200) NOT NULL,              -- Target database host
     port          INT NOT NULL,                       -- Target database port
     db_name       VARCHAR(200) NOT NULL,              -- Target database name
@@ -87,7 +85,7 @@ CREATE TABLE IF NOT EXISTS test_run_result (
     start_time     TIMESTAMPTZ NOT NULL,             -- Measurement window start
     end_time       TIMESTAMPTZ NOT NULL,             -- Measurement window end
     value          DOUBLE PRECISION NOT NULL,        -- Measured value
-    tags           JSONB NOT NULL DEFAULT '{}',      -- Flexible metadata (e.g., {"batch_size":1000})
+    tags           JSONB,      -- Flexible metadata (e.g., {"batch_size":1000})
     created_at     TIMESTAMPTZ DEFAULT now()
 );
 
@@ -171,9 +169,6 @@ END;
 $$ language 'plpgsql';
 
 CREATE TRIGGER update_test_type_updated_at BEFORE UPDATE ON test_type
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_plugin_updated_at BEFORE UPDATE ON plugin
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_test_metric_updated_at BEFORE UPDATE ON test_metric

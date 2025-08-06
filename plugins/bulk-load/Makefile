@@ -17,7 +17,7 @@ all: plugin
 # Build plugin as shared library
 plugin: $(PLUGIN_SO)
 
-$(PLUGIN_SO): $(GO_FILES) go.mod go.sum
+$(PLUGIN_SO): $(GO_FILES)
 	@echo "Building bulk load plugin..."
 	@mkdir -p ../../build/plugins
 	CGO_ENABLED=$(CGO_ENABLED) go build -buildmode=plugin -o $(PLUGIN_SO) .

@@ -5,7 +5,9 @@ set -e
 
 echo "Running StormDB v2 Unit Tests..."
 
-cd /Users/charly.batista/proj/pgstorm/stormdb/v2
+# Get the directory of the script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
 
 # Run all unit tests
 echo "Running unit tests..."

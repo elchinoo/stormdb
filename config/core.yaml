@@ -23,6 +23,7 @@ logging:
   output: "stdout"  # "stdout", "stderr", or file path
 
 scheduler:
+  enabled: true
   worker_pool_size: 10
 
 plugin_dirs:

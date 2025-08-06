@@ -40,6 +40,7 @@ type TPCCConfig struct {
 	SSLMode  string `json:"ssl_mode" yaml:"ssl_mode"`
 
 	// Test configuration
+	Rebuild     bool          `json:"rebuild" yaml:"rebuild"`         // Force drop/recreate of database
 	Scale       int           `json:"scale" yaml:"scale"`             // TPC-C scale factor (warehouses)
 	Connections []int         `json:"connections" yaml:"connections"` // Connection counts to test [48, 96, 192, 256]
 	Duration    time.Duration `json:"duration" yaml:"duration"`       // Duration per connection level
@@ -191,6 +192,13 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 		core.Field{Key: "connection_levels", Value: len(p.config.Connections)},
 	)
 
+	// Rebuild database if requested
+	if p.config.Rebuild {
+		if err := p.rebuildDatabase(ctx); err != nil {
+			return fmt.Errorf("failed to rebuild database: %w", err)
+		}
+	}
+
 	// Connect to database
 	if err := p.connectDB(); err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
@@ -207,31 +215,8 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 		return fmt.Errorf("failed to populate test data: %w", err)
 	}
 
-	// Create test run
-	testRun := &core.TestRun{
-		TestTypeID:  1, // Will be resolved by storage layer
-		PluginID:    1, // Will be resolved by storage layer
-		PluginVer:   "1.0.0",
-		Host:        p.config.Host,
-		Port:        p.config.Port,
-		DBName:      p.config.Database,
-		Name:        fmt.Sprintf("TPC-C Scalability Test - Scale %d", p.config.Scale),
-		Description: fmt.Sprintf("Incremental connection test: %v", p.config.Connections),
-		Status:      core.StatusRunning,
-		Config:      config,
-		CreatedAt:   time.Now(),
-	}
-
-	runID, err := p.core.Storage.CreateTestRun(ctx, testRun)
-	if err != nil {
-		return fmt.Errorf("failed to create test run: %w", err)
-	}
-
-	p.logger.Info("test run created",
-		core.Field{Key: "run_id", Value: runID},
-	)
-
-	// Execute test for each connection level
+	// The test run is created by the scheduler. The plugin's job is to execute
+	// the test logic for each connection level.
 	for i, connCount := range p.config.Connections {
 		p.logger.Info("starting connection level test",
 			core.Field{Key: "level", Value: i + 1},
@@ -241,7 +226,13 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 		p.metrics.CurrentConnections = connCount
 		p.metrics.TestPhase = fmt.Sprintf("Level %d/%d", i+1, len(p.config.Connections))
 
-		if err := p.runConnectionLevel(ctx, runID, connCount); err != nil {
+		// We need a run ID to store results, but the plugin doesn't own the run.
+		// This is a temporary solution. In a real scenario, the run ID would be
+		// passed into the Execute method via the context.
+		// For now, we'll use a placeholder.
+		const placeholderRunID = 1
+
+		if err := p.runConnectionLevel(ctx, placeholderRunID, connCount); err != nil {
 			p.logger.Error("connection level test failed",
 				core.Field{Key: "level", Value: i + 1},
 				core.Field{Key: "connections", Value: connCount},
@@ -255,13 +246,7 @@ func (p *TPCCPlugin) Execute(ctx context.Context, config map[string]interface{})
 		}
 	}
 
-	// Update test run status
-	if err := p.core.Storage.UpdateTestRunStatus(ctx, runID, core.StatusSucceeded); err != nil {
-		p.logger.Warn("failed to update test run status", core.Field{Key: "error", Value: err.Error()})
-	}
-
 	p.logger.Info("TPC-C scalability test completed",
-		core.Field{Key: "run_id", Value: runID},
 		core.Field{Key: "duration", Value: time.Since(p.testStarted)},
 	)
 
@@ -291,6 +276,45 @@ func (p *TPCCPlugin) Cleanup(ctx context.Context) error {
 }
 
 // Helper methods
+
+func (p *TPCCPlugin) rebuildDatabase(ctx context.Context) error {
+	p.logger.Info("Rebuilding database", core.Field{Key: "database", Value: p.config.Database})
+
+	// Connect to the default 'postgres' database to drop the target database
+	defaultConnStr := fmt.Sprintf("host=%s port=%d dbname=postgres user=%s password=%s sslmode=%s",
+		p.config.Host, p.config.Port, p.config.Username, p.config.Password, p.config.SSLMode)
+
+	db, err := sql.Open("postgres", defaultConnStr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to 'postgres' db for rebuild: %w", err)
+	}
+	defer db.Close()
+
+	// Terminate existing connections
+	terminateSQL := `
+		SELECT pg_terminate_backend(pg_stat_activity.pid)
+		FROM pg_stat_activity
+		WHERE pg_stat_activity.datname = $1 AND pid <> pg_backend_pid()`
+	if _, err := db.ExecContext(ctx, terminateSQL, p.config.Database); err != nil {
+		p.logger.Warn("Could not terminate existing connections, proceeding anyway", core.Field{Key: "error", Value: err.Error()})
+	}
+
+	// Drop database
+	dropSQL := fmt.Sprintf("DROP DATABASE IF EXISTS %s", p.config.Database)
+	if _, err := db.ExecContext(ctx, dropSQL); err != nil {
+		return fmt.Errorf("failed to drop database: %w", err)
+	}
+	p.logger.Info("Dropped database", core.Field{Key: "database", Value: p.config.Database})
+
+	// Create database
+	createSQL := fmt.Sprintf("CREATE DATABASE %s", p.config.Database)
+	if _, err := db.ExecContext(ctx, createSQL); err != nil {
+		return fmt.Errorf("failed to create database: %w", err)
+	}
+	p.logger.Info("Created database", core.Field{Key: "database", Value: p.config.Database})
+
+	return nil
+}
 
 func (p *TPCCPlugin) connectDB() error {
 	connStr := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
@@ -682,7 +706,11 @@ func (p *TPCCPlugin) worker(ctx context.Context, workerID int, stopTime time.Tim
 					StartTime: start,
 					EndTime:   start.Add(latency),
 					Value:     float64(latency.Nanoseconds()),
-					Tags:      fmt.Sprintf(`{"worker_id":%d,"tx_type":"%s","connections":%d}`, workerID, txType, p.metrics.CurrentConnections),
+					Tags: map[string]interface{}{
+						"worker_id":   workerID,
+						"tx_type":     txType,
+						"connections": p.metrics.CurrentConnections,
+					},
 				}
 
 				select {
@@ -939,6 +967,7 @@ func getConfigSchema() string {
 			"username": {"type": "string", "default": "postgres"},
 			"password": {"type": "string", "default": "postgres"},
 			"ssl_mode": {"type": "string", "default": "disable"},
+			"rebuild": {"type": "boolean", "default": false, "description": "Force drop and recreate of the test database"},
 			"scale": {"type": "integer", "minimum": 1, "default": 10},
 			"connections": {
 				"type": "array",

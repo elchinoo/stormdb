@@ -24,7 +24,7 @@ deps:
 	$(GOMOD) tidy
 
 # Build the plugin as a shared library
-plugin: deps
+plugin:
 	@echo "Building $(PLUGIN_NAME) plugin..."
 	@mkdir -p $(PLUGIN_DIR)
 	$(GOBUILD) -buildmode=plugin -o $(PLUGIN_DIR)/$(PLUGIN_SO) .

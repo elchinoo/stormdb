@@ -40,6 +40,7 @@ type BulkLoadConfig struct {
 	SSLMode  string `json:"ssl_mode" yaml:"ssl_mode"`
 
 	// Test configuration
+	Rebuild      bool          `json:"rebuild" yaml:"rebuild"`             // Force drop/recreate of database
 	BatchSizes   []int         `json:"batch_sizes" yaml:"batch_sizes"`     // Batch sizes to test [1, 1000, 10000, 50000]
 	Connections  int           `json:"connections" yaml:"connections"`     // Fixed number of connections (default: 20)
 	Duration     time.Duration `json:"duration" yaml:"duration"`           // Duration per batch size
@@ -112,6 +113,7 @@ func (p *BulkLoadPlugin) Metadata() core.PluginMetadata {
 				"username": {"type": "string", "description": "Database username"},
 				"password": {"type": "string", "description": "Database password"},
 				"ssl_mode": {"type": "string", "enum": ["disable", "require", "verify-ca", "verify-full"], "default": "disable"},
+				"rebuild": {"type": "boolean", "default": false, "description": "Force drop and recreate of the test database"},
 				"batch_sizes": {"type": "array", "items": {"type": "integer", "minimum": 1}, "default": [1, 1000, 10000, 50000]},
 				"connections": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 20},
 				"duration": {"type": "string", "pattern": "^[0-9]+[smh]$", "default": "5m"},
@@ -214,6 +216,11 @@ func (p *BulkLoadPlugin) Validate(config map[string]interface{}) error {
 	if verbose, ok := config["verbose"]; ok {
 		if verboseBool, ok := verbose.(bool); ok {
 			bulkConfig.Verbose = verboseBool
+		}
+	}
+	if rebuild, ok := config["rebuild"]; ok {
+		if rebuildBool, ok := rebuild.(bool); ok {
+			bulkConfig.Rebuild = rebuildBool
 		}
 	}
 
@@ -367,6 +374,18 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 	}
 	defer p.db.Close()
 
+	// Rebuild database if requested
+	if p.config.Rebuild {
+		if err := p.rebuildDatabase(); err != nil {
+			return fmt.Errorf("failed to rebuild database: %w", err)
+		}
+		// Reconnect after rebuild
+		if err := p.connectDatabase(); err != nil {
+			return fmt.Errorf("failed to reconnect to database after rebuild: %w", err)
+		}
+		defer p.db.Close()
+	}
+
 	// Create/prepare test table
 	if err := p.setupTestTable(); err != nil {
 		return fmt.Errorf("failed to setup test table: %w", err)
@@ -440,6 +459,45 @@ func (p *BulkLoadPlugin) Cleanup(ctx context.Context) error {
 }
 
 // Helper methods
+
+func (p *BulkLoadPlugin) rebuildDatabase() error {
+	p.logger.Info("Rebuilding database", core.Field{Key: "database", Value: p.config.Database})
+
+	// Connect to the default 'postgres' database to drop the target database
+	defaultConnStr := fmt.Sprintf("host=%s port=%d dbname=postgres user=%s password=%s sslmode=%s",
+		p.config.Host, p.config.Port, p.config.Username, p.config.Password, p.config.SSLMode)
+
+	db, err := sql.Open("postgres", defaultConnStr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to 'postgres' db for rebuild: %w", err)
+	}
+	defer db.Close()
+
+	// Terminate existing connections
+	terminateSQL := `
+		SELECT pg_terminate_backend(pg_stat_activity.pid)
+		FROM pg_stat_activity
+		WHERE pg_stat_activity.datname = $1 AND pid <> pg_backend_pid()`
+	if _, err := db.Exec(terminateSQL, p.config.Database); err != nil {
+		p.logger.Warn("Could not terminate existing connections, proceeding anyway", core.Field{Key: "error", Value: err.Error()})
+	}
+
+	// Drop database
+	dropSQL := fmt.Sprintf("DROP DATABASE IF EXISTS %s", p.config.Database)
+	if _, err := db.Exec(dropSQL); err != nil {
+		return fmt.Errorf("failed to drop database: %w", err)
+	}
+	p.logger.Info("Dropped database", core.Field{Key: "database", Value: p.config.Database})
+
+	// Create database
+	createSQL := fmt.Sprintf("CREATE DATABASE %s", p.config.Database)
+	if _, err := db.Exec(createSQL); err != nil {
+		return fmt.Errorf("failed to create database: %w", err)
+	}
+	p.logger.Info("Created database", core.Field{Key: "database", Value: p.config.Database})
+
+	return nil
+}
 
 // connectDatabase establishes database connection
 func (p *BulkLoadPlugin) connectDatabase() error {
