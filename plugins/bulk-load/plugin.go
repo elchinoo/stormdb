@@ -40,17 +40,17 @@ type BulkLoadConfig struct {
 	SSLMode  string `json:"ssl_mode" yaml:"ssl_mode"`
 
 	// Test configuration
-	BatchSizes    []int         `json:"batch_sizes" yaml:"batch_sizes"`       // Batch sizes to test [1, 1000, 10000, 50000]
-	Connections   int           `json:"connections" yaml:"connections"`       // Fixed number of connections (default: 20)
-	Duration      time.Duration `json:"duration" yaml:"duration"`             // Duration per batch size
-	WarmupTime    time.Duration `json:"warmup_time" yaml:"warmup_time"`       // Warmup before measurements
-	ThinkTime     time.Duration `json:"think_time" yaml:"think_time"`         // Delay between batches
-	TableName     string        `json:"table_name" yaml:"table_name"`         // Table name for bulk inserts
-	DropTable     bool          `json:"drop_table" yaml:"drop_table"`         // Whether to drop/recreate table between tests
-	GenerateData  bool          `json:"generate_data" yaml:"generate_data"`   // Whether to generate random data
-	DataColumns   int           `json:"data_columns" yaml:"data_columns"`     // Number of data columns to create
-	IndexColumns  []string      `json:"index_columns" yaml:"index_columns"`   // Columns to create indexes on
-	Verbose       bool          `json:"verbose" yaml:"verbose"`               // Enable verbose logging
+	BatchSizes   []int         `json:"batch_sizes" yaml:"batch_sizes"`     // Batch sizes to test [1, 1000, 10000, 50000]
+	Connections  int           `json:"connections" yaml:"connections"`     // Fixed number of connections (default: 20)
+	Duration     time.Duration `json:"duration" yaml:"duration"`           // Duration per batch size
+	WarmupTime   time.Duration `json:"warmup_time" yaml:"warmup_time"`     // Warmup before measurements
+	ThinkTime    time.Duration `json:"think_time" yaml:"think_time"`       // Delay between batches
+	TableName    string        `json:"table_name" yaml:"table_name"`       // Table name for bulk inserts
+	DropTable    bool          `json:"drop_table" yaml:"drop_table"`       // Whether to drop/recreate table between tests
+	GenerateData bool          `json:"generate_data" yaml:"generate_data"` // Whether to generate random data
+	DataColumns  int           `json:"data_columns" yaml:"data_columns"`   // Number of data columns to create
+	IndexColumns []string      `json:"index_columns" yaml:"index_columns"` // Columns to create indexes on
+	Verbose      bool          `json:"verbose" yaml:"verbose"`             // Enable verbose logging
 }
 
 // BulkLoadMetrics tracks performance metrics for bulk load tests
@@ -66,29 +66,29 @@ type BulkLoadMetrics struct {
 
 // BatchResult contains metrics for a specific batch size test
 type BatchResult struct {
-	BatchSize         int     `json:"batch_size"`
-	Connections       int     `json:"connections"`
-	TotalTransactions int64   `json:"total_transactions"`
-	TotalRowsInserted int64   `json:"total_rows_inserted"`
-	TotalErrors       int64   `json:"total_errors"`
-	DurationSeconds   float64 `json:"duration_seconds"`
+	BatchSize          int     `json:"batch_size"`
+	Connections        int     `json:"connections"`
+	TotalTransactions  int64   `json:"total_transactions"`
+	TotalRowsInserted  int64   `json:"total_rows_inserted"`
+	TotalErrors        int64   `json:"total_errors"`
+	DurationSeconds    float64 `json:"duration_seconds"`
 	TransactionsPerSec float64 `json:"transactions_per_sec"`
-	RowsPerSec        float64 `json:"rows_per_sec"`
-	AvgLatencyMs      float64 `json:"avg_latency_ms"`
-	MinLatencyMs      float64 `json:"min_latency_ms"`
-	MaxLatencyMs      float64 `json:"max_latency_ms"`
-	ErrorRate         float64 `json:"error_rate"`
+	RowsPerSec         float64 `json:"rows_per_sec"`
+	AvgLatencyMs       float64 `json:"avg_latency_ms"`
+	MinLatencyMs       float64 `json:"min_latency_ms"`
+	MaxLatencyMs       float64 `json:"max_latency_ms"`
+	ErrorRate          float64 `json:"error_rate"`
 }
 
 // WorkerStats tracks per-worker metrics
 type WorkerStats struct {
-	WorkerID      int           `json:"worker_id"`
-	Transactions  int64         `json:"transactions"`
-	RowsInserted  int64         `json:"rows_inserted"`
-	Errors        int64         `json:"errors"`
-	TotalLatency  time.Duration `json:"total_latency"`
-	MinLatency    time.Duration `json:"min_latency"`
-	MaxLatency    time.Duration `json:"max_latency"`
+	WorkerID     int           `json:"worker_id"`
+	Transactions int64         `json:"transactions"`
+	RowsInserted int64         `json:"rows_inserted"`
+	Errors       int64         `json:"errors"`
+	TotalLatency time.Duration `json:"total_latency"`
+	MinLatency   time.Duration `json:"min_latency"`
+	MaxLatency   time.Duration `json:"max_latency"`
 }
 
 // Plugin interface implementation
@@ -546,8 +546,8 @@ func (p *BulkLoadPlugin) clearTableData() error {
 // runBatchTest executes the test for a specific batch size
 func (p *BulkLoadPlugin) runBatchTest(ctx context.Context, batchSize int) (*BatchResult, error) {
 	result := &BatchResult{
-		BatchSize:   batchSize,
-		Connections: p.config.Connections,
+		BatchSize:    batchSize,
+		Connections:  p.config.Connections,
 		MinLatencyMs: float64(time.Hour.Milliseconds()), // Initialize with high value
 	}
 
@@ -559,7 +559,7 @@ func (p *BulkLoadPlugin) runBatchTest(ctx context.Context, batchSize int) (*Batc
 
 	// Measurement phase
 	p.logger.Info("Starting measurement phase", core.Field{Key: "duration", Value: p.config.Duration})
-	
+
 	workerStats := make([]*WorkerStats, p.config.Connections)
 	for i := range workerStats {
 		workerStats[i] = &WorkerStats{
@@ -570,10 +570,10 @@ func (p *BulkLoadPlugin) runBatchTest(ctx context.Context, batchSize int) (*Batc
 
 	measureCtx, measureCancel := context.WithTimeout(ctx, p.config.Duration)
 	testStart := time.Now()
-	
+
 	p.runWorkers(measureCtx, batchSize, workerStats)
 	measureCancel()
-	
+
 	testDuration := time.Since(testStart)
 	result.DurationSeconds = testDuration.Seconds()
 
@@ -591,7 +591,7 @@ func (p *BulkLoadPlugin) runBatchTest(ctx context.Context, batchSize int) (*Batc
 		if stats.Transactions > 0 {
 			minMs := float64(stats.MinLatency.Nanoseconds()) / 1000000.0
 			maxMs := float64(stats.MaxLatency.Nanoseconds()) / 1000000.0
-			
+
 			if minMs < result.MinLatencyMs {
 				result.MinLatencyMs = minMs
 			}
@@ -623,12 +623,12 @@ func (p *BulkLoadPlugin) runWorkers(ctx context.Context, batchSize int, workerSt
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			
+
 			var stats *WorkerStats
 			if workerStats != nil {
 				stats = workerStats[workerID]
 			}
-			
+
 			p.worker(ctx, workerID, batchSize, stats)
 		}(i)
 	}
@@ -690,11 +690,11 @@ func (p *BulkLoadPlugin) executeBulkInsert(batchSize int) error {
 	// Build bulk insert SQL
 	var valuePlaceholders []string
 	var values []interface{}
-	
+
 	placeholderIndex := 1
 	for i := 0; i < batchSize; i++ {
 		var rowPlaceholders []string
-		
+
 		// Add values for each data column
 		for j := 1; j <= p.config.DataColumns; j++ {
 			switch j % 4 {
@@ -710,7 +710,7 @@ func (p *BulkLoadPlugin) executeBulkInsert(batchSize int) error {
 			rowPlaceholders = append(rowPlaceholders, fmt.Sprintf("$%d", placeholderIndex))
 			placeholderIndex++
 		}
-		
+
 		valuePlaceholders = append(valuePlaceholders, "("+strings.Join(rowPlaceholders, ", ")+")")
 	}
 
@@ -738,17 +738,17 @@ func (p *BulkLoadPlugin) executeBulkInsert(batchSize int) error {
 	return err
 }
 
-// GetPlugin returns the plugin instance (required for plugin loading)
-func GetPlugin() core.Plugin {
+// NewPlugin returns the plugin instance (required for plugin loading)
+func NewPlugin() core.Plugin {
 	return &BulkLoadPlugin{}
 }
 
 // Main function for standalone testing
 func main() {
 	// This is only used for testing the plugin as a standalone binary
-	// The actual plugin loading uses GetPlugin()
-	plugin := GetPlugin()
-	fmt.Printf("Bulk Load Plugin: %s v%s\n", 
-		plugin.Metadata().Name, 
+	// The actual plugin loading uses NewPlugin()
+	plugin := NewPlugin()
+	fmt.Printf("Bulk Load Plugin: %s v%s\n",
+		plugin.Metadata().Name,
 		plugin.Metadata().Version)
 }

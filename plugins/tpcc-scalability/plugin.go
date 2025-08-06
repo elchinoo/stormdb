@@ -135,8 +135,6 @@ func (p *TPCCPlugin) Initialize(ctx context.Context, coreServices *core.CoreServ
 
 // Validate checks the plugin configuration
 func (p *TPCCPlugin) Validate(config map[string]interface{}) error {
-	p.logger.Info("validating TPC-C configuration")
-
 	cfg, err := parseConfig(config)
 	if err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
@@ -173,12 +171,6 @@ func (p *TPCCPlugin) Validate(config map[string]interface{}) error {
 	}
 
 	p.config = cfg
-	p.logger.Info("TPC-C configuration validated successfully",
-		core.Field{Key: "scale", Value: cfg.Scale},
-		core.Field{Key: "connections", Value: cfg.Connections},
-		core.Field{Key: "duration", Value: cfg.Duration},
-	)
-
 	return nil
 }
 
@@ -967,6 +959,11 @@ func getConfigSchema() string {
 		},
 		"required": ["host", "port", "database", "username", "password"]
 	}`
+}
+
+// NewPlugin returns a new instance of the TPC-C plugin (required for plugin loading)
+func NewPlugin() core.Plugin {
+	return &TPCCPlugin{}
 }
 
 // Export the plugin (required for Go plugin system)

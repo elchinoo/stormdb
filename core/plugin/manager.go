@@ -297,13 +297,14 @@ func (m *Manager) ValidatePluginFile(path string) error {
 		return fmt.Errorf("plugin file must have .so extension: %s", path)
 	}
 
-	// Check file permissions
+	// Check file permissions for .so files (shared libraries don't need execute permission)
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	if fileInfo.Mode()&0111 == 0 {
+	// Only check execute permission for non-.so files
+	if !strings.HasSuffix(strings.ToLower(path), ".so") && fileInfo.Mode()&0111 == 0 {
 		return fmt.Errorf("plugin file is not executable: %s", path)
 	}
 

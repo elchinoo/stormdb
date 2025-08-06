@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -312,7 +312,7 @@ func (m *Manager) applyMigration(ctx context.Context, migrationFile, migrationNa
 
 // readFile reads a file from the filesystem (wrapper for testing)
 var readFile = func(filename string) ([]byte, error) {
-	return fs.ReadFile(nil, filename)
+	return os.ReadFile(filename)
 }
 
 // ExecuteInTransaction executes a function within a database transaction
