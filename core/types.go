@@ -1,4 +1,4 @@
-// Package core defines the fundamental types and interfaces for StormDB v0.4-alpha.1
+// Package core defines the fundamental types and interfaces for StormDB v0.4-alpha
 // This package provides the core infrastructure for the plugin-based database performance testing framework
 package core
 

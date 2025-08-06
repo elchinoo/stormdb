@@ -1,5 +1,5 @@
-# StormDB v0.4-alpha.1 Dockerfile
-# Multi-stage build for StormDB v0.4-alpha.1 with plugin support
+# StormDB v0.4-alpha Dockerfile
+# Multi-stage build for StormDB v0.4-alpha with plugin support
 
 # Build stage
 FROM golang:1.24-alpine AS builder
@@ -102,11 +102,11 @@ CMD ["-config", "/app/config/core.yaml"]
 
 # Build metadata
 LABEL maintainer="StormDB Team <team@stormdb.io>"
-LABEL version="0.4-alpha.1"
-LABEL description="StormDB v0.4-alpha.1 - Modular PostgreSQL Performance Testing Platform"
-LABEL org.opencontainers.image.title="StormDB v0.4-alpha.1"
+LABEL version="0.4-alpha"
+LABEL description="StormDB v0.4-alpha - Modular PostgreSQL Performance Testing Platform"
+LABEL org.opencontainers.image.title="StormDB v0.4-alpha"
 LABEL org.opencontainers.image.description="Modular plugin-based database performance testing tool"
-LABEL org.opencontainers.image.version="0.4-alpha.1"
+LABEL org.opencontainers.image.version="0.4-alpha"
 LABEL org.opencontainers.image.source="https://github.com/elchinoo/stormdb"
 LABEL org.opencontainers.image.documentation="https://github.com/elchinoo/stormdb/tree/v2-redesign-core"
 LABEL org.opencontainers.image.licenses="MIT"

@@ -1,4 +1,4 @@
-// Package plugin provides dynamic plugin loading for StormDB v0.4-alpha.1
+// Package plugin provides dynamic plugin loading for StormDB v0.4-alpha
 // Handles plugin discovery, loading, validation, and lifecycle management
 package plugin
 

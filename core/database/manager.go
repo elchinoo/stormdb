@@ -1,4 +1,4 @@
-// Package database provides database connection management for StormDB v0.4-alpha.1
+// Package database provides database connection management for StormDB v0.4-alpha
 // Handles connection pooling, health monitoring, and schema migration
 package database
 

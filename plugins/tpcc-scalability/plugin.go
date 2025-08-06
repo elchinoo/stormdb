@@ -1,4 +1,4 @@
-// Package tpcc implements a TPC-C inspired scalability test plugin for StormDB v0.4-alpha.1
+// Package tpcc implements a TPC-C inspired scalability test plugin for StormDB v0.4-alpha
 // This plugin performs incremental connection testing with configurable parameters
 package main
 

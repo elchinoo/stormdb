@@ -1,4 +1,4 @@
-// Package bulkload implements a bulk load performance test plugin for StormDB v0.4-alpha.1
+// Package bulkload implements a bulk load performance test plugin for StormDB v0.4-alpha
 // This plugin tests different batch sizes with a fixed number of connections
 package main
 
