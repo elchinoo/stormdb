@@ -356,6 +356,9 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 	// Extract test run ID from context and add to logger
 	if testRunID, ok := ctx.Value("test_run_id").(int64); ok {
 		p.logger = p.logger.WithFields(core.Field{Key: "test_run_id", Value: testRunID})
+		p.logger.Info("Plugin executing with test run ID", core.Field{Key: "test_run_id", Value: testRunID})
+	} else {
+		p.logger.Warn("No test run ID found in context - this may cause issues with result storage")
 	}
 
 	// Set running state
@@ -418,6 +421,14 @@ func (p *BulkLoadPlugin) Execute(ctx context.Context, config map[string]interfac
 		p.metrics.TotalRowsInserted += result.TotalRowsInserted
 		p.metrics.TotalErrors += result.TotalErrors
 		p.metrics.mu.Unlock()
+
+		p.logger.Info("Metrics collection update",
+			core.Field{Key: "batch_size", Value: batchSize},
+			core.Field{Key: "total_transactions", Value: result.TotalTransactions},
+			core.Field{Key: "total_rows", Value: result.TotalRowsInserted},
+			core.Field{Key: "errors", Value: result.TotalErrors},
+			core.Field{Key: "accumulated_total_transactions", Value: p.metrics.TotalTransactions},
+			core.Field{Key: "accumulated_total_rows", Value: p.metrics.TotalRowsInserted})
 
 		p.logger.Info("Batch test completed",
 			core.Field{Key: "batch_size", Value: batchSize},
@@ -835,6 +846,17 @@ func (p *BulkLoadPlugin) storeResults(ctx context.Context) error {
 
 	var results []core.TestResult
 	now := time.Now()
+
+	if len(p.metrics.BatchResults) == 0 {
+		p.logger.Warn("No batch results to store - test may not have run properly")
+		return nil
+	}
+
+	p.logger.Info("Processing batch results for storage",
+		core.Field{Key: "batch_count", Value: len(p.metrics.BatchResults)},
+		core.Field{Key: "total_transactions", Value: p.metrics.TotalTransactions},
+		core.Field{Key: "total_rows", Value: p.metrics.TotalRowsInserted},
+	)
 
 	// Convert each batch result to database format
 	for _, batch := range p.metrics.BatchResults {
