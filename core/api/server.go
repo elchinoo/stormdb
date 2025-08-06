@@ -101,6 +101,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/test-runs", s.handleListTestRuns).Methods("GET")
 	s.router.HandleFunc("/test-runs/{id}", s.handleGetTestRun).Methods("GET")
 	s.router.HandleFunc("/test-runs/{id}/cancel", s.handleCancelTestRun).Methods("POST")
+	// Fetch recent logs for a specific test run
+	s.router.HandleFunc("/test-runs/{id}/logs", s.handleGetTestRunLogs).Methods("GET")
 
 	// Test results
 	s.router.HandleFunc("/test-runs/{id}/results", s.handleGetTestResults).Methods("GET")
@@ -353,6 +355,40 @@ func (s *Server) handleGetTestResults(w http.ResponseWriter, r *http.Request) {
 		"test_run_id": id,
 		"results":     results,
 		"count":       len(results),
+	})
+}
+
+// handleGetTestRunLogs returns last N lines of logs for a test run
+func (s *Server) handleGetTestRunLogs(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "invalid test run ID", err)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50 // default to last 50 lines
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 1000 {
+			limit = l
+		}
+	}
+
+	ctx := r.Context()
+	logs, err := s.coreServices.Storage.GetTestRunLogs(ctx, id, limit)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "failed to get test run logs", err)
+		return
+	}
+
+	s.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"test_run_id": id,
+		"logs":        logs,
+		"count":       len(logs),
+		"limit":       limit,
 	})
 }
 

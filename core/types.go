@@ -175,6 +175,15 @@ type CoreServices struct {
 	Plugin    PluginManager
 }
 
+// LogEntry represents a single log record for a test run
+type LogEntry struct {
+	TestRunID int64                  `json:"test_run_id"`
+	Level     string                 `json:"level"`
+	Message   string                 `json:"message"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+}
+
 // DatabaseManager provides connection pooling and database operations
 type DatabaseManager interface {
 	// Connection lifecycle
@@ -199,6 +208,8 @@ type Logger interface {
 	Error(msg string, fields ...Field)
 	WithFields(fields ...Field) Logger
 	WithPlugin(pluginName string) Logger
+	// WithStorage provides a StorageManager to enable DB log persistence
+	WithStorage(storage StorageManager) Logger
 }
 
 // Field represents a structured log field
@@ -227,6 +238,11 @@ type StorageManager interface {
 	GetPlugin(ctx context.Context, name, version string) (*PluginMetadata, error)
 	RegisterMetric(ctx context.Context, code, description, unit string) (int, error)
 	GetMetric(ctx context.Context, code string) (*TestMetric, error)
+	// Log persistence
+	StoreLog(ctx context.Context, entry LogEntry) error
+	GetTestRunLogs(ctx context.Context, testRunID int64, limit int) ([]LogEntry, error)
+	// Fix stuck tests on startup: set status=failed for runs still running or pending
+	FixStuckTests(ctx context.Context) (int64, error)
 }
 
 // ConfigManager handles global and plugin-specific configuration

@@ -403,6 +403,10 @@ func (m *MockLogger) WithPlugin(pluginName string) core.Logger {
 	return m
 }
 
+func (m *MockLogger) WithStorage(storage core.StorageManager) core.Logger {
+	return m
+}
+
 // Helper functions
 func abs(x float64) float64 {
 	if x < 0 {

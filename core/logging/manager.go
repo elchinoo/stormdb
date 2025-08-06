@@ -17,11 +17,12 @@ import (
 
 // Manager implements the Logger interface
 type Manager struct {
-	logger *slog.Logger
-	config *core.LoggingConfig
-	level  slog.Level
-	fields []core.Field
-	writer io.Writer
+	logger  *slog.Logger
+	config  *core.LoggingConfig
+	level   slog.Level
+	fields  []core.Field
+	writer  io.Writer
+	storage core.StorageManager // optional DB storage for logs
 }
 
 // NewManager creates a new logging manager
@@ -59,10 +60,11 @@ func NewManager(config *core.LoggingConfig) (*Manager, error) {
 	logger := slog.New(handler)
 
 	return &Manager{
-		logger: logger,
-		config: config,
-		level:  level,
-		writer: writer,
+		logger:  logger,
+		config:  config,
+		level:   level,
+		writer:  writer,
+		storage: nil, // set via WithStorage if desired
 	}, nil
 }
 
@@ -91,6 +93,7 @@ func (m *Manager) Warn(msg string, fields ...core.Field) {
 func (m *Manager) Error(msg string, fields ...core.Field) {
 	if m.level <= slog.LevelError {
 		m.log(slog.LevelError, msg, fields...)
+		m.persistLog(slog.LevelError, msg, fields...)
 	}
 }
 
@@ -114,6 +117,18 @@ func (m *Manager) WithPlugin(pluginName string) core.Logger {
 	return m.WithFields(core.Field{Key: "plugin", Value: pluginName})
 }
 
+// WithStorage returns a new logger that persists logs to the given StorageManager
+func (m *Manager) WithStorage(storage core.StorageManager) core.Logger {
+	return &Manager{
+		logger:  m.logger,
+		config:  m.config,
+		level:   m.level,
+		fields:  m.fields,
+		writer:  m.writer,
+		storage: storage,
+	}
+}
+
 // log is the internal logging method
 func (m *Manager) log(level slog.Level, msg string, fields ...core.Field) {
 	// Combine permanent fields with temporary fields
@@ -132,6 +147,53 @@ func (m *Manager) log(level slog.Level, msg string, fields ...core.Field) {
 
 	// Log with attributes using context.Background()
 	m.logger.LogAttrs(context.Background(), level, msg, attrs...)
+}
+
+// persistLog writes a log entry to the database if storage is configured
+func (m *Manager) persistLog(level slog.Level, msg string, fields ...core.Field) {
+	if m.storage == nil {
+		return
+	}
+
+	// Convert fields to JSON and look for test_run_id
+	meta := make(map[string]interface{})
+	var testRunID int64 = 0
+
+	for _, f := range m.fields {
+		meta[f.Key] = f.Value
+		// Extract test run ID if present
+		if f.Key == "test_run_id" {
+			if id, ok := f.Value.(int64); ok {
+				testRunID = id
+			}
+		}
+	}
+	for _, f := range fields {
+		meta[f.Key] = f.Value
+		// Extract test run ID if present
+		if f.Key == "test_run_id" {
+			if id, ok := f.Value.(int64); ok {
+				testRunID = id
+			}
+		}
+	}
+
+	entry := core.LogEntry{
+		TestRunID: testRunID,
+		Level:     level.String(),
+		Message:   msg,
+		Metadata:  meta,
+		Timestamp: time.Now(),
+	}
+
+	// Fire and forget
+	go func() {
+		ctx := context.Background()
+		if err := m.storage.StoreLog(ctx, entry); err != nil {
+			// cannot log error to storage, fallback to console
+			m.logger.LogAttrs(ctx, level, "failed to persist log entry", slog.String("error", err.Error()))
+		}
+	}()
 }
 
 // Close closes any file handles (if logging to file)

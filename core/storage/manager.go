@@ -26,6 +26,80 @@ func NewManager(db core.DatabaseManager, logger core.Logger) *Manager {
 	}
 }
 
+// StoreLog writes a log entry for a test run into the database
+func (m *Manager) StoreLog(ctx context.Context, entry core.LogEntry) error {
+	db, err := m.db.GetConnection(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get DB connection for log storage: %w", err)
+	}
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO test_run_logs (test_run_id, timestamp, level, message, metadata) VALUES ($1, $2, $3, $4, $5)`,
+		entry.TestRunID, entry.Timestamp, entry.Level, entry.Message, entry.Metadata,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert log entry: %w", err)
+	}
+	return nil
+}
+
+// GetTestRunLogs retrieves logs for a test run
+func (m *Manager) GetTestRunLogs(ctx context.Context, testRunID int64, limit int) ([]core.LogEntry, error) {
+	query := `
+		SELECT test_run_id, timestamp, level, message, metadata
+		FROM test_run_logs 
+		WHERE test_run_id = $1
+		ORDER BY timestamp DESC
+		LIMIT $2
+	`
+
+	db, err := m.db.GetConnection(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database connection: %w", err)
+	}
+
+	rows, err := db.QueryContext(ctx, query, testRunID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []core.LogEntry
+	for rows.Next() {
+		var log core.LogEntry
+		err := rows.Scan(&log.TestRunID, &log.Timestamp, &log.Level, &log.Message, &log.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan log entry: %w", err)
+		}
+		logs = append(logs, log)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating logs: %w", err)
+	}
+
+	return logs, nil
+}
+
+// FixStuckTests marks any pending or running test runs as failed at Startup
+func (m *Manager) FixStuckTests(ctx context.Context) (int64, error) {
+	db, err := m.db.GetConnection(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get DB connection for fixing stuck tests: %w", err)
+	}
+	result, err := db.ExecContext(ctx,
+		`UPDATE test_run SET status = 'failed', end_time = now() WHERE status IN ('pending','running') AND end_time IS NULL`,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to update stuck test runs: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected for stuck tests: %w", err)
+	}
+	m.logger.Info("Fixed stuck test runs", core.Field{Key: "count", Value: count})
+	return count, nil
+}
+
 // CreateTestRun creates a new test run record
 func (m *Manager) CreateTestRun(ctx context.Context, run *core.TestRun) (int64, error) {
 	configJSON, err := json.Marshal(run.Config)
@@ -119,7 +193,7 @@ func (m *Manager) UpdateTestRunStatus(ctx context.Context, runID int64, status c
 func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, error) {
 	query := `
 		SELECT id, test_type_id, plugin_id, host, port, db_name, 
-		       name, description, status, config, created_at, start_time, end_time
+			   name, description, status, config, created_at, start_time, end_time
 		FROM test_run 
 		WHERE id = $1
 	`
@@ -176,7 +250,7 @@ func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, e
 func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.TestRun, error) {
 	query := `
 		SELECT id, test_type_id, plugin_id, host, port, db_name, 
-		       name, description, status, config, created_at, start_time, end_time
+			   name, description, status, config, created_at, start_time, end_time
 		FROM test_run 
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
