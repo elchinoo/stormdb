@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/elchinoo/stormdb/core"
+	"github.com/elchinoo/stormdb/core/validation"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,6 +20,7 @@ type Manager struct {
 	globalConfig  *core.CoreConfig
 	pluginConfigs map[string]map[string]interface{}
 	configPath    string
+	validator     *validation.SchemaValidator
 	mu            sync.RWMutex
 }
 
@@ -26,6 +28,7 @@ type Manager struct {
 func NewManager() *Manager {
 	return &Manager{
 		pluginConfigs: make(map[string]map[string]interface{}),
+		validator:     validation.NewSchemaValidator(),
 	}
 }
 
@@ -162,18 +165,12 @@ func (m *Manager) Reload() error {
 
 // Validate validates configuration against a JSON schema
 func (m *Manager) Validate(config map[string]interface{}, schema string) error {
-	// For now, we'll do basic validation
-	// In a full implementation, you'd use a JSON Schema validator
 	if schema == "" {
 		return nil // No schema means no validation
 	}
 
-	// Basic validation for required fields (simplified)
-	if _, exists := config["name"]; !exists {
-		return fmt.Errorf("missing required field: name")
-	}
-
-	return nil
+	// Use JSON Schema validation
+	return m.validator.ValidateWithSchema(config, schema)
 }
 
 // validateGlobalConfig validates the global configuration

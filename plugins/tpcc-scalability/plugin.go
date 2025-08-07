@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -21,7 +22,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// TPCCPlugin implements the TPC-C scalability test skeleton
+// TPCCPlugin implements the TPC-C scalability test with enhanced metrics
 type TPCCPlugin struct {
 	core   *core.CoreServices
 	logger core.Logger
@@ -30,13 +31,18 @@ type TPCCPlugin struct {
 
 	isRunning int64
 	stopChan  chan struct{}
-	stopOnce  sync.Once // ensure stopChan closed only once on error limit
+	stopOnce  sync.Once
 	wg        sync.WaitGroup
 
-	metrics *TPCCMetrics
-	stats   *Stats
-	// ExecTx executes a transaction; can be overridden for tests
-	ExecTx func(db *sql.DB, txType string, warehouseID int) error
+	// Enhanced metrics system
+	metrics *PerformanceMetrics
+
+	// Legacy metrics for compatibility
+	legacyMetrics *TPCCMetrics
+	stats         *Stats
+
+	// Transaction executor (can be overridden for tests)
+	ExecTx func(db *sql.DB, txType string, warehouseID int, workerID int, metrics *PerformanceMetrics) error
 }
 
 // Duration is a wrapper around time.Duration that supports unmarshalling
@@ -97,6 +103,7 @@ type TPCCConfig struct {
 	WarmupTime  Duration `json:"warmup_time"`
 	ThinkTime   Duration `json:"think_time"`
 	Mode        string   `json:"mode"`
+	Rebuild     bool     `json:"rebuild"` // Added rebuild flag
 
 	NewOrderPct       int `json:"new_order_pct"`
 	PaymentPct        int `json:"payment_pct"`
@@ -237,13 +244,25 @@ var Plugin TPCCPlugin
 
 // Metadata returns plugin metadata for registration.
 func (p *TPCCPlugin) Metadata() core.PluginMetadata {
+	// Load the config schema
+	schemaPath := filepath.Join(filepath.Dir(os.Args[0]), "plugins", "tpcc-scalability", "config-schema.json")
+	schemaBytes, err := os.ReadFile(schemaPath)
+	var configSchema string
+	if err != nil {
+		// Fallback to empty schema if file not found
+		configSchema = ""
+	} else {
+		configSchema = string(schemaBytes)
+	}
+
 	return core.PluginMetadata{
 		Name:         "tpcc-scalability",
 		Version:      "2.0.0",
-		Description:  "TPC-C scalability test plugin",
+		Description:  "TPC-C scalability test plugin with enhanced metrics and error handling",
 		Author:       "StormDB Team",
 		License:      "MIT",
 		TestTypes:    []string{"tpcc", "scalability", "performance"},
+		ConfigSchema: configSchema,
 		Dependencies: map[string]string{"postgresql": ">=12.0"},
 	}
 }
@@ -253,10 +272,16 @@ func (p *TPCCPlugin) Initialize(ctx context.Context, cs *core.CoreServices) erro
 	p.core = cs
 	p.logger = cs.Logger.WithPlugin(p.Metadata().Name)
 	p.stopChan = make(chan struct{})
-	p.metrics = &TPCCMetrics{SecondlyMetrics: make([]SecondMetrics, 0)}
+
+	// Initialize enhanced metrics system
+	p.metrics = NewPerformanceMetrics(p.db)
+
+	// Initialize legacy metrics for compatibility
+	p.legacyMetrics = &TPCCMetrics{SecondlyMetrics: make([]SecondMetrics, 0)}
 	p.stats = &Stats{}
-	// default transaction executor
-	p.ExecTx = p.executeTransaction
+
+	// Set default transaction executor
+	p.ExecTx = p.executeTransactionWithMetrics
 	return nil
 }
 
@@ -300,6 +325,22 @@ func (p *TPCCPlugin) Validate(cfgData map[string]interface{}) error {
 	if sum > 100 {
 		return fmt.Errorf("percentage weights sum to %d, must be <= 100", sum)
 	}
+	if sum == 0 {
+		return fmt.Errorf("at least one transaction type percentage must be > 0")
+	}
+	// Validate error rate
+	if cfg.MaxErrorRate < 0 || cfg.MaxErrorRate > 1 {
+		return fmt.Errorf("max_error_rate must be between 0 and 1, got %f", cfg.MaxErrorRate)
+	}
+	// Validate connection counts
+	for i, conn := range cfg.Connections {
+		if conn <= 0 {
+			return fmt.Errorf("connections[%d] must be positive, got %d", i, conn)
+		}
+		if conn > 1000 {
+			return fmt.Errorf("connections[%d] too high (%d), maximum 1000 for safety", i, conn)
+		}
+	}
 	p.cfg = cfg
 	return nil
 }
@@ -311,17 +352,56 @@ func (p *TPCCPlugin) Execute(ctx context.Context, cfgData map[string]interface{}
 	defer atomic.StoreInt64(&p.isRunning, 0)
 	// Parse and validate config
 	if err := p.Validate(cfgData); err != nil {
+		p.logger.Error("Configuration validation failed",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "Execute.Validate"},
+			core.Field{Key: "config_data", Value: fmt.Sprintf("%+v", cfgData)})
 		return fmt.Errorf("validation error: %w", err)
 	}
+
 	// Connect to database
 	dsn := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
 		p.cfg.Host, p.cfg.Port, p.cfg.Database, p.cfg.Username, p.cfg.Password, p.cfg.SSLMode)
 	var err error
 	p.db, err = sql.Open("postgres", dsn)
 	if err != nil {
+		p.logger.Error("Failed to open database connection",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "Execute.sql.Open"},
+			core.Field{Key: "host", Value: p.cfg.Host},
+			core.Field{Key: "port", Value: p.cfg.Port},
+			core.Field{Key: "database", Value: p.cfg.Database},
+			core.Field{Key: "username", Value: p.cfg.Username},
+			core.Field{Key: "ssl_mode", Value: p.cfg.SSLMode})
 		return fmt.Errorf("failed to open db: %w", err)
 	}
+
+	// Configure connection pool based on maximum expected connections
+	maxConnections := 0
+	for _, conn := range p.cfg.Connections {
+		if conn > maxConnections {
+			maxConnections = conn
+		}
+	}
+	// Set pool size to accommodate all workers plus some overhead
+	poolSize := maxConnections + 10
+	p.db.SetMaxOpenConns(poolSize)
+	p.db.SetMaxIdleConns(poolSize / 2)
+	p.db.SetConnMaxLifetime(30 * time.Minute)
+	p.db.SetConnMaxIdleTime(5 * time.Minute)
+
+	p.logger.Info("Database connection pool configured",
+		core.Field{Key: "max_open_connections", Value: poolSize},
+		core.Field{Key: "max_idle_connections", Value: poolSize / 2},
+		core.Field{Key: "max_worker_connections", Value: maxConnections})
+
 	if err := p.db.PingContext(ctx); err != nil {
+		p.logger.Error("Database ping failed",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "Execute.db.PingContext"},
+			core.Field{Key: "host", Value: p.cfg.Host},
+			core.Field{Key: "port", Value: p.cfg.Port},
+			core.Field{Key: "database", Value: p.cfg.Database})
 		return fmt.Errorf("failed to ping db: %w", err)
 	}
 	// Wrap context with cancel to allow signal handler to stop execution
@@ -332,8 +412,16 @@ func (p *TPCCPlugin) Execute(ctx context.Context, cfgData map[string]interface{}
 		_ = p.Cleanup(ctx)
 		p.logger.Info("Cleanup complete")
 	}()
-	// Dispatch based on mode
-	switch p.cfg.Mode {
+
+	// Handle rebuild flag - if rebuild is true, force rebuild mode regardless of mode setting
+	mode := p.cfg.Mode
+	if p.cfg.Rebuild {
+		mode = "rebuild"
+		p.logger.Info("Rebuild flag set, forcing rebuild mode")
+	}
+
+	// Dispatch based on effective mode
+	switch mode {
 	case "setup":
 		return p.executeSetup(ctx)
 	case "run":
@@ -367,25 +455,56 @@ func (p *TPCCPlugin) setupSchema(ctx context.Context) error {
 	// run migrations: prefer plugin-specific files if present, else fallback to root migrations
 	pluginDir := "plugins/tpcc-scalability/migrations"
 	pluginPattern := filepath.Join(pluginDir, "*.up.sql")
-	pluginFiles, _ := filepath.Glob(pluginPattern)
+	pluginFiles, err := filepath.Glob(pluginPattern)
+	if err != nil {
+		p.logger.Error("Failed to glob plugin migration files",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "setupSchema.Glob"},
+			core.Field{Key: "pattern", Value: pluginPattern})
+	}
+
 	if len(pluginFiles) > 0 {
 		p.logger.Info("Applying migrations from plugin", core.Field{Key: "dir", Value: pluginDir})
 		if err := schema.Migrate(ctx, p.db, pluginDir); err != nil {
+			p.logger.Error("Plugin schema migration failed",
+				core.Field{Key: "error_message", Value: err.Error()},
+				core.Field{Key: "location", Value: "setupSchema.schema.Migrate"},
+				core.Field{Key: "migration_dir", Value: pluginDir},
+				core.Field{Key: "files_found", Value: len(pluginFiles)})
 			return fmt.Errorf("schema migration failed (plugin): %w", err)
 		}
 		return nil
 	}
+
 	// fallback to root migrations directory
 	localDir := "migrations"
 	localPattern := filepath.Join(localDir, "*.up.sql")
-	localFiles, _ := filepath.Glob(localPattern)
+	localFiles, err := filepath.Glob(localPattern)
+	if err != nil {
+		p.logger.Error("Failed to glob root migration files",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "setupSchema.Glob"},
+			core.Field{Key: "pattern", Value: localPattern})
+	}
+
 	if len(localFiles) > 0 {
 		p.logger.Info("Applying migrations from root", core.Field{Key: "dir", Value: localDir})
 		if err := schema.Migrate(ctx, p.db, localDir); err != nil {
+			p.logger.Error("Root schema migration failed",
+				core.Field{Key: "error_message", Value: err.Error()},
+				core.Field{Key: "location", Value: "setupSchema.schema.Migrate"},
+				core.Field{Key: "migration_dir", Value: localDir},
+				core.Field{Key: "files_found", Value: len(localFiles)})
 			return fmt.Errorf("schema migration failed (root): %w", err)
 		}
 		return nil
 	}
+
+	p.logger.Error("No migration files found",
+		core.Field{Key: "error_message", Value: "no SQL migration files available"},
+		core.Field{Key: "location", Value: "setupSchema.noFiles"},
+		core.Field{Key: "plugin_dir", Value: pluginDir},
+		core.Field{Key: "root_dir", Value: localDir})
 	return fmt.Errorf("no migration files found in %s or %s", pluginDir, localDir)
 }
 
@@ -393,9 +512,17 @@ func (p *TPCCPlugin) setupSchema(ctx context.Context) error {
 func (p *TPCCPlugin) populateData(ctx context.Context) error {
 	p.logger.Info("Populating data for TPC-C")
 	if err := p.populateSeedData(ctx); err != nil {
+		p.logger.Error("Seed data population failed",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "populateData.populateSeedData"},
+			core.Field{Key: "scale", Value: p.cfg.Scale})
 		return fmt.Errorf("populateSeedData failed: %w", err)
 	}
 	if err := p.populateTPCCData(ctx); err != nil {
+		p.logger.Error("TPC-C data population failed",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "populateData.populateTPCCData"},
+			core.Field{Key: "scale", Value: p.cfg.Scale})
 		return fmt.Errorf("populateTPCCData failed: %w", err)
 	}
 	return nil
@@ -414,7 +541,10 @@ func (p *TPCCPlugin) executeRunOnly(ctx context.Context) error {
 // executeRebuild rebuilds schema and data, then runs tests
 func (p *TPCCPlugin) executeRebuild(ctx context.Context) error {
 	if err := p.dropTables(ctx); err != nil {
-		p.logger.Warn("dropTables failed", core.Field{Key: "error", Value: err.Error()})
+		p.logger.Error("Table drop failed during rebuild",
+			core.Field{Key: "error_message", Value: err.Error()},
+			core.Field{Key: "location", Value: "executeRebuild.dropTables"})
+		// Continue despite drop failure - tables might not exist
 	}
 	if err := p.setupSchema(ctx); err != nil {
 		return err
@@ -452,6 +582,11 @@ func (p *TPCCPlugin) populateSeedData(ctx context.Context) error {
 			0.0,
 		)
 		if err != nil {
+			p.logger.Error("Failed to insert warehouse data",
+				core.Field{Key: "error_message", Value: err.Error()},
+				core.Field{Key: "location", Value: "populateSeedData.warehouse"},
+				core.Field{Key: "warehouse_id", Value: wID},
+				core.Field{Key: "scale", Value: p.cfg.Scale})
 			return fmt.Errorf("populateSeedData warehouse %d: %w", wID, err)
 		}
 		// insert 10 districts per warehouse
@@ -473,6 +608,11 @@ func (p *TPCCPlugin) populateSeedData(ctx context.Context) error {
 				0.0,
 			)
 			if err != nil {
+				p.logger.Error("Failed to insert district data",
+					core.Field{Key: "error_message", Value: err.Error()},
+					core.Field{Key: "location", Value: "populateSeedData.district"},
+					core.Field{Key: "warehouse_id", Value: wID},
+					core.Field{Key: "district_id", Value: dID})
 				return fmt.Errorf("populateSeedData district %d.%d: %w", wID, dID, err)
 			}
 		}
@@ -498,6 +638,11 @@ func (p *TPCCPlugin) populateTPCCData(ctx context.Context) error {
 			float64(rand.Intn(10000))/100.0,
 			"data",
 		); err != nil {
+			p.logger.Error("Failed to insert item data",
+				core.Field{Key: "error_message", Value: err.Error()},
+				core.Field{Key: "location", Value: "populateTPCCData.item"},
+				core.Field{Key: "item_id", Value: i},
+				core.Field{Key: "total_items", Value: NumItems})
 			return fmt.Errorf("populateTPCCData item %d: %w", i, err)
 		}
 	}
@@ -531,6 +676,12 @@ func (p *TPCCPlugin) populateTPCCData(ctx context.Context) error {
 				0, 0, 0, // s_order_cnt, s_remote_cnt, s_reorder_qty
 				"data", // s_data
 			); err != nil {
+				p.logger.Error("Failed to insert stock data",
+					core.Field{Key: "error_message", Value: err.Error()},
+					core.Field{Key: "location", Value: "populateTPCCData.stock"},
+					core.Field{Key: "warehouse_id", Value: w},
+					core.Field{Key: "item_id", Value: i},
+					core.Field{Key: "scale", Value: p.cfg.Scale})
 				return fmt.Errorf("populateTPCCData stock %d.%d: %w", w, i, err)
 			}
 		}
@@ -562,6 +713,13 @@ func (p *TPCCPlugin) populateTPCCData(ctx context.Context) error {
 					0.0, "customer data", 0.0, // c_discount, c_data, c_ytd_payment
 					0, 0, // c_payment_cnt, c_delivery_cnt
 				); err != nil {
+					p.logger.Error("Failed to populate customer data",
+						core.Field{Key: "warehouse_id", Value: w},
+						core.Field{Key: "district_id", Value: d},
+						core.Field{Key: "customer_id", Value: c},
+						core.Field{Key: "scale", Value: p.cfg.Scale},
+						core.Field{Key: "error_message", Value: err.Error()},
+						core.Field{Key: "location", Value: "populateTPCCData.customers"})
 					return fmt.Errorf("populateTPCCData customer %d.%d.%d: %w", w, d, c, err)
 				}
 			}
@@ -570,42 +728,52 @@ func (p *TPCCPlugin) populateTPCCData(ctx context.Context) error {
 	return nil
 }
 
-// runTestWorkload runs the TPC-C workload per connection levels
+// runTestWorkload runs the TPC-C workload per connection levels with enhanced metrics
 func (p *TPCCPlugin) runTestWorkload(ctx context.Context) error {
 	levels := p.cfg.Connections
 	if len(levels) == 0 {
 		return fmt.Errorf("no connection levels defined")
 	}
+
 	perLevel := time.Duration(p.cfg.Duration) / time.Duration(len(levels))
 	p.logger.Info("Test plan",
 		core.Field{Key: "total_duration", Value: p.cfg.Duration},
 		core.Field{Key: "levels", Value: len(levels)},
 		core.Field{Key: "duration_per_level", Value: perLevel})
+
 	for idx, conns := range levels {
-		// reset error and transaction counters for this level
-		atomic.StoreInt64(&p.metrics.TotalTransactions, 0)
-		atomic.StoreInt64(&p.metrics.Errors, 0)
+		// Reset metrics for this level
+		p.metrics.Reset()
+
 		p.logger.Info("Starting level",
 			core.Field{Key: "level", Value: idx + 1},
 			core.Field{Key: "connections", Value: conns})
-		// record stats start for this level
-		p.stats.Start(conns)
-		// Warmup
+
+		// Start metrics collection for this level
+		p.metrics.Start(conns)
+
+		// Warmup phase
 		if p.cfg.WarmupTime > 0 {
 			p.logger.Info("Warmup phase",
 				core.Field{Key: "duration", Value: p.cfg.WarmupTime})
 			warmCtx, cancel := context.WithTimeout(ctx, time.Duration(p.cfg.WarmupTime))
 			p.runWorkload(warmCtx, conns, time.Duration(p.cfg.ThinkTime))
 			cancel()
+
+			// Reset metrics after warmup
+			p.metrics.Reset()
+			p.metrics.Start(conns)
 		}
-		// Measurement
+
+		// Measurement phase
 		p.logger.Info("Measurement phase",
-			core.Field{Key: "connections", Value: conns}, core.Field{Key: "duration", Value: perLevel})
+			core.Field{Key: "connections", Value: conns},
+			core.Field{Key: "duration", Value: perLevel})
+
 		measureCtx, cancel := context.WithTimeout(ctx, perLevel)
-		// real-time reporting ticker
+
+		// Start real-time reporting ticker
 		ticker := time.NewTicker(time.Duration(p.cfg.MetricsInterval))
-		// track last error count for per-second delta
-		lastErrCount := atomic.LoadInt64(&p.metrics.Errors)
 		go func() {
 			defer ticker.Stop()
 			for {
@@ -615,58 +783,63 @@ func (p *TPCCPlugin) runTestWorkload(ctx context.Context) error {
 				case <-p.stopChan:
 					return
 				case <-ticker.C:
-					snap := p.stats.SnapshotAndReset()
-					// compute per-second metrics
-					ops := snap.NumInsert + snap.NumUpdate + snap.NumDelete + snap.NumSelect
-					durationSec := time.Duration(p.cfg.MetricsInterval).Seconds()
-					tps := float64(ops) / durationSec
-					// compute errors delta
-					currErr := atomic.LoadInt64(&p.metrics.Errors)
-					errs := currErr - lastErrCount
-					lastErrCount = currErr
-					// append to in-memory slice
-					p.metrics.SecondlyMetrics = append(p.metrics.SecondlyMetrics, SecondMetrics{
+					// Get interval snapshot (resets counters)
+					snap := p.metrics.SnapshotAndReset()
+
+					// Calculate metrics for this interval
+					ops := snap.TotalOperations()
+					tps := snap.OperationsPerSecond()
+					avgLatency := snap.AverageLatencyMS()
+					errorRate := snap.ErrorRate()
+
+					// Store in legacy format for compatibility
+					p.legacyMetrics.SecondlyMetrics = append(p.legacyMetrics.SecondlyMetrics, SecondMetrics{
 						Timestamp: time.Now(),
 						Count:     ops,
 						TPS:       tps,
-						Errors:    errs,
+						Errors:    snap.NumErrors,
 					})
-					// console logging
+
+					// Console logging (once per second)
 					if p.cfg.Verbose {
 						p.logger.Info("Interval stats",
 							core.Field{Key: "connections", Value: snap.NumConnections},
-							core.Field{Key: "ops", Value: ops},
+							core.Field{Key: "ops_total", Value: ops},
 							core.Field{Key: "tps", Value: tps},
-							core.Field{Key: "errors", Value: errs},
+							core.Field{Key: "avg_latency_ms", Value: avgLatency},
+							core.Field{Key: "errors", Value: snap.NumErrors},
+							core.Field{Key: "error_rate", Value: errorRate},
+							core.Field{Key: "inserts", Value: snap.NumInsert},
+							core.Field{Key: "updates", Value: snap.NumUpdate},
+							core.Field{Key: "deletes", Value: snap.NumDelete},
+							core.Field{Key: "selects", Value: snap.NumSelect},
 						)
 					}
-					// persist metrics to storage via storage-enabled logger
-					if p.cfg.StreamMetrics {
-						storeLog := p.logger.WithStorage(p.core.Storage)
-						storeLog.Info("Persist interval stats",
-							core.Field{Key: "connections", Value: snap.NumConnections},
-							core.Field{Key: "ops", Value: ops},
-							core.Field{Key: "tps", Value: tps},
-							core.Field{Key: "errors", Value: errs},
-						)
-						// also store TestResult
+
+					// Persist metrics to storage (once per second)
+					if p.cfg.StreamMetrics && ops > 0 {
 						results := []core.TestResult{{
 							StartTime:         snap.DtStarted,
-							EndTime:           snap.DtEnded,
+							EndTime:           snap.DtEnd,
 							Value:             float64(ops),
 							ActiveConnections: &snap.NumConnections,
 							Tags: map[string]interface{}{
-								"num_insert":     snap.NumInsert,
-								"num_update":     snap.NumUpdate,
-								"num_delete":     snap.NumDelete,
-								"num_select":     snap.NumSelect,
-								"latency_sum":    snap.LatencySum,
-								"latency_count":  snap.LatencyCount,
-								"num_row_insert": snap.NumRowInsert,
-								"num_row_update": snap.NumRowUpdate,
-								"num_row_delete": snap.NumRowDelete,
-								"num_row_select": snap.NumRowSelect,
-								"avg_latency_ms": float64(snap.LatencySum) / float64(snap.LatencyCount) / 1e6,
+								"dt_started":      snap.DtStarted.UnixNano(),
+								"dt_end":          snap.DtEnd.UnixNano(),
+								"num_connections": snap.NumConnections,
+								"num_insert":      snap.NumInsert,
+								"num_update":      snap.NumUpdate,
+								"num_delete":      snap.NumDelete,
+								"num_select":      snap.NumSelect,
+								"latency_sum":     snap.LatencySum,
+								"latency_count":   snap.LatencyCount,
+								"num_row_insert":  snap.NumRowInsert,
+								"num_row_update":  snap.NumRowUpdate,
+								"num_row_delete":  snap.NumRowDelete,
+								"num_row_select":  snap.NumRowSelect,
+								"avg_latency_ms":  avgLatency,
+								"error_rate":      errorRate,
+								"tps":             tps,
 							},
 						}}
 						_ = p.core.Storage.StoreResults(ctx, results)
@@ -674,61 +847,81 @@ func (p *TPCCPlugin) runTestWorkload(ctx context.Context) error {
 				}
 			}
 		}()
+
+		// Run the actual workload
 		p.runWorkload(measureCtx, conns, time.Duration(p.cfg.ThinkTime))
 		cancel()
-		// record stats end for this level
-		p.stats.End()
-		// check error rate limit
+
+		// End metrics collection for this level
+		p.metrics.End()
+
+		// Check error rate limit
 		if p.cfg.StopOnErrorLimit {
-			total := atomic.LoadInt64(&p.metrics.TotalTransactions)
-			errs := atomic.LoadInt64(&p.metrics.Errors)
-			if total > 0 {
-				rate := float64(errs) / float64(total)
-				if rate > p.cfg.MaxErrorRate {
-					p.logger.Warn("Error rate limit exceeded, stopping workload", core.Field{Key: "error_rate", Value: rate})
+			finalSnap := p.metrics.Snapshot()
+			if finalSnap.TotalOperations() > 0 {
+				errorRate := finalSnap.ErrorRate()
+				if errorRate > p.cfg.MaxErrorRate*100 { // MaxErrorRate is 0-1, ErrorRate() returns 0-100
+					p.logger.Warn("Error rate limit exceeded, stopping workload",
+						core.Field{Key: "error_rate", Value: errorRate},
+						core.Field{Key: "limit", Value: p.cfg.MaxErrorRate * 100})
 					return nil
 				}
 			}
 		}
 	}
-	// final summary
-	finalSnap := p.stats.SnapshotAndReset()
-	// calculate average latency for final summary
-	avgMs := float64(0)
-	if finalSnap.LatencyCount > 0 {
-		avgMs = float64(finalSnap.LatencySum) / float64(finalSnap.LatencyCount) / 1e6
+
+	// Final summary after all levels
+	finalSnap := p.metrics.Snapshot()
+	if finalSnap.TotalOperations() > 0 {
+		avgLatency := finalSnap.AverageLatencyMS()
+		finalResults := []core.TestResult{{
+			StartTime:         finalSnap.DtStarted,
+			EndTime:           finalSnap.DtEnd,
+			Value:             float64(finalSnap.TotalOperations()),
+			ActiveConnections: &finalSnap.NumConnections,
+			Tags: map[string]interface{}{
+				"dt_started":      finalSnap.DtStarted.UnixNano(),
+				"dt_end":          finalSnap.DtEnd.UnixNano(),
+				"num_connections": finalSnap.NumConnections,
+				"num_insert":      finalSnap.NumInsert,
+				"num_update":      finalSnap.NumUpdate,
+				"num_delete":      finalSnap.NumDelete,
+				"num_select":      finalSnap.NumSelect,
+				"latency_sum":     finalSnap.LatencySum,
+				"latency_count":   finalSnap.LatencyCount,
+				"num_row_insert":  finalSnap.NumRowInsert,
+				"num_row_update":  finalSnap.NumRowUpdate,
+				"num_row_delete":  finalSnap.NumRowDelete,
+				"num_row_select":  finalSnap.NumRowSelect,
+				"avg_latency_ms":  avgLatency,
+				"error_rate":      finalSnap.ErrorRate(),
+				"summary":         "final",
+			},
+		}}
+
+		if p.cfg.StreamMetrics {
+			_ = p.core.Storage.StoreResults(ctx, finalResults)
+		}
 	}
-	finalResults := []core.TestResult{{
-		StartTime:         finalSnap.DtStarted,
-		EndTime:           finalSnap.DtEnded,
-		Value:             float64(finalSnap.NumInsert + finalSnap.NumUpdate + finalSnap.NumDelete + finalSnap.NumSelect),
-		ActiveConnections: &finalSnap.NumConnections,
-		Tags: map[string]interface{}{
-			"num_insert":     finalSnap.NumInsert,
-			"num_update":     finalSnap.NumUpdate,
-			"num_delete":     finalSnap.NumDelete,
-			"num_select":     finalSnap.NumSelect,
-			"latency_sum":    finalSnap.LatencySum,
-			"latency_count":  finalSnap.LatencyCount,
-			"num_row_insert": finalSnap.NumRowInsert,
-			"num_row_update": finalSnap.NumRowUpdate,
-			"num_row_delete": finalSnap.NumRowDelete,
-			"num_row_select": finalSnap.NumRowSelect,
-			"avg_latency_ms": avgMs,
-		},
-	}}
-	if p.cfg.StreamMetrics {
-		_ = p.core.Storage.StoreResults(ctx, finalResults)
-	}
+
 	return nil
 }
 
-// runWorkload starts workers that execute transactions until context is done
+// runWorkload starts workers that execute transactions with enhanced metrics tracking
 func (p *TPCCPlugin) runWorkload(ctx context.Context, connections int, thinkTime time.Duration) {
 	p.wg.Add(connections)
+
 	for i := 0; i < connections; i++ {
-		go func() {
+		go func(workerID int) {
 			defer p.wg.Done()
+
+			// Register this worker with the metrics system
+			metricsWorkerID := p.metrics.RegisterWorker()
+			defer p.metrics.UnregisterWorker(metricsWorkerID)
+
+			// Local counters for tracking transaction totals
+			var totalTransactions, totalErrors int64
+
 			for {
 				select {
 				case <-ctx.Done():
@@ -737,38 +930,78 @@ func (p *TPCCPlugin) runWorkload(ctx context.Context, connections int, thinkTime
 					return
 				default:
 				}
-				// choose and execute transaction
+
+				// Choose and execute transaction
 				op := chooseTransactionType(p.cfg)
-				// pick random warehouse
-				warehouse := rand.Intn(p.cfg.Scale) + 1
-				start := time.Now()
-				// execute transaction via ExecTx or fallback to method
-				executor := p.ExecTx
-				if executor == nil {
-					executor = p.executeTransaction
+				// Distribute warehouses across workers to reduce contention on the same warehouse
+				warehouse := (workerID % p.cfg.Scale) + 1
+
+				// Occasionally use random warehouse for cross-warehouse transactions
+				if rand.Float64() < 0.1 {
+					warehouse = rand.Intn(p.cfg.Scale) + 1
 				}
-				err := executor(p.db, op, warehouse)
-				// count metrics
-				total := atomic.AddInt64(&p.metrics.TotalTransactions, 1)
-				if err != nil {
-					atomic.AddInt64(&p.metrics.Errors, 1)
+
+				// Execute transaction with enhanced metrics
+				var err error
+
+				if p.ExecTx != nil {
+					err = p.ExecTx(p.db, op, warehouse, metricsWorkerID, p.metrics)
+				} else {
+					err = p.executeTransactionWithMetrics(p.db, op, warehouse, metricsWorkerID, p.metrics)
 				}
-				// check error rate limit per operation
-				if p.cfg.StopOnErrorLimit {
-					errs := atomic.LoadInt64(&p.metrics.Errors)
-					if total > 0 && float64(errs)/float64(total) > p.cfg.MaxErrorRate {
-						// stop all workers once
-						p.stopOnce.Do(func() { close(p.stopChan) })
+
+				isError := err != nil
+
+				// Enhanced error logging with context
+				if isError {
+					p.logger.Error("Transaction execution failed",
+						core.Field{Key: "worker_id", Value: workerID},
+						core.Field{Key: "metrics_worker_id", Value: metricsWorkerID},
+						core.Field{Key: "transaction_type", Value: op},
+						core.Field{Key: "warehouse_id", Value: warehouse},
+						core.Field{Key: "error_message", Value: err.Error()},
+						core.Field{Key: "location", Value: "runWorkload.executeTransaction"},
+						core.Field{Key: "total_transactions", Value: totalTransactions + 1},
+						core.Field{Key: "total_errors", Value: totalErrors + 1})
+				}
+
+				// Update local counters
+				totalTransactions++
+				if isError {
+					totalErrors++
+				}
+
+				// Note: Individual database operations are recorded within transaction implementations
+				// No need to record transaction-level metrics here as we want raw operation data
+
+				// Check error rate limit per operation (use local counters for immediate response)
+				// Only check after a minimum number of transactions to avoid false positives
+				minTransactionsForErrorCheck := int64(10)
+				if p.cfg.StopOnErrorLimit && totalTransactions >= minTransactionsForErrorCheck {
+					localErrorRate := float64(totalErrors) / float64(totalTransactions)
+					if localErrorRate > p.cfg.MaxErrorRate {
+						// Signal stop to all workers
+						p.stopOnce.Do(func() {
+							close(p.stopChan)
+							p.logger.Warn("Error rate limit exceeded in worker",
+								core.Field{Key: "worker_id", Value: workerID},
+								core.Field{Key: "error_rate", Value: localErrorRate},
+								core.Field{Key: "limit", Value: p.cfg.MaxErrorRate},
+								core.Field{Key: "total_transactions", Value: totalTransactions},
+								core.Field{Key: "total_errors", Value: totalErrors})
+						})
 						return
 					}
 				}
-				latency := time.Since(start)
-				// record one row per operation
-				p.stats.Record(op, latency, 1)
-				time.Sleep(thinkTime)
+
+				// Think time between transactions
+				if thinkTime > 0 {
+					time.Sleep(thinkTime)
+				}
 			}
-		}()
+		}(i)
 	}
+
 	p.wg.Wait()
 }
 
@@ -798,6 +1031,12 @@ func (p *TPCCPlugin) Stop() error {
 	// close stopChan once to signal all workers
 	p.stopOnce.Do(func() { close(p.stopChan) })
 	p.wg.Wait()
+
+	// Stop the metrics system gracefully
+	if p.metrics != nil {
+		p.metrics.Stop()
+	}
+
 	return nil
 }
 
@@ -806,11 +1045,135 @@ func (p *TPCCPlugin) Cleanup(ctx context.Context) error {
 	// ensure workers are stopped
 	p.stopOnce.Do(func() { close(p.stopChan) })
 	p.wg.Wait()
+
+	// Stop the metrics system gracefully
+	if p.metrics != nil {
+		p.metrics.Stop()
+	}
+
 	// close database connection
 	if p.db != nil {
 		_ = p.db.Close()
 	}
 	return nil
+}
+
+// Health performs a comprehensive health check of the plugin
+func (p *TPCCPlugin) Health(ctx context.Context) core.PluginHealth {
+	health := core.PluginHealth{
+		Status:       core.PluginStatusHealthy,
+		LastCheck:    time.Now(),
+		Metrics:      make(map[string]interface{}),
+		Dependencies: []core.DependencyHealth{},
+	}
+
+	// Check database connection
+	if p.db == nil {
+		health.Status = core.PluginStatusFailed
+		health.Message = "Database connection not initialized"
+		health.Dependencies = append(health.Dependencies, core.DependencyHealth{
+			Name:    "database",
+			Type:    "database",
+			Status:  core.PluginStatusFailed,
+			Message: "Connection not established",
+		})
+		return health
+	}
+
+	// Test database connectivity
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := p.db.PingContext(dbCtx); err != nil {
+		health.Status = core.PluginStatusDegraded
+		health.Message = "Database connection issues detected"
+		health.Dependencies = append(health.Dependencies, core.DependencyHealth{
+			Name:    "database",
+			Type:    "database",
+			Status:  core.PluginStatusFailed,
+			Message: fmt.Sprintf("Ping failed: %v", err),
+		})
+	} else {
+		health.Dependencies = append(health.Dependencies, core.DependencyHealth{
+			Name:   "database",
+			Type:   "database",
+			Status: core.PluginStatusHealthy,
+		})
+	}
+
+	// Check metrics system health
+	if p.metrics != nil {
+		snapshot := p.metrics.Snapshot()
+		health.Metrics["metrics_system"] = "active"
+		health.Metrics["total_operations"] = snapshot.TotalOperations
+		health.Metrics["total_errors"] = snapshot.NumErrors
+		health.Metrics["connections"] = snapshot.NumConnections
+		health.Metrics["latency_avg_ms"] = float64(snapshot.LatencySum) / float64(snapshot.LatencyCount) / 1e6
+	} else {
+		health.Metrics["metrics_system"] = "not_initialized"
+		if health.Status == core.PluginStatusHealthy {
+			health.Status = core.PluginStatusDegraded
+			health.Message = "Metrics system not initialized"
+		}
+	}
+
+	// Check configuration
+	if p.cfg == nil {
+		if health.Status == core.PluginStatusHealthy {
+			health.Status = core.PluginStatusDegraded
+			health.Message = "Plugin not configured"
+		}
+		health.Metrics["configured"] = false
+	} else {
+		health.Metrics["configured"] = true
+		health.Metrics["scale"] = p.cfg.Scale
+		health.Metrics["max_connections"] = p.cfg.Connections
+	}
+
+	// Add runtime metrics
+	health.Metrics["goroutines"] = runtime.NumGoroutine()
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	health.Metrics["memory_usage_mb"] = float64(m.Alloc) / 1024 / 1024
+	health.Metrics["gc_runs"] = m.NumGC
+
+	return health
+}
+
+// GetResourceUsage implements PluginResourceMonitor interface
+func (p *TPCCPlugin) GetResourceUsage() map[string]interface{} {
+	usage := make(map[string]interface{})
+
+	// Basic plugin state
+	usage["configured"] = p.cfg != nil
+	usage["database_connected"] = p.db != nil
+
+	if p.cfg != nil {
+		usage["scale"] = p.cfg.Scale
+		usage["max_connections"] = p.cfg.Connections
+	}
+
+	// Metrics information
+	if p.metrics != nil {
+		snapshot := p.metrics.Snapshot()
+		usage["total_operations"] = snapshot.TotalOperations
+		usage["total_errors"] = snapshot.NumErrors
+		usage["connections_active"] = snapshot.NumConnections
+
+		if snapshot.LatencyCount > 0 {
+			usage["avg_latency_ms"] = float64(snapshot.LatencySum) / float64(snapshot.LatencyCount) / 1e6
+		}
+
+		usage["operations_breakdown"] = map[string]interface{}{
+			"inserts": snapshot.NumInsert,
+			"updates": snapshot.NumUpdate,
+			"selects": snapshot.NumSelect,
+			"deletes": snapshot.NumDelete,
+		}
+	}
+
+	return usage
 }
 
 // GetStatus returns current plugin status and basic metrics.
@@ -852,14 +1215,16 @@ func chooseTransactionType(cfg *TPCCConfig) string {
 	return "new_order"
 }
 
-// executeTransaction dispatches TPC-C transactions based on type.
-func (p *TPCCPlugin) executeTransaction(db *sql.DB, txType string, warehouseID int) error {
-	// delegate transaction execution to txn package
-	return txn.ExecuteTransaction(
+// executeTransactionWithMetrics dispatches TPC-C transactions with enhanced metrics tracking
+func (p *TPCCPlugin) executeTransactionWithMetrics(db *sql.DB, txType string, warehouseID int, workerID int, metrics *PerformanceMetrics) error {
+	// Delegate to transaction package with enhanced context
+	return txn.ExecuteTransactionWithMetrics(
 		context.Background(),
 		db,
 		txn.TransactionType(txType),
 		warehouseID,
 		p.cfg.Scale,
+		workerID,
+		metrics,
 	)
 }

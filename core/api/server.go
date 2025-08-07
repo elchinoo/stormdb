@@ -94,7 +94,12 @@ func (s *Server) setupRoutes() {
 	// Plugin management
 	s.router.HandleFunc("/plugins", s.handleListPlugins).Methods("GET")
 	s.router.HandleFunc("/plugins/{name}", s.handleGetPlugin).Methods("GET")
+	s.router.HandleFunc("/plugins/{name}/health", s.handleGetPluginHealth).Methods("GET")
 	s.router.HandleFunc("/plugins/reload", s.handleReloadPlugins).Methods("POST")
+
+	// System monitoring
+	s.router.HandleFunc("/system/resources", s.handleGetSystemResources).Methods("GET")
+	s.router.HandleFunc("/system/health", s.handleGetSystemHealth).Methods("GET")
 
 	// Test run management
 	s.router.HandleFunc("/test-runs", s.handleCreateTestRun).Methods("POST")
@@ -503,6 +508,90 @@ func (s *Server) writeErrorResponse(w http.ResponseWriter, statusCode int, messa
 	}
 
 	s.writeJSONResponse(w, statusCode, response)
+}
+
+// handleGetPluginHealth returns the health status of a specific plugin
+func (s *Server) handleGetPluginHealth(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	pluginName := vars["name"]
+
+	plugins := s.coreServices.Plugin.GetLoadedPlugins()
+	for _, plugin := range plugins {
+		if plugin.Metadata().Name == pluginName {
+			health := plugin.Health(r.Context())
+			s.writeJSONResponse(w, http.StatusOK, health)
+			return
+		}
+	}
+
+	s.writeJSONResponse(w, http.StatusNotFound, map[string]string{
+		"error": "plugin not found",
+	})
+}
+
+// handleGetSystemResources returns system resource usage information
+func (s *Server) handleGetSystemResources(w http.ResponseWriter, r *http.Request) {
+	// For now, return basic system information
+	// In a full implementation, this would use the ResourceMonitor
+	response := map[string]interface{}{
+		"status":    "not_implemented",
+		"message":   "Resource monitoring not yet fully integrated",
+		"timestamp": time.Now(),
+	}
+	s.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// handleGetSystemHealth returns comprehensive system health information
+func (s *Server) handleGetSystemHealth(w http.ResponseWriter, r *http.Request) {
+	health := map[string]interface{}{
+		"status":     "healthy",
+		"timestamp":  time.Now(),
+		"components": map[string]interface{}{},
+	}
+
+	// Check database health
+	if err := s.coreServices.Database.Health(r.Context()); err != nil {
+		health["status"] = "degraded"
+		health["components"].(map[string]interface{})["database"] = map[string]interface{}{
+			"status": "unhealthy",
+			"error":  err.Error(),
+		}
+	} else {
+		health["components"].(map[string]interface{})["database"] = map[string]interface{}{
+			"status": "healthy",
+		}
+	}
+
+	// Check scheduler health
+	health["components"].(map[string]interface{})["scheduler"] = map[string]interface{}{
+		"status":  "healthy",
+		"running": s.coreServices.Scheduler.IsRunning(),
+	}
+
+	// Check plugin health
+	plugins := s.coreServices.Plugin.GetLoadedPlugins()
+	pluginHealth := make(map[string]interface{})
+	for _, plugin := range plugins {
+		pluginHealthInfo := plugin.Health(r.Context())
+		pluginHealth[plugin.Metadata().Name] = pluginHealthInfo
+
+		if pluginHealthInfo.Status != "healthy" && health["status"] == "healthy" {
+			health["status"] = "degraded"
+		}
+	}
+	health["components"].(map[string]interface{})["plugins"] = pluginHealth
+
+	var statusCode int
+	switch health["status"] {
+	case "healthy":
+		statusCode = http.StatusOK
+	case "degraded":
+		statusCode = http.StatusOK // Still return 200 but with degraded status
+	default:
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	s.writeJSONResponse(w, statusCode, health)
 }
 
 // responseWrapper wraps http.ResponseWriter to capture status code

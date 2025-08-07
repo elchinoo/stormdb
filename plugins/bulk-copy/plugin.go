@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -556,6 +557,75 @@ func (p *BulkCopyPlugin) Cleanup(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// Health performs a comprehensive health check of the plugin
+func (p *BulkCopyPlugin) Health(ctx context.Context) core.PluginHealth {
+	health := core.PluginHealth{
+		Status:       core.PluginStatusHealthy,
+		LastCheck:    time.Now(),
+		Metrics:      make(map[string]interface{}),
+		Dependencies: []core.DependencyHealth{},
+	}
+
+	// Check database connection
+	if p.db == nil {
+		health.Status = core.PluginStatusFailed
+		health.Message = "Database connection not initialized"
+		health.Dependencies = append(health.Dependencies, core.DependencyHealth{
+			Name:    "database",
+			Type:    "database",
+			Status:  core.PluginStatusFailed,
+			Message: "Connection not established",
+		})
+		return health
+	}
+
+	// Test database connectivity
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := p.db.PingContext(dbCtx); err != nil {
+		health.Status = core.PluginStatusDegraded
+		health.Message = "Database connection issues detected"
+		health.Dependencies = append(health.Dependencies, core.DependencyHealth{
+			Name:    "database",
+			Type:    "database",
+			Status:  core.PluginStatusFailed,
+			Message: fmt.Sprintf("Ping failed: %v", err),
+		})
+	} else {
+		health.Dependencies = append(health.Dependencies, core.DependencyHealth{
+			Name:   "database",
+			Type:   "database",
+			Status: core.PluginStatusHealthy,
+		})
+	}
+
+	// Check configuration
+	if p.config == nil {
+		if health.Status == core.PluginStatusHealthy {
+			health.Status = core.PluginStatusDegraded
+			health.Message = "Plugin not configured"
+		}
+		health.Metrics["configured"] = false
+	} else {
+		health.Metrics["configured"] = true
+		health.Metrics["batch_sizes"] = p.config.BatchSizes
+		health.Metrics["connections"] = p.config.Connections
+		health.Metrics["table_name"] = p.config.TableName
+		health.Metrics["duration"] = p.config.Duration.String()
+	}
+
+	// Add runtime metrics
+	health.Metrics["goroutines"] = runtime.NumGoroutine()
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	health.Metrics["memory_usage_mb"] = float64(m.Alloc) / 1024 / 1024
+	health.Metrics["gc_runs"] = m.NumGC
+
+	return health
 }
 
 // Helper methods

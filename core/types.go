@@ -158,6 +158,33 @@ type SchedulerStatus struct {
 	ScheduledTaskCount int  `json:"scheduled_task_count"`
 }
 
+// PluginHealth represents the health status of a plugin
+type PluginHealth struct {
+	Status       PluginStatus           `json:"status"`
+	Message      string                 `json:"message,omitempty"`
+	LastCheck    time.Time              `json:"last_check"`
+	Metrics      map[string]interface{} `json:"metrics,omitempty"`
+	Dependencies []DependencyHealth     `json:"dependencies,omitempty"`
+}
+
+// PluginStatus represents the current status of a plugin
+type PluginStatus string
+
+const (
+	PluginStatusHealthy  PluginStatus = "healthy"
+	PluginStatusDegraded PluginStatus = "degraded"
+	PluginStatusFailed   PluginStatus = "failed"
+	PluginStatusUnknown  PluginStatus = "unknown"
+)
+
+// DependencyHealth represents the health of a plugin dependency
+type DependencyHealth struct {
+	Name    string       `json:"name"`
+	Type    string       `json:"type"` // database, service, file, etc.
+	Status  PluginStatus `json:"status"`
+	Message string       `json:"message,omitempty"`
+}
+
 // Plugin interface that all test plugins must implement
 type Plugin interface {
 	// Plugin metadata and identification
@@ -168,6 +195,9 @@ type Plugin interface {
 	Validate(config map[string]interface{}) error
 	Execute(ctx context.Context, config map[string]interface{}) error
 	Cleanup(ctx context.Context) error
+
+	// Health monitoring
+	Health(ctx context.Context) PluginHealth
 }
 
 // CoreServices provides all core infrastructure to plugins
@@ -178,6 +208,7 @@ type CoreServices struct {
 	Config    ConfigManager
 	Scheduler SchedulerManager
 	Plugin    PluginManager
+	Events    EventManager
 }
 
 // LogEntry represents a single log record for a test run
@@ -302,4 +333,29 @@ type PluginManager interface {
 	ValidatePluginFile(path string) error
 	RegisterPlugin(plugin Plugin) error
 	UnregisterPlugin(name string) error
+}
+
+// EventManager provides pub/sub event system
+type EventManager interface {
+	// Event publishing
+	Publish(eventType string, source string, data map[string]interface{}) error
+
+	// Event subscription
+	Subscribe(eventType string, handler EventHandler, subscriber string) (Subscription, error)
+	Unsubscribe(subscription Subscription) error
+
+	// Event querying
+	GetRecentEvents(limit int) []interface{}
+	GetSubscriptions() map[string][]interface{}
+}
+
+// EventHandler is a function that handles events
+type EventHandler func(eventData map[string]interface{}) error
+
+// Subscription represents an event subscription
+type Subscription interface {
+	GetID() string
+	GetEventType() string
+	GetSubscriber() string
+	GetCreatedAt() time.Time
 }

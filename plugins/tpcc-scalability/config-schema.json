@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TPC-C Scalability Plugin Configuration",
+  "description": "Configuration schema for the TPC-C scalability testing plugin",
+  "type": "object",
+  "required": [
+    "host",
+    "port", 
+    "database",
+    "username",
+    "password",
+    "scale",
+    "connections",
+    "duration"
+  ],
+  "properties": {
+    "host": {
+      "type": "string",
+      "description": "Database server hostname",
+      "examples": ["localhost", "db.example.com"]
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 5432,
+      "description": "Database server port"
+    },
+    "database": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Database name"
+    },
+    "username": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Database username"
+    },
+    "password": {
+      "type": "string",
+      "description": "Database password"
+    },
+    "ssl_mode": {
+      "type": "string",
+      "enum": ["disable", "require", "verify-ca", "verify-full"],
+      "default": "disable",
+      "description": "SSL connection mode"
+    },
+    "scale": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 1,
+      "description": "Number of warehouses (scale factor)"
+    },
+    "connections": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "minItems": 1,
+          "maxItems": 10
+        }
+      ],
+      "description": "Number of concurrent connections (single value or array for multi-level testing)"
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^[0-9]+[smh]$",
+      "examples": ["30s", "5m", "1h"],
+      "description": "Test duration (e.g., 30s, 5m, 1h)"
+    },
+    "warmup_time": {
+      "type": "string",
+      "pattern": "^[0-9]+[smh]$", 
+      "default": "10s",
+      "description": "Warmup period before starting measurements"
+    },
+    "think_time": {
+      "type": "string",
+      "pattern": "^[0-9]+[mu]?s$",
+      "default": "1s",
+      "description": "Think time between transactions"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["data_only", "schema_only", "full"],
+      "default": "full",
+      "description": "Execution mode"
+    },
+    "rebuild": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to rebuild schema and data"
+    },
+    "new_order_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 45,
+      "description": "Percentage of New Order transactions"
+    },
+    "payment_pct": {
+      "type": "integer", 
+      "minimum": 0,
+      "maximum": 100,
+      "default": 43,
+      "description": "Percentage of Payment transactions"
+    },
+    "order_status_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 4,
+      "description": "Percentage of Order Status transactions"
+    },
+    "delivery_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 4,
+      "description": "Percentage of Delivery transactions"
+    },
+    "stock_level_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 4,
+      "description": "Percentage of Stock Level transactions"
+    },
+    "cross_warehouse_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "Percentage of cross-warehouse transactions"
+    },
+    "enable_metrics": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable detailed metrics collection"
+    },
+    "stream_metrics": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable real-time metrics streaming"
+    },
+    "metrics_interval": {
+      "type": "string",
+      "pattern": "^[0-9]+[smh]$",
+      "default": "1s",
+      "description": "Metrics collection interval"
+    },
+    "max_error_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.05,
+      "description": "Maximum error rate before stopping test"
+    },
+    "stop_on_error_limit": {
+      "type": "boolean",
+      "default": true,
+      "description": "Stop test when error limit is reached"
+    },
+    "verbose": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable verbose logging"
+    }
+  },
+  "additionalProperties": false
+}

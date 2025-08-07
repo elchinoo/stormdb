@@ -1,0 +1,29 @@
+{
+  "plugin_name": "tpcc-scalability",
+  "name": "Thread Metrics Architecture Test",
+  "description": "Testing new thread-level metrics with raw data persistence",
+  "config": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "testdb",
+    "username": "postgres",
+    "password": "postgres",
+    "ssl_mode": "disable",
+    "scale": 1,
+    "connections": [5, 10],
+    "duration": "30s",
+    "warmup_time": "5s",
+    "think_time": "10ms",
+    "mode": "full",
+    "new_order_pct": 45,
+    "payment_pct": 43,
+    "order_status_pct": 4,
+    "delivery_pct": 4,
+    "stock_level_pct": 4,
+    "enable_metrics": true,
+    "stream_metrics": true,
+    "verbose": true,
+    "max_error_rate": 0.1,
+    "stop_on_error_limit": false
+  }
+}
