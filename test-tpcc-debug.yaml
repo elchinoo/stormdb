@@ -1,0 +1,19 @@
+plugin_name: "tpcc-scalability"
+test_type: "tpcc"
+test_config:
+  host: "localhost"
+  port: 5432
+  database: "stormdb"
+  username: "postgres"
+  password: "password"
+  ssl_mode: "disable"
+  
+  scale: 1
+  connections: [5]
+  duration: "10s"
+  warmup_time: "5s"
+  
+  rebuild: true
+  enable_metrics: true
+  verbose: true
+  log_transactions: true

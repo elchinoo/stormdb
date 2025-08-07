@@ -1,0 +1,12 @@
+-- 004_add_stock_dist.up.sql
+-- Add missing stock distribution columns with default values
+ALTER TABLE stock
+    ADD COLUMN IF NOT EXISTS s_dist_02 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_03 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_04 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_05 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_06 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_07 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_08 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_09 TEXT NOT NULL DEFAULT 'dist',
+    ADD COLUMN IF NOT EXISTS s_dist_10 TEXT NOT NULL DEFAULT 'dist';

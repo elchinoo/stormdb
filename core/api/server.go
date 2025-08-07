@@ -359,6 +359,8 @@ func (s *Server) handleGetTestResults(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetTestRunLogs returns last N lines of logs for a test run
+// Useful for debugging failed test runs and understanding execution flow
+// Query params: ?limit=N (default: 50, max: 1000)
 func (s *Server) handleGetTestRunLogs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	idStr := vars["id"]

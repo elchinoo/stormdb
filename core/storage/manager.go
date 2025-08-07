@@ -189,11 +189,53 @@ func (m *Manager) UpdateTestRunStatus(ctx context.Context, runID int64, status c
 	return nil
 }
 
+// UpdateTestRunWithError updates a test run with error information
+func (m *Manager) UpdateTestRunWithError(ctx context.Context, runID int64, status core.ServiceStatus, errorMessage string, errorDetails map[string]interface{}) error {
+	errorDetailsJSON, err := json.Marshal(errorDetails)
+	if err != nil {
+		return fmt.Errorf("failed to marshal error details: %w", err)
+	}
+
+	query := `
+		UPDATE test_run 
+		SET status = $1, end_time = $2, error_message = $3, error_details = $4 
+		WHERE id = $5
+	`
+
+	db, err := m.db.GetConnection(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get database connection: %w", err)
+	}
+
+	result, err := db.ExecContext(ctx, query, status, time.Now(), errorMessage, errorDetailsJSON, runID)
+	if err != nil {
+		return fmt.Errorf("failed to update test run with error: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("test run %d not found", runID)
+	}
+
+	m.logger.Info("test run updated with error",
+		core.Field{Key: "test_run_id", Value: runID},
+		core.Field{Key: "status", Value: status},
+		core.Field{Key: "error_message", Value: errorMessage},
+	)
+
+	return nil
+}
+
 // GetTestRun retrieves a test run by ID
 func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, error) {
 	query := `
 		SELECT id, test_type_id, plugin_id, host, port, db_name, 
-			   name, description, status, config, created_at, start_time, end_time
+			   name, description, status, config, created_at, start_time, end_time,
+			   error_message, error_details
 		FROM test_run 
 		WHERE id = $1
 	`
@@ -206,6 +248,8 @@ func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, e
 	var run core.TestRun
 	var configJSON []byte
 	var startTime, endTime sql.NullTime
+	var errorMessage sql.NullString
+	var errorDetailsJSON []byte
 
 	err = db.QueryRowContext(ctx, query, runID).Scan(
 		&run.ID,
@@ -221,6 +265,8 @@ func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, e
 		&run.CreatedAt,
 		&startTime,
 		&endTime,
+		&errorMessage,
+		&errorDetailsJSON,
 	)
 
 	if err != nil {
@@ -243,6 +289,22 @@ func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, e
 		run.EndTime = &endTime.Time
 	}
 
+	// Handle error information
+	if errorMessage.Valid {
+		run.ErrorMessage = &errorMessage.String
+	}
+	if errorDetailsJSON != nil {
+		if err := json.Unmarshal(errorDetailsJSON, &run.ErrorDetails); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal error details: %w", err)
+		}
+	}
+
+	// Add logs URL for failed tests
+	if run.Status == core.StatusFailed {
+		logsURL := fmt.Sprintf("/test-runs/%d/logs", run.ID)
+		run.LogsURL = &logsURL
+	}
+
 	return &run, nil
 }
 
@@ -250,7 +312,8 @@ func (m *Manager) GetTestRun(ctx context.Context, runID int64) (*core.TestRun, e
 func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.TestRun, error) {
 	query := `
 		SELECT id, test_type_id, plugin_id, host, port, db_name, 
-			   name, description, status, config, created_at, start_time, end_time
+			   name, description, status, config, created_at, start_time, end_time,
+			   error_message, error_details
 		FROM test_run 
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -272,6 +335,8 @@ func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.T
 		var run core.TestRun
 		var configJSON []byte
 		var startTime, endTime sql.NullTime
+		var errorMessage sql.NullString
+		var errorDetailsJSON []byte
 
 		err := rows.Scan(
 			&run.ID,
@@ -287,6 +352,8 @@ func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.T
 			&run.CreatedAt,
 			&startTime,
 			&endTime,
+			&errorMessage,
+			&errorDetailsJSON,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan test run: %w", err)
@@ -303,6 +370,22 @@ func (m *Manager) ListTestRuns(ctx context.Context, limit, offset int) ([]core.T
 		}
 		if endTime.Valid {
 			run.EndTime = &endTime.Time
+		}
+
+		// Handle error information
+		if errorMessage.Valid {
+			run.ErrorMessage = &errorMessage.String
+		}
+		if errorDetailsJSON != nil {
+			if err := json.Unmarshal(errorDetailsJSON, &run.ErrorDetails); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal error details: %w", err)
+			}
+		}
+
+		// Add logs URL for failed tests
+		if run.Status == core.StatusFailed {
+			logsURL := fmt.Sprintf("/test-runs/%d/logs", run.ID)
+			run.LogsURL = &logsURL
 		}
 
 		runs = append(runs, run)

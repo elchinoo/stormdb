@@ -69,7 +69,7 @@ clean:
 	@echo "Clean complete"
 
 # Run tests for core and plugins
-test-all: test test-plugins
+test-all: test test-plugins e2e-tpcc
 
 # Run core tests
 test:
@@ -195,6 +195,15 @@ help:
 	@echo "  test           - Run core tests"
 	@echo "  test-plugins   - Run plugin tests"
 	@echo "  test-plugin-<name> - Test specific plugin"
+  
+# Integration & E2E tests for tpcc-scalability plugin
+## Integration & E2E tests for tpcc-scalability plugin
+.PHONY: e2e-tpcc
+e2e-tpcc:
+	@echo "Running end-to-end TPC-C E2E tests"
+	@go test -v ./e2e
+	@echo "Running E2E tpcc-scalability integration tests..."
+	@./scripts/e2e_tpcc_scalability.sh
 	@echo "  install        - Install application and plugins"
 	@echo "  dev            - Run in development mode"
 	@echo "  run            - Run the application"

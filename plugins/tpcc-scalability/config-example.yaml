@@ -1,71 +1,107 @@
-# TPC-C Scalability Test Plugin Configuration Example
+# TPC-C Scalability Plugin Configuration Examples
 
-plugin_config:
-  # Database connection settings
+# Basic Configuration - Minimal TPC-C test
+basic_config:
   host: "localhost"
   port: 5432
-  database: "tpcc_test"
+  database: "tpcc"
   username: "postgres"
-  password: "postgres"
+  password: "password"
   ssl_mode: "disable"
-
-  # Test scale and configuration
-  scale: 10                    # Number of warehouses (scale factor)
-  connections: [48, 96, 192, 256]  # Connection levels to test
-  duration: "5m"               # Duration per connection level
-  warmup_time: "30s"          # Warmup time before measurements
-  think_time: "100ms"         # Delay between transactions
-
-  # Transaction mix percentages (must sum to 100)
-  new_order_pct: 45           # New Order transactions
-  payment_pct: 43             # Payment transactions  
-  order_status_pct: 4         # Order Status transactions
-  delivery_pct: 4             # Delivery transactions
-  stock_level_pct: 4          # Stock Level transactions
-
-  # Performance and monitoring settings
-  batch_size: 100             # Batch size for result storage
-  enable_metrics: true        # Enable detailed metrics collection
-  log_transactions: false     # Log individual transactions (verbose)
-
-# Alternative configurations for different test scenarios
-
-# Quick test configuration
-quick_test:
-  scale: 5
-  connections: [24, 48]
+  
+  scale: 1
+  connections: [10, 20]
   duration: "2m"
-  warmup_time: "15s"
+  warmup_time: "30s"
+  
+  rebuild: true
+  enable_metrics: true
+
+# Standard Configuration - Full TPC-C compliance
+standard_config:
+  host: "localhost"
+  port: 5432
+  database: "tpcc"
+  username: "postgres"
+  password: "password"
+  ssl_mode: "disable"
+  
+  # TPC-C Standard Parameters
+  scale: 10
+  connections: [50, 100, 200]
+  duration: "10m"
+  warmup_time: "2m"
+  think_time: "1ms"
+  
+  # Standard TPC-C transaction mix
   new_order_pct: 45
   payment_pct: 43
   order_status_pct: 4
   delivery_pct: 4
   stock_level_pct: 4
+  cross_warehouse: 15
+  
+  drop_tables: true
+  rebuild: true
+  enable_metrics: true
+  log_transactions: false
+  verbose: true
 
-# Stress test configuration  
-stress_test:
+# Performance Testing Configuration
+performance_config:
+  host: "db.example.com"
+  port: 5432
+  database: "tpcc_perf"
+  username: "tpcc_user"
+  password: "secure_password"
+  ssl_mode: "require"
+  
+  # Large scale testing
   scale: 50
-  connections: [128, 256, 512, 1000]
-  duration: "10m"
-  warmup_time: "1m"
-  think_time: "50ms"
-  new_order_pct: 50
-  payment_pct: 40
-  order_status_pct: 3
-  delivery_pct: 3
+  connections: [100, 200, 400, 800, 1600]
+  duration: "30m"
+  warmup_time: "5m"
+  think_time: "0ms"
+  
+  # Standard mix
+  new_order_pct: 45
+  payment_pct: 43
+  order_status_pct: 4
+  delivery_pct: 4
   stock_level_pct: 4
-
-# Latency focused test
-latency_test:
-  scale: 20
-  connections: [48, 96, 144, 192]
-  duration: "15m"
-  warmup_time: "2m"
-  think_time: "200ms"
+  cross_warehouse: 15
+  
+  drop_tables: false
+  rebuild: false
   enable_metrics: true
   log_transactions: true
-  new_order_pct: 45
-  payment_pct: 43
-  order_status_pct: 4
-  delivery_pct: 4
-  stock_level_pct: 4
+  verbose: true
+
+# Development Configuration - Quick testing
+dev_config:
+  host: "localhost"
+  port: 5432
+  database: "tpcc_dev"
+  username: "dev"
+  password: "dev"
+  ssl_mode: "disable"
+  
+  scale: 1
+  connections: [5, 10]
+  duration: "30s"
+  warmup_time: "10s"
+  think_time: "10ms"
+  
+  # Modified mix for faster testing
+  new_order_pct: 50
+  payment_pct: 30
+  order_status_pct: 5
+  delivery_pct: 10
+  stock_level_pct: 5
+  cross_warehouse: 10
+  
+  drop_tables: true
+  rebuild: true
+  enable_metrics: true
+  log_transactions: true
+  verbose: true

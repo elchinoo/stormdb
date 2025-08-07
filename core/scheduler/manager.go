@@ -506,23 +506,34 @@ func (t *TestExecutionTask) Execute(ctx context.Context) error {
 			core.Field{Key: "task_id", Value: t.id},
 			core.Field{Key: "error", Value: err.Error()},
 		)
+
+		// Store error information for debugging
+		errorDetails := map[string]interface{}{
+			"task_id": t.id,
+			"plugin":  t.plugin.Metadata().Name,
+			"version": t.plugin.Metadata().Version,
+		}
+
+		if statusErr := t.storage.UpdateTestRunWithError(ctx, t.runID, finalStatus, err.Error(), errorDetails); statusErr != nil {
+			t.logger.Error("failed to update test run with error",
+				core.Field{Key: "run_id", Value: t.runID},
+				core.Field{Key: "error", Value: statusErr.Error()},
+			)
+			return fmt.Errorf("plugin execution failed (%v) and error update failed (%v)", err, statusErr)
+		}
 	} else {
 		finalStatus = core.StatusSucceeded
 		t.logger.Info("test execution completed successfully",
 			core.Field{Key: "task_id", Value: t.id},
 		)
-	}
 
-	if statusErr := t.storage.UpdateTestRunStatus(ctx, t.runID, finalStatus); statusErr != nil {
-		t.logger.Error("failed to update final test run status",
-			core.Field{Key: "run_id", Value: t.runID},
-			core.Field{Key: "error", Value: statusErr.Error()},
-		)
-		// Return original error if it exists, otherwise return status update error
-		if err != nil {
-			return fmt.Errorf("plugin execution failed (%v) and status update failed (%v)", err, statusErr)
+		if statusErr := t.storage.UpdateTestRunStatus(ctx, t.runID, finalStatus); statusErr != nil {
+			t.logger.Error("failed to update final test run status",
+				core.Field{Key: "run_id", Value: t.runID},
+				core.Field{Key: "error", Value: statusErr.Error()},
+			)
+			return fmt.Errorf("failed to update test run status: %w", statusErr)
 		}
-		return fmt.Errorf("failed to update test run status: %w", statusErr)
 	}
 
 	return err

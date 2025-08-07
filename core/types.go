@@ -90,19 +90,22 @@ type PluginMetadata struct {
 
 // TestRun represents a test execution instance
 type TestRun struct {
-	ID          int64                  `json:"id"`
-	TestTypeID  int                    `json:"test_type_id"`
-	PluginID    int                    `json:"plugin_id"`
-	Host        string                 `json:"host"`
-	Port        int                    `json:"port"`
-	DBName      string                 `json:"db_name"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Status      ServiceStatus          `json:"status"`
-	Config      map[string]interface{} `json:"config"`
-	CreatedAt   time.Time              `json:"created_at"`
-	StartTime   *time.Time             `json:"start_time,omitempty"`
-	EndTime     *time.Time             `json:"end_time,omitempty"`
+	ID           int64                  `json:"id"`
+	TestTypeID   int                    `json:"test_type_id"`
+	PluginID     int                    `json:"plugin_id"`
+	Host         string                 `json:"host"`
+	Port         int                    `json:"port"`
+	DBName       string                 `json:"db_name"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description"`
+	Status       ServiceStatus          `json:"status"`
+	Config       map[string]interface{} `json:"config"`
+	CreatedAt    time.Time              `json:"created_at"`
+	StartTime    *time.Time             `json:"start_time,omitempty"`
+	EndTime      *time.Time             `json:"end_time,omitempty"`
+	ErrorMessage *string                `json:"error_message,omitempty"`
+	ErrorDetails map[string]interface{} `json:"error_details,omitempty"`
+	LogsURL      *string                `json:"logs_url,omitempty"`
 }
 
 // TestResult represents a single measurement from a test execution
@@ -225,6 +228,7 @@ type StorageManager interface {
 	// Test run lifecycle
 	CreateTestRun(ctx context.Context, run *TestRun) (int64, error)
 	UpdateTestRunStatus(ctx context.Context, runID int64, status ServiceStatus) error
+	UpdateTestRunWithError(ctx context.Context, runID int64, status ServiceStatus, errorMessage string, errorDetails map[string]interface{}) error
 	GetTestRun(ctx context.Context, runID int64) (*TestRun, error)
 	ListTestRuns(ctx context.Context, limit, offset int) ([]TestRun, error)
 

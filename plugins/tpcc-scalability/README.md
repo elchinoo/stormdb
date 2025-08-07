@@ -1,347 +1,280 @@
-# TPC-C Scalability Plugin for StormDB v2
+# TPC-C Scalability Plugin
 
-A comprehensive TPC-C inspired performance testing plugin that performs incremental connection scaling tests to evaluate PostgreSQL database performance under varying load conditions.
+A comprehensive TPC-C (Transaction Processing Performance Council Benchmark C) scalability testing plugin for StormDB v2. This plugin implements the full TPC-C specification with supplier reordering extensions to measure database performance characteristics under realistic OLTP workloads.
 
 ## Overview
 
-The TPC-C (Transaction Processing Performance Council Benchmark C) Scalability Plugin implements a simplified version of the TPC-C benchmark designed to test database performance with incrementally increasing connection counts. This plugin is perfect for understanding how your PostgreSQL database performs as the workload scales.
+TPC-C simulates a complete computing environment where a population of users executes transactions against a database. The benchmark is centered around the principal activities (transactions) of an order-entry environment:
+
+- **New-Order** (45%): Enter a new order from a customer
+- **Payment** (43%): Update customer balance to record a payment
+- **Order-Status** (4%): Retrieve status of customer's most recent order
+- **Delivery** (4%): Process a batch of orders for delivery
+- **Stock-Level** (4%): Monitor warehouse inventory levels
 
 ## Features
 
-- **Incremental Connection Testing**: Tests performance at multiple connection levels (default: 48, 96, 192, 256)
-- **TPC-C Transaction Mix**: Implements all five TPC-C transaction types with configurable percentages
-- **Comprehensive Metrics**: Collects detailed performance metrics including latency, throughput, and error rates
-- **Configurable Workload**: Adjustable scale factor, test duration, think time, and transaction mix
-- **Automatic Schema Management**: Creates and populates TPC-C database schema automatically
-- **Batch Result Storage**: Efficient storage of test results for analysis
-- **Real-time Monitoring**: Live status updates during test execution
+### Core TPC-C Implementation
+- Complete TPC-C schema with all 8 core tables
+- Standard TPC-C transaction mix with configurable percentages
+- Proper warehouse/district/customer hierarchical data model
+- Support for multiple scale factors (1x = 1 warehouse)
 
-## Transaction Types
+### Supplier Reordering Extensions
+- Extended schema with supplier management
+- Purchase order and goods receipt processing
+- Inventory reordering automation
+- Supply chain transaction simulation
 
-The plugin implements all five standard TPC-C transactions:
+### Seed Data Management
+- Multi-country support with localized data
+- Realistic names and company data by region
+- Configurable data populations per country
+- Geographic distribution modeling
 
-1. **New Order (45%)**: Creates new customer orders
-2. **Payment (43%)**: Processes customer payments
-3. **Order Status (4%)**: Queries order status
-4. **Delivery (4%)**: Processes order deliveries
-5. **Stock Level (4%)**: Checks inventory levels
+### Performance Testing
+- Incremental connection testing
+- Configurable warmup and measurement phases
+- Real-time metrics collection
+- Delta-based throughput calculation
+- Comprehensive error reporting
 
-## Installation
+## Schema
 
-### Build the Plugin
+### Core TPC-C Tables
+1. **warehouse** - Warehouse master data
+2. **district** - 10 districts per warehouse
+3. **customer** - 3,000 customers per district
+4. **item** - Static catalog of 100,000 items
+5. **stock** - Inventory (100,000 × warehouses)
+6. **order** - Order headers (90,000 per district)
+7. **order_line** - Order line items (~9 per order)
+8. **new_order** - Pending orders queue
+9. **history** - Payment transaction history
 
-```bash
-cd plugins/tpcc-scalability
-make plugin
-```
+### Supplier Extensions
+10. **supplier** - Supplier master data
+11. **purchase_order** - Purchase orders to suppliers
+12. **purchase_order_line** - PO line items
+13. **goods_receipt** - Received shipments
+14. **goods_receipt_line** - Receipt line items
 
-### Verify Installation
-
-```bash
-ls -la ../../build/plugins/tpcc-scalability.so
-```
+### Seed Tables
+15. **countries** - Country master data
+16. **cities** - Cities by country
+17. **first_names** - Localized first names
+18. **family_names** - Localized family names
+19. **company_names** - Company names by industry
 
 ## Configuration
 
-### Basic Configuration
-
-```yaml
-host: "localhost"
-port: 5432
-database: "tpcc_test"
-username: "postgres"
-password: "postgres"
-ssl_mode: "disable"
-scale: 10
-connections: [48, 96, 192, 256]
-duration: "5m"
-warmup_time: "30s"
-think_time: "100ms"
-new_order_pct: 45
-payment_pct: 43
-order_status_pct: 4
-delivery_pct: 4
-stock_level_pct: 4
-batch_size: 100
-enable_metrics: true
-log_transactions: false
-```
-
-### Configuration Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `host` | string | `localhost` | Database host |
-| `port` | int | `5432` | Database port |
-| `database` | string | `tpcc_test` | Database name |
-| `username` | string | `postgres` | Database user |
-| `password` | string | `postgres` | Database password |
-| `ssl_mode` | string | `disable` | SSL mode |
-| `scale` | int | `10` | Number of warehouses (scale factor) |
-| `connections` | []int | `[48,96,192,256]` | Connection levels to test |
-| `duration` | string | `5m` | Duration per connection level |
-| `warmup_time` | string | `30s` | Warmup time before measurements |
-| `think_time` | string | `100ms` | Delay between transactions |
-| `new_order_pct` | int | `45` | New Order transaction percentage |
-| `payment_pct` | int | `43` | Payment transaction percentage |
-| `order_status_pct` | int | `4` | Order Status transaction percentage |
-| `delivery_pct` | int | `4` | Delivery transaction percentage |
-| `stock_level_pct` | int | `4` | Stock Level transaction percentage |
-| `batch_size` | int | `100` | Batch size for result storage |
-| `enable_metrics` | bool | `true` | Enable detailed metrics collection |
-| `log_transactions` | bool | `false` | Log individual transactions |
-
-### Predefined Configurations
-
-#### Quick Test (2 minutes)
-```yaml
-scale: 5
-connections: [24, 48]
-duration: "2m"
-warmup_time: "15s"
-```
-
-#### Stress Test (10 minutes)
-```yaml
-scale: 50
-connections: [128, 256, 512, 1000]
-duration: "10m"
-warmup_time: "1m"
-think_time: "50ms"
-```
-
-#### Latency Test (15 minutes)
-```yaml
-scale: 20
-connections: [48, 96, 144, 192]
-duration: "15m"
-warmup_time: "2m"
-think_time: "200ms"
-enable_metrics: true
-log_transactions: true
-```
-
-## Usage
-
-### Using StormDB v2 API
-
-```bash
-# Start a standard TPC-C test
-curl -X POST "http://localhost:8080/test-runs" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "plugin_name": "tpcc-scalability",
-    "name": "TPC-C Scalability Test",
-    "description": "4-level connection scaling test",
-    "config": {
-      "host": "localhost",
-      "port": 5432,
-      "database": "tpcc_test",
-      "username": "postgres",
-      "password": "postgres",
-      "scale": 10,
-      "connections": [48, 96, 192, 256],
-      "duration": "5m"
-    }
-  }'
-```
-
-### Monitor Test Progress
-
-```bash
-# Get test status
-curl "http://localhost:8080/test-runs/{test_run_id}"
-
-# Get real-time results
-curl "http://localhost:8080/test-runs/{test_run_id}/results"
-```
-
-## Test Execution Flow
-
-1. **Initialization**: Plugin connects to database and validates configuration
-2. **Schema Preparation**: Creates TPC-C tables if they don't exist
-3. **Data Population**: Populates warehouses, districts, customers, items, and stock
-4. **Connection Level Testing**: For each connection count:
-   - **Warmup Phase**: Runs transactions without recording metrics
-   - **Measurement Phase**: Records all transaction metrics
-   - **Result Collection**: Stores results in batches
-5. **Completion**: Aggregates results and updates test run status
-
-## Database Schema
-
-The plugin automatically creates the following TPC-C tables:
-
-- `tpcc_warehouse`: Warehouse master data
-- `tpcc_district`: District information per warehouse
-- `tpcc_customer`: Customer records
-- `tpcc_item`: Item catalog (shared across warehouses)
-- `tpcc_stock`: Stock levels per warehouse/item
-
-## Metrics Collected
-
-### Transaction Metrics
-- **Transaction Counts**: Per transaction type
-- **Latency Statistics**: Min, max, average latency
-- **Throughput**: Transactions per second (TPS)
-- **Error Counts**: Failed transactions and timeouts
-
-### Performance Metrics
-- **Response Time**: Individual transaction response times
-- **Concurrency**: Active connection utilization
-- **Database Stats**: Cache hit ratios, lock waits
-
-### Scalability Metrics
-- **Throughput vs. Connections**: TPS at each connection level
-- **Latency vs. Load**: Response time degradation
-- **Resource Utilization**: CPU, memory, I/O patterns
-
-## Test Results Analysis
-
-### Connection Level Summary
 ```json
 {
-  "connections": 48,
-  "duration": "5m0s",
-  "total_transactions": 12450,
-  "tps": 41.5,
-  "avg_latency_ms": 12,
-  "min_latency_ms": 2,
-  "max_latency_ms": 85,
-  "errors": 0,
-  "transaction_breakdown": {
-    "new_order": 5603,
-    "payment": 5354,
-    "order_status": 497,
-    "delivery": 498,
-    "stock_level": 498
+  "plugin_name": "tpcc-scalability",
+  "config": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "tpcc",
+    "username": "postgres", 
+    "password": "password",
+    "ssl_mode": "disable",
+    
+    "mode": "full",
+    "scale": 1,
+    "connections": [10, 20, 50],
+    "duration": "15m",
+    "warmup_time": "30s",
+    "think_time": "0ms",
+    
+    "new_order_pct": 45,
+    "payment_pct": 43,
+    "order_status_pct": 4,
+    "delivery_pct": 4,
+    "stock_level_pct": 4,
+    "cross_warehouse": 15,
+    
+    "enable_supplier_reorder": false,
+    "supplier_reorder_pct": 0,
+    "min_stock_level": 10,
+    "reorder_quantity": 100,
+    
+    "max_error_rate": 0.05,
+    "error_window": "1m",
+    "stop_on_error_limit": true,
+    
+    "drop_tables": true,
+    "rebuild": true,
+    "enable_metrics": true,
+    "stream_metrics": true,
+    "metrics_interval": "1s",
+    "log_transactions": false,
+    "verbose": true
   }
 }
 ```
 
-### Performance Trends
-- **Linear Scaling**: TPS increases proportionally with connections
-- **Saturation Point**: Connection count where TPS plateaus
-- **Latency Degradation**: Point where response times increase significantly
-- **Error Threshold**: Connection count where errors begin to occur
+### Configuration Parameters
 
-## Troubleshooting
+#### Database Connection
+- `host`: Database server hostname
+- `port`: Database port (default: 5432)
+- `database`: Target database name
+- `username`: Database username
+- `password`: Database password
+- `ssl_mode`: SSL connection mode
 
-### Common Issues
+#### Test Parameters
+- `mode`: Execution mode - "setup", "run", "rebuild", "full" (default: "full")
+- `scale`: Number of warehouses (1x = 1 warehouse)
+- `connections`: Array of connection levels to test
+- `duration`: Total test duration (divided by number of connection levels)
+- `warmup_time`: Warmup period duration
+- `think_time`: Delay between transactions
 
-#### Database Connection Errors
-```
-Error: failed to connect to database: dial tcp: connection refused
-```
-**Solution**: Ensure PostgreSQL is running and accessible
+#### Execution Modes
+- `setup`: Create schema and populate data only (no test execution)
+- `run`: Run tests only (assumes schema and data exist)  
+- `rebuild`: Drop tables, recreate schema, populate data, then run tests
+- `full`: Smart setup (create/populate if needed) + run tests (default)
 
-#### Schema Creation Failures
-```
-Error: failed to create schema: permission denied
-```
-**Solution**: Ensure database user has CREATE privileges
+#### Transaction Mix
+- `new_order_pct`: New order transaction percentage (default: 45%)
+- `payment_pct`: Payment transaction percentage (default: 43%)
+- `order_status_pct`: Order status percentage (default: 4%)
+- `delivery_pct`: Delivery transaction percentage (default: 4%)
+- `stock_level_pct`: Stock level percentage (default: 4%)
+- `cross_warehouse`: Cross-warehouse transaction percentage (default: 15%)
 
-#### High Memory Usage
-```
-Warning: memory usage exceeding limits
-```
-**Solution**: Reduce scale factor or batch size
+#### Supplier Reordering Extensions
+- `enable_supplier_reorder`: Enable supplier reordering transactions
+- `supplier_reorder_pct`: Percentage of supplier reorder transactions (default: 5%)
+- `min_stock_level`: Minimum stock level to trigger reorder (default: 10)
+- `reorder_quantity`: Default reorder quantity (default: 100)
+- `reorder_lead_time`: Lead time for reorders (default: "7d")
+- `supplier_response_time`: Supplier response time variation (default: "1h")
 
-#### Transaction Timeouts
-```
-Error: context deadline exceeded
-```
-**Solution**: Increase database connection limits or reduce concurrent connections
+#### Error Rate Limiting
+- `max_error_rate`: Maximum error rate (0.0-1.0) before stopping test (default: 0.05)
+- `error_window`: Time window for error rate calculation (default: "1m")
+- `stop_on_error_limit`: Stop test when error limit is reached (default: true)
 
-### Performance Tuning
+#### Real-time Metrics
+- `stream_metrics`: Enable real-time metrics streaming (default: true)
+- `metrics_interval`: Metrics reporting interval (default: "1s")
+- `stream_batch_size`: Batch size for streaming (default: 50)
+- `stream_flush_time`: Max time before forced flush (default: "1s")
 
-#### Database Configuration
-```sql
--- Increase connection limits
-ALTER SYSTEM SET max_connections = 1000;
+#### Schema Options
+- `drop_tables`: Drop existing tables before test
+- `rebuild`: Repopulate data before test
+- `enable_metrics`: Enable background metrics collection
+- `log_transactions`: Log individual transaction details
+- `verbose`: Enable verbose logging
 
--- Optimize memory settings
-ALTER SYSTEM SET shared_buffers = '256MB';
-ALTER SYSTEM SET work_mem = '4MB';
-ALTER SYSTEM SET maintenance_work_mem = '64MB';
+## Metrics
 
--- Improve checkpoint behavior
-ALTER SYSTEM SET checkpoint_completion_target = 0.9;
-ALTER SYSTEM SET wal_buffers = '16MB';
-```
+The plugin collects comprehensive metrics including:
 
-#### Plugin Configuration
-```yaml
-# For high-throughput testing
-scale: 20
-connections: [100, 200, 400, 800]
-think_time: "50ms"
-batch_size: 200
+### Transaction Metrics
+- Total transaction count by type
+- Transaction latencies (min/max/avg/p95/p99)
+- Throughput (tpmC - transactions per minute)
+- Error rates and types
 
-# For latency-sensitive testing  
-scale: 10
-connections: [24, 48, 72, 96]
-think_time: "200ms"
-enable_metrics: true
-log_transactions: true
-```
+### System Metrics
+- Active connections
+- Active workers
+- Database response times
+- Resource utilization
 
-## Testing Best Practices
+### Business Metrics
+- Order processing rates
+- Payment volumes
+- Inventory turnover
+- Supply chain efficiency
 
-### Test Environment
-- Use dedicated test database
-- Ensure sufficient hardware resources
-- Monitor system metrics during tests
-- Isolate from production workloads
+## Building
 
-### Test Design
-- Start with small scale factors
-- Gradually increase connection counts
-- Allow adequate warmup time
-- Run multiple iterations for consistency
-
-### Result Interpretation
-- Compare against baseline measurements
-- Look for inflection points in performance curves
-- Consider both throughput and latency metrics
-- Document configuration and environment details
-
-## Development
-
-### Running Tests
 ```bash
-# Run plugin unit tests
+# Build the plugin
+make plugin
+
+# Run tests
 make test
 
-# Run with coverage
-make test-coverage
-
-# Run benchmarks
-make bench
+# Clean build artifacts
+make clean
 ```
 
-### Code Structure
+## Usage Examples
+
+### Basic TPC-C Test
+```bash
+curl -X POST http://localhost:8080/test-runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plugin_name": "tpcc-scalability",
+    "name": "Basic TPC-C Test",
+    "config": {
+      "host": "localhost",
+      "database": "tpcc",
+      "username": "postgres",
+      "password": "password",
+      "scale": 1,
+      "connections": [10, 20],
+      "duration": "2m",
+      "warmup_time": "30s",
+      "rebuild": true
+    }
+  }'
 ```
-plugin.go          # Main plugin implementation
-plugin_test.go     # Unit tests
-config-example.yaml # Configuration examples
-API_EXAMPLES.md    # API usage examples
-Makefile          # Build automation
-go.mod            # Go module definition
+
+### Multi-Scale Performance Test
+```bash
+curl -X POST http://localhost:8080/test-runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plugin_name": "tpcc-scalability", 
+    "name": "Multi-Scale TPC-C Test",
+    "config": {
+      "host": "localhost",
+      "database": "tpcc",
+      "username": "postgres",
+      "password": "password",
+      "scale": 5,
+      "connections": [50, 100, 200, 400],
+      "duration": "10m",
+      "warmup_time": "2m",
+      "think_time": "10ms",
+      "enable_metrics": true,
+      "verbose": true,
+      "rebuild": true
+    }
+  }'
 ```
 
-### Contributing
-1. Follow Go coding standards
-2. Add tests for new functionality
-3. Update documentation
-4. Ensure backward compatibility
+## TPC-C Standard Compliance
 
-## License
+This implementation follows the TPC-C specification v5.11 with the following characteristics:
 
-This plugin is part of StormDB v2 and is licensed under the MIT License.
+- **Data Scale**: Configurable warehouse count (1x = 1 warehouse)
+- **Transaction Mix**: Standard 45/43/4/4/4 percentage distribution
+- **Data Locality**: 85% local warehouse, 15% remote warehouse transactions
+- **Response Time**: Sub-5 second 90th percentile requirement
+- **Throughput Metric**: tpmC (new-order transactions per minute)
 
-## Support
+## Performance Expectations
 
-For issues, questions, or contributions:
-- GitHub Issues: [StormDB Repository](https://github.com/elchinoo/stormdb)
-- Documentation: [StormDB v2 Docs](https://github.com/elchinoo/stormdb/tree/v2-redesign-core)
-- API Examples: [API_EXAMPLES.md](./API_EXAMPLES.md)
+Typical performance characteristics:
+
+- **Small Scale (1-5 warehouses)**: 1,000-10,000 tpmC
+- **Medium Scale (10-50 warehouses)**: 10,000-100,000 tpmC  
+- **Large Scale (100+ warehouses)**: 100,000+ tpmC
+
+Results depend on hardware, database configuration, and system tuning.
+
+## References
+
+- [TPC-C Specification v5.11](http://www.tpc.org/tpcc/)
+- [TPC-C Standard Benchmark Results](http://www.tpc.org/tpcc/results/)
+- [PostgreSQL Performance Tuning](https://wiki.postgresql.org/wiki/Performance_Optimization)
