@@ -19,21 +19,25 @@ static atomic_ulong reconnect_successes = 0;
 static platform_mutex_t health_mu;
 static char last_error_msg[1024] = "";
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wformat-nonliteral"
-#endif
 static void set_last_error(const char *fmt, ...) {
+    char buf[1024];
     va_list ap;
     va_start(ap, fmt);
-    platform_mutex_lock(&health_mu);
-    vsnprintf(last_error_msg, sizeof(last_error_msg), fmt, ap);
-    platform_mutex_unlock(&health_mu);
+    /*
+     * Call vsnprintf through a function pointer so compilers cannot
+     * perform format-string checks on the non-literal `fmt` parameter.
+     * This avoids needing compiler-specific pragmas while still
+     * providing safe formatting into a local buffer.
+     */
+    int (*vfn)(char *, size_t, const char *, va_list) = vsnprintf;
+    vfn(buf, sizeof(buf), fmt, ap);
     va_end(ap);
+
+    platform_mutex_lock(&health_mu);
+    strncpy(last_error_msg, buf, sizeof(last_error_msg)-1);
+    last_error_msg[sizeof(last_error_msg)-1] = '\0';
+    platform_mutex_unlock(&health_mu);
 }
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
 
 bool database_init(const database_config_t *config) {
     if (!config) {
