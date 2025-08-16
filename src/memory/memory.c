@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
 
 typedef struct mem_block_s {
     memory_handle_t handle;
@@ -21,7 +22,6 @@ static mem_block_t **g_table = NULL;
 static size_t g_table_cap = 0;
 static memory_handle_t g_next_handle = 1;
 
-static void *g_buffer = NULL;
 static size_t g_buffer_size = 0; // configured limit
 static size_t g_buffer_used = 0;
 

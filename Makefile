@@ -381,6 +381,8 @@ TEST_SRC := test/smoke_tests.c
 TEST_BIN := bin/tests-smoke$(EXEC_EXT)
 UNIT_TEST_SRC := test/unit_config_pid_plugin.c
 UNIT_TEST_BIN := bin/tests-unit$(EXEC_EXT)
+UNIT_DATABASE_MATERIALIZE_SRC := test/unit_database_materialize.c
+UNIT_DATABASE_MATERIALIZE_BIN := bin/tests-db-materialize$(EXEC_EXT)
 
 CORE_NO_MAIN := $(filter-out $(OBJDIR)/debug/main.o,$(DEBUG_OBJECTS))
 $(TEST_BIN): $(CORE_NO_MAIN) $(TEST_SRC) | $(BINDIR)
@@ -389,13 +391,19 @@ $(TEST_BIN): $(CORE_NO_MAIN) $(TEST_SRC) | $(BINDIR)
 $(UNIT_TEST_BIN): $(CORE_NO_MAIN) $(UNIT_TEST_SRC) | $(BINDIR)
 	$(CC) $(DEBUG_CFLAGS) $(CPPFLAGS) $(UNIT_TEST_SRC) $(CORE_NO_MAIN) $(LIBS) -o $@
 
-run-tests: $(TEST_BIN) $(UNIT_TEST_BIN)
+$(UNIT_DATABASE_MATERIALIZE_BIN): $(CORE_NO_MAIN) $(UNIT_DATABASE_MATERIALIZE_SRC) | $(BINDIR)
+	$(CC) $(DEBUG_CFLAGS) $(CPPFLAGS) $(UNIT_DATABASE_MATERIALIZE_SRC) $(CORE_NO_MAIN) $(LIBS) -o $@
+
+run-tests: $(TEST_BIN) $(UNIT_TEST_BIN) $(UNIT_DATABASE_MATERIALIZE_BIN)
 	@echo "=== Running smoke tests ==="
 	$(TEST_BIN)
 	@echo "All smoke tests passed"
 	@echo "=== Running unit tests ==="
 	$(UNIT_TEST_BIN)
 	@echo "All unit tests passed"
+	@echo "=== Running database materialize unit test ==="
+	$(UNIT_DATABASE_MATERIALIZE_BIN)
+	@echo "All unit/database tests passed"
 test-asan: $(ASAN_TARGET)
 	@echo "=== AddressSanitizer Test ==="
 ifeq ($(PLATFORM),windows)
@@ -834,3 +842,12 @@ run-unit-api:
 	@gcc -o test/unit_api_health test/unit_api_health.c -Iinclude
 	@echo "Note: ensure server is running on port 8080 before running this test"
 	@./test/unit_api_health || echo "unit_api_health failed or server not running"
+
+.PHONY: compose-run-tests
+compose-run-tests:
+	@echo "Running tests inside Docker Compose (stormdb-dev)"
+	./scripts/ci/run_in_compose.sh stormdb-dev
+
+.PHONY: run-tests-compose
+run-tests-compose: compose-run-tests
+	@echo "Done."
