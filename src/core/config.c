@@ -59,6 +59,9 @@ void config_set_defaults(stormdb_config_t *config) {
     config->metrics.collection_interval = 1000;
     config->metrics.buffer_size = 10000;
     strncpy(config->metrics.export_format, "json", sizeof(config->metrics.export_format) - 1);
+    
+    // Memory defaults (256MB)
+    config->memory.buffer_size_bytes = 268435456;
 }
 
 stormdb_config_t* config_load(const char *config_file) {
@@ -368,6 +371,20 @@ bool config_reload(void) {
                             new_cfg->metrics.buffer_size = atoi(value);
                         } else if (strcmp(key, "export_format") == 0) {
                             strncpy(new_cfg->metrics.export_format, value, sizeof(new_cfg->metrics.export_format) - 1);
+                        }
+                    }
+                }
+            } else if (strcmp(section, "memory") == 0 && value_node->type == YAML_MAPPING_NODE) {
+                yaml_node_pair_t *m_pair;
+                for (m_pair = value_node->data.mapping.pairs.start; m_pair < value_node->data.mapping.pairs.top; m_pair++) {
+                    yaml_node_t *m_key = yaml_document_get_node(&document, m_pair->key);
+                    yaml_node_t *m_value = yaml_document_get_node(&document, m_pair->value);
+                    if (!m_key || !m_value) continue;
+                    if (m_key->type == YAML_SCALAR_NODE && m_value->type == YAML_SCALAR_NODE) {
+                        const char *key = (const char *)m_key->data.scalar.value;
+                        const char *value = (const char *)m_value->data.scalar.value;
+                        if (strcmp(key, "buffer_size_bytes") == 0) {
+                            new_cfg->memory.buffer_size_bytes = (size_t)strtoull(value, NULL, 10);
                         }
                     }
                 }

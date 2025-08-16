@@ -30,3 +30,6 @@ metrics:
   collection_interval: 1000  # milliseconds
   buffer_size: 10000
   export_format: "json"
+
+memory:
+  buffer_size_bytes: 268435456  # 256MB

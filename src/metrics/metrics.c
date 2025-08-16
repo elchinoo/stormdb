@@ -13,9 +13,38 @@ typedef struct {
     platform_mutex_t mu;
     bool running;
     platform_thread_t th;
+    int collection_interval_ms;
+    int health_push_counter;
 } metrics_state_t;
 
 static metrics_state_t g;
+
+static void push_health_metrics(void) {
+    metric_t m;
+    unsigned long failures = database_get_reconnect_failures();
+    unsigned long successes = database_get_reconnect_successes();
+    int connected = database_is_connected() ? 1 : 0;
+    uint64_t ts = platform_get_timestamp_us();
+
+    // failures
+    memset(&m, 0, sizeof(m));
+    m.ts_us = ts;
+    snprintf(m.name, sizeof(m.name), "stormdb.db.reconnect_failures");
+    m.value = (double)failures;
+    metrics_push(&m);
+    // successes
+    memset(&m, 0, sizeof(m));
+    m.ts_us = ts;
+    snprintf(m.name, sizeof(m.name), "stormdb.db.reconnect_successes");
+    m.value = (double)successes;
+    metrics_push(&m);
+    // connected
+    memset(&m, 0, sizeof(m));
+    m.ts_us = ts;
+    snprintf(m.name, sizeof(m.name), "stormdb.db.connected");
+    m.value = (double)connected;
+    metrics_push(&m);
+}
 
 static void* metrics_thread(void* arg) {
     (void)arg;
@@ -39,6 +68,13 @@ static void* metrics_thread(void* arg) {
         } else {
             platform_sleep_ms(50);
         }
+
+        // Periodically push health metrics
+        g.health_push_counter += 1;
+        if (g.health_push_counter >= (1000 / (g.collection_interval_ms > 0 ? g.collection_interval_ms : 1000))) {
+            push_health_metrics();
+            g.health_push_counter = 0;
+        }
     }
     LOG_INFO_MSG("Metrics thread exiting");
     return NULL;
@@ -51,6 +87,9 @@ bool metrics_init(size_t capacity) {
     if (!g.buf) return false;
     g.cap = capacity;
     if (platform_mutex_init(&g.mu) != 0) return false;
+    // default collection interval until configured externally
+    g.collection_interval_ms = 1000;
+    g.health_push_counter = 0;
     return true;
 }
 
