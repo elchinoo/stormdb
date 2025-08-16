@@ -34,4 +34,9 @@ const char* database_get_column_name(database_result_t *result, int col);
 // Metrics persistence (simple example table metrics(ts TIMESTAMPTZ, name TEXT, value DOUBLE PRECISION))
 bool database_insert_metric(uint64_t ts_us, const char* name, double value);
 
+// Health instrumentation: counters for reconnect attempts
+unsigned long database_get_reconnect_failures(void);
+unsigned long database_get_reconnect_successes(void);
+const char* database_get_last_error(void);
+
 #endif // STORMDB_DATABASE_H

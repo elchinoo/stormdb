@@ -1,14 +1,36 @@
 #include "database.h"
 #include "logging.h"
+#include "platform.h"
 #include <dlfcn.h>
 #include <libpq-fe.h>
+#include <stdatomic.h>
 
 static PGconn *pg_connection = NULL;
 static char *current_conn_info = NULL;
 
+// Health instrumentation
+static atomic_ulong reconnect_failures = 0;
+static atomic_ulong reconnect_successes = 0;
+static platform_mutex_t health_mu;
+static char last_error_msg[1024] = "";
+
+static void set_last_error(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    platform_mutex_lock(&health_mu);
+    vsnprintf(last_error_msg, sizeof(last_error_msg), fmt, ap);
+    platform_mutex_unlock(&health_mu);
+    va_end(ap);
+}
+
 bool database_init(const database_config_t *config) {
     if (!config) {
         LOG_ERROR_MSG("Database configuration is NULL");
+        return false;
+    }
+    
+    if (platform_mutex_init(&health_mu) != 0) {
+        LOG_ERROR_MSG("Failed to initialize health mutex");
         return false;
     }
     
@@ -29,10 +51,12 @@ bool database_init(const database_config_t *config) {
     // Connect to database
     pg_connection = PQconnectdb(conn_info);
     if (PQstatus(pg_connection) != CONNECTION_OK) {
+        set_last_error("Connection to database failed: %s", PQerrorMessage(pg_connection));
         LOG_ERROR_MSG("Connection to database failed: %s", PQerrorMessage(pg_connection));
         PQfinish(pg_connection);
         pg_connection = NULL;
         free(conn_info);
+        atomic_fetch_add(&reconnect_failures, 1);
         return false;
     }
     
@@ -41,6 +65,7 @@ bool database_init(const database_config_t *config) {
     
     LOG_INFO_MSG("Connected to PostgreSQL database %s@%s:%d", 
                  config->database, config->host, config->port);
+    atomic_fetch_add(&reconnect_successes, 1);
     
     return true;
 }
@@ -56,6 +81,7 @@ void database_cleanup(void) {
         free(current_conn_info);
         current_conn_info = NULL;
     }
+    platform_mutex_destroy(&health_mu);
 }
 
 bool database_is_connected(void) {
@@ -66,9 +92,23 @@ bool database_is_connected(void) {
     return PQstatus(pg_connection) == CONNECTION_OK;
 }
 
+// Exponential backoff with capped jitter
+static void backoff_sleep_ms(int attempt) {
+    // base 100ms, double each attempt, cap 5s
+    int base = 100;
+    int cap = 5000;
+    int delay = base << (attempt > 6 ? 6 : attempt); // up to ~6.4s
+    if (delay > cap) delay = cap;
+    // add small jitter up to 100ms
+    int jitter = platform_get_timestamp_ms() % 100;
+    delay += jitter;
+    platform_sleep_ms(delay);
+}
+
 bool database_reconnect(void) {
     if (!current_conn_info) {
         LOG_ERROR_MSG("No connection info available for reconnection");
+        set_last_error("No connection info available for reconnection");
         return false;
     }
     
@@ -78,17 +118,31 @@ bool database_reconnect(void) {
         pg_connection = NULL;
     }
     
-    // Reconnect
-    pg_connection = PQconnectdb(current_conn_info);
-    if (PQstatus(pg_connection) != CONNECTION_OK) {
-        LOG_ERROR_MSG("Reconnection to database failed: %s", PQerrorMessage(pg_connection));
-        PQfinish(pg_connection);
-        pg_connection = NULL;
-        return false;
+    // Try reconnect with backoff attempts
+    const int max_attempts = 6; // up to ~6.4s base before cap
+    for (int attempt = 0; attempt < max_attempts; ++attempt) {
+        pg_connection = PQconnectdb(current_conn_info);
+        if (pg_connection && PQstatus(pg_connection) == CONNECTION_OK) {
+            LOG_INFO_MSG("Successfully reconnected to database");
+            atomic_fetch_add(&reconnect_successes, 1);
+            set_last_error("");
+            return true;
+        }
+        if (pg_connection) {
+            set_last_error("Reconnection attempt %d failed: %s", attempt+1, PQerrorMessage(pg_connection));
+            LOG_WARN_MSG("Reconnection attempt %d failed: %s", attempt+1, PQerrorMessage(pg_connection));
+            PQfinish(pg_connection);
+            pg_connection = NULL;
+        } else {
+            set_last_error("Reconnection attempt %d failed: unknown error", attempt+1);
+            LOG_WARN_MSG("Reconnection attempt %d failed: PQconnectdb returned NULL", attempt+1);
+        }
+        atomic_fetch_add(&reconnect_failures, 1);
+        backoff_sleep_ms(attempt);
     }
     
-    LOG_INFO_MSG("Successfully reconnected to database");
-    return true;
+    LOG_ERROR_MSG("All reconnection attempts failed");
+    return false;
 }
 
 bool database_ensure_schema(void) {
@@ -103,6 +157,7 @@ bool database_ensure_schema(void) {
     if (!r) return false;
     ExecStatusType st = PQresultStatus(r);
     if (st != PGRES_COMMAND_OK) {
+        set_last_error("Schema ensure failed: %s", PQerrorMessage(pg_connection));
         LOG_ERROR_MSG("Schema ensure failed: %s", PQerrorMessage(pg_connection));
         PQclear(r);
         return false;
@@ -152,10 +207,14 @@ bool database_insert_metric(uint64_t ts_us, const char* name, double value) {
     if (!r) return false;
     ExecStatusType st = PQresultStatus(r);
     bool ok = (st == PGRES_COMMAND_OK);
-    if (!ok) LOG_ERROR_MSG("Insert metric failed: %s", PQerrorMessage(pg_connection));
+    if (!ok) {
+        set_last_error("Insert metric failed: %s", PQerrorMessage(pg_connection));
+        LOG_ERROR_MSG("Insert metric failed: %s", PQerrorMessage(pg_connection));
+    }
     PQclear(r);
     return ok;
 }
+
 database_result_t* database_execute_query(const char *query, const char **params, int param_count) {
     if (!pg_connection || !query) {
         LOG_ERROR_MSG("Invalid database connection or query");
@@ -238,4 +297,15 @@ const char* database_get_column_name(database_result_t *result, int col) {
     }
     
     return PQfname(result->pg_result, col);
+}
+
+// Health getters
+unsigned long database_get_reconnect_failures(void) {
+    return atomic_load(&reconnect_failures);
+}
+unsigned long database_get_reconnect_successes(void) {
+    return atomic_load(&reconnect_successes);
+}
+const char* database_get_last_error(void) {
+    return last_error_msg;
 }

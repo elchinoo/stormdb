@@ -769,6 +769,33 @@ help:
 	@echo "  Linux:   Full support including all sanitizers"
 	@echo "  Docker:  Full Linux development environment"
 
+# Integration test for DB persistence using a local postgres-test container
+.PHONY: integration-db build-postgres-test up-postgres-test down-postgres-test run-integration-db
+
+build-postgres-test:
+	@echo "Building postgres-test image (pulled official postgres if not present)..."
+	@docker pull postgres:14-alpine >/dev/null 2>&1 || true
+
+up-postgres-test:
+	@echo "Starting postgres-test service..."
+	@docker compose -f docker-compose.yml -f docker-compose.local.yml up -d postgres-test
+	@sleep 2
+
+down-postgres-test:
+	@echo "Stopping postgres-test service..."
+	@docker compose -f docker-compose.yml -f docker-compose.local.yml down postgres-test || true
+
+run-integration-db: up-postgres-test
+	@echo "Running integration DB test against postgres-test (host=127.0.0.1:54320)"
+	@# Wait for DB to accept connections
+	@./scripts/wait-for-db.sh 127.0.0.1 54320 30
+	@echo "Compiling integration test..."
+	@gcc -o test/integration_db test/integration_db.c $(PQ_CFLAGS) $(PQ_LIBS)
+	@echo "Executing integration test..."
+	@./test/integration_db || (RET=$$?; echo "Integration test failed with code $$RET"; exit $$RET)
+	@echo "Integration DB test passed"
+	@$(MAKE) down-postgres-test
+
 # Dependencies
 -include $(OBJECTS:.o=.d)
 -include $(DEBUG_OBJECTS:.o=.d)
