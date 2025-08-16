@@ -1,0 +1,596 @@
+# StormDB Makefile
+
+CC = gcc
+# Default flags (optimized with basic debug info)
+DEFAULT_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O2 -g
+CFLAGS = $(DEFAULT_CFLAGS)
+CPPFLAGS = -D_GNU_SOURCE $(shell pkg-config --cflags yaml-0.1 libpq)
+LDFLAGS = 
+LIBS = -lpthread $(shell pkg-config --libs yaml-0.1 libpq) -ldl
+
+# Debug build configuration (with sanitizers)
+DEBUG_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O0 -g3 -DDEBUG \
+               -fno-omit-frame-pointer -fno-optimize-sibling-calls \
+               -fsanitize=address -fsanitize=undefined
+DEBUG_LDFLAGS = -fsanitize=address -fsanitize=undefined
+
+# Debug build for GDB (no sanitizers, easier debugging)
+DEBUG_GDB_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O0 -g3 -DDEBUG \
+                   -fno-omit-frame-pointer -fno-optimize-sibling-calls
+
+# Sanitizer-specific build configurations
+ASAN_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O1 -g3 -DDEBUG \
+              -fno-omit-frame-pointer -fno-optimize-sibling-calls \
+              -fsanitize=address -fno-common
+ASAN_LDFLAGS = -fsanitize=address
+
+TSAN_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O1 -g3 -DDEBUG \
+              -fno-omit-frame-pointer -fno-optimize-sibling-calls \
+              -fsanitize=thread
+TSAN_LDFLAGS = -fsanitize=thread
+
+MSAN_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O1 -g3 -DDEBUG \
+              -fno-omit-frame-pointer -fno-optimize-sibling-calls \
+              -fsanitize=memory -fsanitize-memory-track-origins=2
+MSAN_LDFLAGS = -fsanitize=memory
+
+UBSAN_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O1 -g3 -DDEBUG \
+               -fno-omit-frame-pointer -fno-optimize-sibling-calls \
+               -fsanitize=undefined -fsanitize=nullability \
+               -fsanitize=implicit-conversion -fsanitize=integer
+UBSAN_LDFLAGS = -fsanitize=undefined
+
+# Combined sanitizers (AddressSanitizer + UndefinedBehaviorSanitizer)
+ASAN_UBSAN_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O1 -g3 -DDEBUG \
+                    -fno-omit-frame-pointer -fno-optimize-sibling-calls \
+                    -fsanitize=address -fsanitize=undefined \
+                    -fsanitize=nullability -fsanitize=implicit-conversion
+ASAN_UBSAN_LDFLAGS = -fsanitize=address -fsanitize=undefined
+
+# Release build configuration  
+RELEASE_CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O3 -DNDEBUG \
+                 -fomit-frame-pointer -flto
+RELEASE_LDFLAGS = -flto
+
+# Directories
+SRCDIR = src
+INCDIR = include
+OBJDIR = obj
+BINDIR = bin
+TESTDIR = tests
+PLUGINDIR = plugins
+
+# Source files
+CORE_SOURCES = $(wildcard $(SRCDIR)/core/*.c)
+LOGGING_SOURCES = $(wildcard $(SRCDIR)/logging/*.c)
+DATABASE_SOURCES = $(wildcard $(SRCDIR)/database/*.c)
+PLUGIN_SOURCES = $(wildcard $(SRCDIR)/plugin/*.c)
+METRICS_SOURCES = $(wildcard $(SRCDIR)/metrics/*.c)
+MEMORY_SOURCES = $(wildcard $(SRCDIR)/memory/*.c)
+COORDINATOR_SOURCES = $(wildcard $(SRCDIR)/coordinator/*.c)
+API_SOURCES = $(wildcard $(SRCDIR)/api/*.c)
+MAIN_SOURCE = $(SRCDIR)/main.c
+
+ALL_SOURCES = $(CORE_SOURCES) $(LOGGING_SOURCES) $(DATABASE_SOURCES) \
+              $(PLUGIN_SOURCES) $(METRICS_SOURCES) $(MEMORY_SOURCES) \
+              $(COORDINATOR_SOURCES) $(API_SOURCES) $(MAIN_SOURCE)
+
+# Object files
+OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+DEBUG_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/debug/%.o)
+DEBUG_GDB_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/debug-gdb/%.o)
+ASAN_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/asan/%.o)
+TSAN_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/tsan/%.o)
+MSAN_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/msan/%.o)
+UBSAN_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/ubsan/%.o)
+ASAN_UBSAN_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/asan-ubsan/%.o)
+RELEASE_OBJECTS = $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/release/%.o)
+
+# Test sources
+TEST_SOURCES = $(wildcard $(TESTDIR)/*.c)
+TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.c=$(OBJDIR)/test_%.o)
+TEST_BINARIES = $(TEST_SOURCES:$(TESTDIR)/%.c=$(BINDIR)/test_%)
+
+# Target binary
+TARGET = $(BINDIR)/stormdb
+DEBUG_TARGET = $(BINDIR)/stormdb-debug
+DEBUG_GDB_TARGET = $(BINDIR)/stormdb-debug-gdb
+ASAN_TARGET = $(BINDIR)/stormdb-asan
+TSAN_TARGET = $(BINDIR)/stormdb-tsan
+MSAN_TARGET = $(BINDIR)/stormdb-msan
+UBSAN_TARGET = $(BINDIR)/stormdb-ubsan
+ASAN_UBSAN_TARGET = $(BINDIR)/stormdb-asan-ubsan
+RELEASE_TARGET = $(BINDIR)/stormdb-release
+
+# Test configuration
+TEST_CONFIG = config/stormdb.yaml
+TEST_CONFIG_ALT = config/test.yaml
+
+# Runtime testing targets that exercise the code more thoroughly
+runtime-test-asan: asan
+	@echo "=== Runtime testing with AddressSanitizer ==="
+	ASAN_OPTIONS="abort_on_error=1:detect_stack_use_after_return=1:check_initialization_order=1" \
+		$(ASAN_TARGET) --version
+	@echo "Testing config loading with ASAN..."
+	ASAN_OPTIONS="abort_on_error=1:detect_stack_use_after_return=1:check_initialization_order=1" \
+		$(ASAN_TARGET) -c $(TEST_CONFIG) --help >/dev/null
+	@echo "ASAN runtime test completed successfully!"
+
+runtime-test-tsan: tsan
+	@echo "=== Runtime testing with ThreadSanitizer ==="
+	TSAN_OPTIONS="halt_on_error=1:abort_on_error=1:report_thread_leaks=1" \
+		$(TSAN_TARGET) --version
+	@echo "Testing config loading with TSAN..."
+	TSAN_OPTIONS="halt_on_error=1:abort_on_error=1:report_thread_leaks=1" \
+		$(TSAN_TARGET) -c $(TEST_CONFIG) --help >/dev/null
+	@echo "TSAN runtime test completed successfully!"
+
+runtime-test-ubsan: ubsan
+	@echo "=== Runtime testing with UndefinedBehaviorSanitizer ==="
+	UBSAN_OPTIONS="halt_on_error=1:abort_on_error=1:print_stacktrace=1" \
+		$(UBSAN_TARGET) --version
+	@echo "Testing config loading with UBSAN..."
+	UBSAN_OPTIONS="halt_on_error=1:abort_on_error=1:print_stacktrace=1" \
+		$(UBSAN_TARGET) -c $(TEST_CONFIG) --help >/dev/null
+	@echo "UBSAN runtime test completed successfully!"
+
+runtime-test-asan-ubsan: asan-ubsan
+	@echo "=== Runtime testing with ASAN + UBSAN ==="
+	ASAN_OPTIONS="abort_on_error=1:check_initialization_order=1" \
+	UBSAN_OPTIONS="halt_on_error=1:abort_on_error=1" \
+		$(ASAN_UBSAN_TARGET) --version
+	@echo "Testing config loading with ASAN+UBSAN..."
+	ASAN_OPTIONS="abort_on_error=1:check_initialization_order=1" \
+	UBSAN_OPTIONS="halt_on_error=1:abort_on_error=1" \
+		$(ASAN_UBSAN_TARGET) -c $(TEST_CONFIG) --help >/dev/null
+	@echo "ASAN+UBSAN runtime test completed successfully!"
+
+# Comprehensive runtime testing
+runtime-test-all: runtime-test-asan runtime-test-tsan runtime-test-ubsan runtime-test-asan-ubsan
+	@echo "=== ALL RUNTIME TESTS COMPLETED ==="
+
+# Default target
+all: $(TARGET)
+
+# Create directories
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)/core
+	mkdir -p $(OBJDIR)/logging
+	mkdir -p $(OBJDIR)/database
+	mkdir -p $(OBJDIR)/plugin
+	mkdir -p $(OBJDIR)/metrics
+	mkdir -p $(OBJDIR)/memory
+	mkdir -p $(OBJDIR)/coordinator
+	mkdir -p $(OBJDIR)/api
+	mkdir -p $(OBJDIR)/debug
+	mkdir -p $(OBJDIR)/debug/core
+	mkdir -p $(OBJDIR)/debug/logging
+	mkdir -p $(OBJDIR)/debug/database
+	mkdir -p $(OBJDIR)/debug/plugin
+	mkdir -p $(OBJDIR)/debug/metrics
+	mkdir -p $(OBJDIR)/debug/memory
+	mkdir -p $(OBJDIR)/debug/coordinator
+	mkdir -p $(OBJDIR)/debug/api
+	mkdir -p $(OBJDIR)/debug-gdb
+	mkdir -p $(OBJDIR)/debug-gdb/core
+	mkdir -p $(OBJDIR)/debug-gdb/logging
+	mkdir -p $(OBJDIR)/debug-gdb/database
+	mkdir -p $(OBJDIR)/debug-gdb/plugin
+	mkdir -p $(OBJDIR)/debug-gdb/metrics
+	mkdir -p $(OBJDIR)/debug-gdb/memory
+	mkdir -p $(OBJDIR)/debug-gdb/coordinator
+	mkdir -p $(OBJDIR)/debug-gdb/api
+	mkdir -p $(OBJDIR)/asan $(OBJDIR)/asan/core $(OBJDIR)/asan/logging $(OBJDIR)/asan/database
+	mkdir -p $(OBJDIR)/asan/plugin $(OBJDIR)/asan/metrics $(OBJDIR)/asan/memory
+	mkdir -p $(OBJDIR)/asan/coordinator $(OBJDIR)/asan/api
+	mkdir -p $(OBJDIR)/tsan $(OBJDIR)/tsan/core $(OBJDIR)/tsan/logging $(OBJDIR)/tsan/database
+	mkdir -p $(OBJDIR)/tsan/plugin $(OBJDIR)/tsan/metrics $(OBJDIR)/tsan/memory
+	mkdir -p $(OBJDIR)/tsan/coordinator $(OBJDIR)/tsan/api
+	mkdir -p $(OBJDIR)/msan $(OBJDIR)/msan/core $(OBJDIR)/msan/logging $(OBJDIR)/msan/database
+	mkdir -p $(OBJDIR)/msan/plugin $(OBJDIR)/msan/metrics $(OBJDIR)/msan/memory
+	mkdir -p $(OBJDIR)/msan/coordinator $(OBJDIR)/msan/api
+	mkdir -p $(OBJDIR)/ubsan $(OBJDIR)/ubsan/core $(OBJDIR)/ubsan/logging $(OBJDIR)/ubsan/database
+	mkdir -p $(OBJDIR)/ubsan/plugin $(OBJDIR)/ubsan/metrics $(OBJDIR)/ubsan/memory
+	mkdir -p $(OBJDIR)/ubsan/coordinator $(OBJDIR)/ubsan/api
+	mkdir -p $(OBJDIR)/asan-ubsan $(OBJDIR)/asan-ubsan/core $(OBJDIR)/asan-ubsan/logging $(OBJDIR)/asan-ubsan/database
+	mkdir -p $(OBJDIR)/asan-ubsan/plugin $(OBJDIR)/asan-ubsan/metrics $(OBJDIR)/asan-ubsan/memory
+	mkdir -p $(OBJDIR)/asan-ubsan/coordinator $(OBJDIR)/asan-ubsan/api
+	mkdir -p $(OBJDIR)/release
+	mkdir -p $(OBJDIR)/release/core
+	mkdir -p $(OBJDIR)/release/logging
+	mkdir -p $(OBJDIR)/release/database
+	mkdir -p $(OBJDIR)/release/plugin
+	mkdir -p $(OBJDIR)/release/metrics
+	mkdir -p $(OBJDIR)/release/memory
+	mkdir -p $(OBJDIR)/release/coordinator
+	mkdir -p $(OBJDIR)/release/api
+
+$(BINDIR):
+	mkdir -p $(BINDIR)
+
+# Compile object files - Default build
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(DEFAULT_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - Debug build with sanitizers
+$(OBJDIR)/debug/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(DEBUG_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - Debug build for GDB (no sanitizers)
+$(OBJDIR)/debug-gdb/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(DEBUG_GDB_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - AddressSanitizer build
+$(OBJDIR)/asan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(ASAN_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - ThreadSanitizer build
+$(OBJDIR)/tsan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(TSAN_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - MemorySanitizer build
+$(OBJDIR)/msan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(MSAN_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - UndefinedBehaviorSanitizer build
+$(OBJDIR)/ubsan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(UBSAN_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - Combined ASAN+UBSAN build
+$(OBJDIR)/asan-ubsan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(ASAN_UBSAN_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Compile object files - Release build
+$(OBJDIR)/release/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(RELEASE_CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Link the main binary
+$(TARGET): $(OBJECTS) | $(BINDIR)
+	$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
+
+# Debug targets
+debug: $(DEBUG_TARGET)
+
+$(DEBUG_TARGET): $(DEBUG_OBJECTS) | $(BINDIR)
+	$(CC) $(LDFLAGS) $(DEBUG_OBJECTS) $(LIBS) -o $@
+
+debug-gdb: $(DEBUG_GDB_TARGET)
+
+$(DEBUG_GDB_TARGET): $(DEBUG_GDB_OBJECTS) | $(BINDIR)
+	$(CC) $(LDFLAGS) $(DEBUG_GDB_OBJECTS) $(LIBS) -o $@
+
+# Sanitizer targets
+asan: $(ASAN_TARGET)
+
+$(ASAN_TARGET): $(ASAN_OBJECTS) | $(BINDIR)
+	$(CC) $(ASAN_LDFLAGS) $(ASAN_OBJECTS) $(LIBS) -o $@
+
+tsan: $(TSAN_TARGET)
+
+$(TSAN_TARGET): $(TSAN_OBJECTS) | $(BINDIR)
+	$(CC) $(TSAN_LDFLAGS) $(TSAN_OBJECTS) $(LIBS) -o $@
+
+msan: $(MSAN_TARGET)
+
+$(MSAN_TARGET): $(MSAN_OBJECTS) | $(BINDIR)
+	$(CC) $(MSAN_LDFLAGS) $(MSAN_OBJECTS) $(LIBS) -o $@
+
+ubsan: $(UBSAN_TARGET)
+
+$(UBSAN_TARGET): $(UBSAN_OBJECTS) | $(BINDIR)
+	$(CC) $(UBSAN_LDFLAGS) $(UBSAN_OBJECTS) $(LIBS) -o $@
+
+asan-ubsan: $(ASAN_UBSAN_TARGET)
+
+$(ASAN_UBSAN_TARGET): $(ASAN_UBSAN_OBJECTS) | $(BINDIR)
+	$(CC) $(ASAN_UBSAN_LDFLAGS) $(ASAN_UBSAN_OBJECTS) $(LIBS) -o $@
+
+release: $(RELEASE_TARGET)
+
+$(RELEASE_TARGET): $(RELEASE_OBJECTS) | $(BINDIR)
+	$(CC) $(LDFLAGS) $(RELEASE_OBJECTS) $(LIBS) -o $@
+
+# Test compilation
+$(OBJDIR)/test_%.o: $(TESTDIR)/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -I$(INCDIR) -c $< -o $@
+
+$(BINDIR)/test_%: $(OBJDIR)/test_%.o $(filter-out $(OBJDIR)/main.o,$(OBJECTS)) | $(BINDIR)
+	$(CC) $(LDFLAGS) $^ $(LIBS) -o $@
+
+# Build tests
+tests: $(TEST_BINARIES)
+
+# Run tests
+test: tests
+	@echo "Running tests..."
+	@for test in $(TEST_BINARIES); do \
+		echo "Running $$test"; \
+		$$test || exit 1; \
+	done
+	@echo "All tests passed!"
+
+# Individual test targets
+test-core: $(BINDIR)/test_core
+	$(BINDIR)/test_core
+
+test-logging: $(BINDIR)/test_logging
+	$(BINDIR)/test_logging
+
+test-database: $(BINDIR)/test_database
+	$(BINDIR)/test_database
+
+test-plugin: $(BINDIR)/test_plugin
+	$(BINDIR)/test_plugin
+
+# Clean build artifacts
+clean:
+	rm -rf $(OBJDIR) $(BINDIR)
+
+# Install
+install: $(TARGET)
+	install -d $(DESTDIR)/usr/local/bin
+	install -m 755 $(TARGET) $(DESTDIR)/usr/local/bin/
+	install -d $(DESTDIR)/etc/stormdb
+	install -m 644 config/stormdb.yaml $(DESTDIR)/etc/stormdb/
+	install -d $(DESTDIR)/usr/local/lib/stormdb/plugins
+
+# Uninstall
+uninstall:
+	rm -f $(DESTDIR)/usr/local/bin/stormdb
+	rm -rf $(DESTDIR)/etc/stormdb
+	rm -rf $(DESTDIR)/usr/local/lib/stormdb
+
+# Format code (requires clang-format)
+format:
+	find $(SRCDIR) $(INCDIR) $(TESTDIR) -name "*.c" -o -name "*.h" | xargs clang-format -i
+
+# Static analysis (requires cppcheck)
+analyze:
+	cppcheck --enable=all --std=c11 --platform=unix64 \
+		--suppress=missingIncludeSystem \
+		-I$(INCDIR) $(SRCDIR)
+
+# Generate documentation (requires doxygen)
+docs:
+	doxygen Doxyfile
+
+# Check for memory leaks (requires valgrind)
+memcheck: $(TARGET)
+	@if command -v valgrind >/dev/null 2>&1; then \
+		valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+			--verbose --log-file=valgrind.log $(TARGET) -c $(TEST_CONFIG); \
+	else \
+		echo "Valgrind not available on this platform (install with: brew install valgrind)"; \
+		echo "Memcheck skipped"; \
+	fi
+
+# Memory check with debug build (more accurate)
+memcheck-debug: debug-gdb
+	@if command -v valgrind >/dev/null 2>&1; then \
+		valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+			--verbose --log-file=valgrind-debug.log $(DEBUG_GDB_TARGET) -c $(TEST_CONFIG); \
+	else \
+		echo "Valgrind not available on this platform"; \
+		echo "Note: Valgrind is not officially supported on macOS"; \
+		echo "Using AddressSanitizer instead for memory checking..."; \
+		$(MAKE) runtime-test-asan; \
+	fi
+
+# Comprehensive sanitizer testing targets
+test-asan: asan
+	@echo "Running AddressSanitizer test..."
+	ASAN_OPTIONS="abort_on_error=1:detect_stack_use_after_return=1:check_initialization_order=1" \
+		$(ASAN_TARGET) --version
+	@echo "ASAN test completed successfully!"
+
+test-tsan: tsan
+	@echo "Running ThreadSanitizer test..."
+	TSAN_OPTIONS="halt_on_error=1:abort_on_error=1:report_thread_leaks=1" \
+		$(TSAN_TARGET) --version
+	@echo "TSAN test completed successfully!"
+
+test-msan: 
+	@echo "MemorySanitizer test..."
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		echo "MemorySanitizer is not supported on macOS"; \
+		echo "MSAN test skipped on macOS platform"; \
+	else \
+		$(MAKE) msan && \
+		MSAN_OPTIONS="halt_on_error=1:abort_on_error=1:print_stats=1" \
+			$(MSAN_TARGET) --version && \
+		echo "MSAN test completed successfully!"; \
+	fi
+
+test-ubsan: ubsan
+	@echo "Running UndefinedBehaviorSanitizer test..."
+	UBSAN_OPTIONS="halt_on_error=1:abort_on_error=1:print_stacktrace=1" \
+		$(UBSAN_TARGET) --version
+	@echo "UBSAN test completed successfully!"
+
+test-asan-ubsan: asan-ubsan
+	@echo "Running combined AddressSanitizer + UndefinedBehaviorSanitizer test..."
+	ASAN_OPTIONS="abort_on_error=1:check_initialization_order=1" \
+	UBSAN_OPTIONS="halt_on_error=1:abort_on_error=1" \
+		$(ASAN_UBSAN_TARGET) --version
+	@echo "ASAN+UBSAN test completed successfully!"
+
+# Comprehensive testing with all sanitizers
+test-all-sanitizers: test-asan test-tsan test-msan test-ubsan test-asan-ubsan
+	@echo "All available sanitizer tests completed!"
+
+# Memory and thread safety comprehensive check
+safety-check: runtime-test-asan runtime-test-tsan memcheck-debug
+	@echo "=== COMPREHENSIVE SAFETY CHECK COMPLETED ==="
+	@echo "Checked for:"
+	@echo "  ✓ Memory corruption (AddressSanitizer)"
+	@echo "  ✓ Use-after-free (AddressSanitizer)"
+	@echo "  ✓ Buffer overflows (AddressSanitizer)"
+	@echo "  ✓ Thread safety issues (ThreadSanitizer)"
+	@echo "  ✓ Race conditions (ThreadSanitizer)"
+	@if command -v valgrind >/dev/null 2>&1; then \
+		echo "  ✓ Memory leaks (Valgrind)"; \
+		echo "Check log files: valgrind-debug.log"; \
+	else \
+		echo "  ✓ Memory leaks (AddressSanitizer - Valgrind not available)"; \
+	fi
+
+# Full code quality and safety check
+quality-check: runtime-test-all memcheck-debug
+	@echo "=== FULL CODE QUALITY CHECK COMPLETED ==="
+	@echo "All sanitizers and memory checkers passed!"
+	@echo "Your code is ready for production!"
+
+# Performance baseline test (no sanitizers)
+perf-test: all
+	@echo "=== Performance baseline test ==="
+	time $(TARGET) --version
+	@echo "Performance test completed"
+
+# Valgrind with more comprehensive options
+valgrind-full: debug-gdb
+	@if command -v valgrind >/dev/null 2>&1; then \
+		echo "=== Running comprehensive Valgrind check ==="; \
+		valgrind --tool=memcheck \
+			--leak-check=full \
+			--show-leak-kinds=all \
+			--track-origins=yes \
+			--track-fds=yes \
+			--show-reachable=yes \
+			--error-exitcode=1 \
+			--verbose \
+			--log-file=valgrind-full.log \
+			$(DEBUG_GDB_TARGET) --version; \
+		echo "Valgrind full check completed. Check valgrind-full.log for details"; \
+	else \
+		echo "Valgrind not available on this platform"; \
+		echo "Using AddressSanitizer for comprehensive memory checking instead..."; \
+		$(MAKE) runtime-test-asan; \
+	fi
+
+# Run with GDB
+gdb: debug-gdb
+	gdb --args $(DEBUG_GDB_TARGET) -c $(TEST_CONFIG)
+
+# Run with LLDB (macOS)
+lldb: debug-gdb
+	lldb -- $(DEBUG_GDB_TARGET) -c $(TEST_CONFIG)
+
+# Build example plugins
+plugins:
+	$(MAKE) -C $(PLUGINDIR)
+
+# Package for distribution
+dist: clean
+	tar -czf stormdb-$(shell git describe --tags --always).tar.gz \
+		--exclude='.git*' --exclude='*.tar.gz' .
+
+# Debug build with extensive debugging information
+debug: CFLAGS = $(DEBUG_CFLAGS)
+debug: LDFLAGS += $(DEBUG_LDFLAGS)
+debug: TARGET = $(DEBUG_TARGET)
+debug: $(DEBUG_TARGET)
+	@echo "Debug build completed: $(DEBUG_TARGET)"
+	@echo "Debug features enabled:"
+	@echo "  - No optimization (-O0)"
+	@echo "  - Maximum debug info (-g3)"
+	@echo "  - Address sanitizer"
+	@echo "  - Undefined behavior sanitizer"
+	@echo "  - Frame pointer preservation"
+	@echo "Run with: ./$(DEBUG_TARGET) [options]"
+
+# Debug build without sanitizers (for use with external debuggers like gdb/lldb)
+debug-gdb: CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O0 -g3 -DDEBUG \
+                    -fno-omit-frame-pointer -fno-optimize-sibling-calls
+debug-gdb: TARGET = $(BINDIR)/stormdb-debug-gdb
+debug-gdb: $(BINDIR)/stormdb-debug-gdb
+	@echo "GDB-friendly debug build completed: $(BINDIR)/stormdb-debug-gdb"
+	@echo "Debug with: gdb ./$(BINDIR)/stormdb-debug-gdb"
+
+# Release build
+release: CFLAGS = $(RELEASE_CFLAGS)
+release: LDFLAGS += $(RELEASE_LDFLAGS)
+release: TARGET = $(RELEASE_TARGET)
+release: clean $(RELEASE_TARGET)
+	@echo "Release build completed: $(RELEASE_TARGET)"
+	@echo "Optimizations enabled: -O3, LTO, frame pointer omission"
+
+# Help
+help:
+	@echo "Available targets:"
+	@echo ""
+	@echo "Build targets:"
+	@echo "  all           - Build the main binary (default)"
+	@echo "  debug         - Build debug version with sanitizers"
+	@echo "  debug-gdb     - Build debug version for GDB/LLDB (no sanitizers)"
+	@echo "  release       - Build optimized release version"
+	@echo ""
+	@echo "Sanitizer builds:"
+	@echo "  asan          - Build with AddressSanitizer"
+	@echo "  tsan          - Build with ThreadSanitizer"
+	@echo "  msan          - Build with MemorySanitizer"
+	@echo "  ubsan         - Build with UndefinedBehaviorSanitizer"
+	@echo "  asan-ubsan    - Build with AddressSanitizer + UBSan"
+	@echo ""
+	@echo "Testing targets:"
+	@echo "  tests         - Build all tests"
+	@echo "  test          - Build and run all tests"
+	@echo "  test-asan     - Test with AddressSanitizer"
+	@echo "  test-tsan     - Test with ThreadSanitizer"
+	@echo "  test-msan     - Test with MemorySanitizer (Linux only)"
+	@echo "  test-ubsan    - Test with UndefinedBehaviorSanitizer"
+	@echo "  test-asan-ubsan - Test with ASAN + UBSan"
+	@echo "  test-all-sanitizers - Run all sanitizer tests"
+	@echo "  runtime-test-all - Runtime testing with all sanitizers"
+	@echo "  safety-check  - Comprehensive memory/thread safety check"
+	@echo "  quality-check - Full code quality check (all sanitizers + Valgrind)"
+	@echo "  perf-test     - Performance baseline test"
+	@echo ""
+	@echo "Memory checking:"
+	@echo "  memcheck      - Run with valgrind (standard build)"
+	@echo "  memcheck-debug- Run with valgrind (debug build)"
+	@echo "  valgrind-full - Comprehensive Valgrind analysis"
+	@echo ""
+	@echo "Debugging:"
+	@echo "  gdb           - Build and run with GDB"
+	@echo "  lldb          - Build and run with LLDB (macOS)"
+	@echo ""
+	@echo "Other targets:"
+	@echo "  clean         - Remove build artifacts"
+	@echo "  install       - Install to system"
+	@echo "  uninstall     - Remove from system"
+	@echo "  format        - Format source code"
+	@echo "  analyze       - Run static analysis"
+	@echo "  docs          - Generate documentation"
+	@echo "  plugins       - Build example plugins"
+	@echo "  dist          - Create distribution tarball"
+	@echo "  help          - Show this help"
+	@echo ""
+	@echo "Sanitizer details:"
+	@echo "  - asan:       Detects memory errors, leaks, use-after-free"
+	@echo "  - tsan:       Detects thread safety issues, race conditions"
+	@echo "  - msan:       Detects uninitialized memory usage (Linux only)"
+	@echo "  - ubsan:      Detects undefined behavior, overflows"
+	@echo "  - asan-ubsan: Combined memory + undefined behavior detection"
+	@echo ""
+	@echo "Platform compatibility:"
+	@echo "  - ASAN/TSAN/UBSAN: Supported on macOS and Linux"
+	@echo "  - MSAN: Linux only (not supported on macOS)"
+	@echo ""
+	@echo "Safety check runs: AddressSanitizer, ThreadSanitizer, and Valgrind"
+
+# Phony targets
+.PHONY: all tests test clean install uninstall format analyze docs memcheck memcheck-debug
+.PHONY: plugins dist debug debug-gdb release help gdb lldb
+.PHONY: asan tsan msan ubsan asan-ubsan
+.PHONY: test-asan test-tsan test-msan test-ubsan test-asan-ubsan test-all-sanitizers safety-check
+.PHONY: runtime-test-asan runtime-test-tsan runtime-test-ubsan runtime-test-asan-ubsan runtime-test-all
+.PHONY: quality-check perf-test valgrind-full
+.PHONY: test-core test-logging test-database test-plugin
+
+# Dependencies
+-include $(OBJECTS:.o=.d)
+
+# Generate dependency files
+$(OBJDIR)/%.d: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -I$(INCDIR) -MM -MT $(OBJDIR)/$*.o $< > $@

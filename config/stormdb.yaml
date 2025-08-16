@@ -1,0 +1,32 @@
+database:
+  host: "localhost"
+  port: 5432
+  database: "stormdb_test"
+  user: "stormdb"
+  password: "stormdb123"
+  connect_timeout: 30
+
+api:
+  host: "0.0.0.0"
+  port: 8080
+  max_connections: 100
+
+plugin:
+  plugin_dir: "./plugins"
+  auto_load: true
+
+daemon:
+  pid_file: "/tmp/stormdb.pid"
+  user: ""
+  group: ""
+
+logging:
+  level: "INFO"
+  file: ""
+  max_size: 104857600  # 100MB
+  max_files: 5
+
+metrics:
+  collection_interval: 1000  # milliseconds
+  buffer_size: 10000
+  export_format: "json"

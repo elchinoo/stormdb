@@ -1,0 +1,110 @@
+{
+    "name": "StormDB Development Environment",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "stormdb-dev",
+    "workspaceFolder": "/workspace",
+    "shutdownAction": "stopCompose",
+
+    // Features to install in the container
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "configureZshAsDefaultShell": true,
+            "installOhMyZsh": true,
+            "upgradePackages": true,
+            "username": "dev",
+            "userUid": "1000",
+            "userGid": "1000"
+        },
+        "ghcr.io/devcontainers/features/git:1": {
+            "ppa": true,
+            "version": "latest"
+        }
+    },
+
+    // Configure tool-specific properties
+    "customizations": {
+        "vscode": {
+            // Extensions to install
+            "extensions": [
+                "ms-vscode.cpptools-extension-pack",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.makefile-tools",
+                "vadimcn.vscode-lldb",
+                "ms-vscode.hexeditor",
+                "formulahendry.code-runner",
+                "jeff-hykin.better-cpp-syntax",
+                "twxs.cmake",
+                "ms-vscode.vscode-json",
+                "redhat.vscode-yaml",
+                "ms-python.python",
+                "ms-python.flake8",
+                "streetsidesoftware.code-spell-checker",
+                "gruntfuggly.todo-tree",
+                "eamodio.gitlens",
+                "ms-vscode-remote.remote-containers"
+            ],
+
+            // Settings
+            "settings": {
+                "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+                "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+                "C_Cpp.default.cStandard": "c11",
+                "C_Cpp.default.cppStandard": "c++17",
+                "C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
+                "C_Cpp.errorSquiggles": "enabled",
+                "C_Cpp.autocomplete": "default",
+                "makefile.configureOnOpen": true,
+                "makefile.alwaysPreConfigureIntelliSense": true,
+                "makefile.buildLog": "verbose",
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "editor.formatOnSave": true,
+                "editor.insertSpaces": true,
+                "editor.tabSize": 4,
+                "files.trimTrailingWhitespace": true,
+                "files.insertFinalNewline": true,
+                "git.autofetch": true,
+                "debug.allowBreakpointsEverywhere": true
+            }
+        }
+    },
+
+    // Ports to forward
+    "forwardPorts": [
+        5432  // PostgreSQL
+    ],
+
+    // Environment variables
+    "containerEnv": {
+        "CC": "gcc",
+        "CXX": "g++",
+        "DEBIAN_FRONTEND": "noninteractive"
+    },
+
+    // Commands to run after container creation
+    "postCreateCommand": "make info",
+
+    // Commands to run after the container starts
+    "postStartCommand": "echo 'StormDB development environment ready!'",
+
+    // Commands to run when attaching to the container
+    "postAttachCommand": "echo 'Welcome to StormDB development container!'",
+
+    // Mount the Docker socket for Docker-in-Docker scenarios
+    "mounts": [
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    ],
+
+    // Enable required capabilities for debugging
+    "capAdd": [
+        "SYS_PTRACE"
+    ],
+
+    // Security options for debugging
+    "securityOpt": [
+        "seccomp:unconfined"
+    ],
+
+    // Remote user
+    "remoteUser": "dev"
+}

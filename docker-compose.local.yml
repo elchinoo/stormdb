@@ -1,0 +1,59 @@
+# ========================================================================
+# StormDB Local Development Docker Compose
+# For use when external registries have connectivity issues
+# ========================================================================
+
+services:
+  # Local development environment
+  stormdb-local:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    image: stormdb:local-dev
+    container_name: stormdb-local-dev
+    volumes:
+      - .:/workspace
+      - stormdb-local-cache:/tmp/stormdb-cache
+    working_dir: /workspace
+    ports:
+      - "2224:22"  # SSH for remote development
+    environment:
+      - TERM=xterm-256color
+      - STORMDB_ENV=development
+    stdin_open: true
+    tty: true
+    networks:
+      - stormdb-local-net
+
+  # PostgreSQL for testing (if needed)
+  postgres-local:
+    image: postgres:15
+    container_name: postgres-local
+    environment:
+      POSTGRES_DB: stormdb_test
+      POSTGRES_USER: stormdb
+      POSTGRES_PASSWORD: stormdb_test_password
+    volumes:
+      - postgres-local-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - stormdb-local-net
+    # Skip healthcheck if there are image pull issues
+    # healthcheck:
+    #   test: ["CMD-SHELL", "pg_isready -U stormdb -d stormdb_test"]
+    #   interval: 5s
+    #   timeout: 5s
+    #   retries: 5
+
+# Named volumes
+volumes:
+  stormdb-local-cache:
+    driver: local
+  postgres-local-data:
+    driver: local
+
+# Network
+networks:
+  stormdb-local-net:
+    driver: bridge

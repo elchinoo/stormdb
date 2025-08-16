@@ -1,0 +1,119 @@
+# ========================================================================
+# StormDB China-Optimized Development Container (Ubuntu-based)
+# Uses China mirrors for reliable package access
+# ========================================================================
+
+# Use Ubuntu 22.04 with China mirror sources (overrideable for China registries)
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE:-ubuntu:22.04} AS base
+
+# Configure Tencent mirrors for faster package installation
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.tencent.com/ubuntu/|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://mirrors.tencent.com/ubuntu/|g' /etc/apt/sources.list
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+
+# Update package lists and install essential development tools
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    gdb \
+    valgrind \
+    git \
+    vim \
+    curl \
+    wget \
+    pkg-config \
+    libyaml-dev \
+    libpq-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up working directory
+WORKDIR /workspace
+ENV CC=gcc
+ENV CXX=g++
+ENV STORMDB_ENV=development
+
+# Development stage - adds debugging and additional tools
+FROM base AS development
+
+# Install additional development and debugging tools
+RUN apt-get update && apt-get install -y \
+    clang \
+    llvm \
+    strace \
+    ltrace \
+    htop \
+    bash-completion \
+    nano \
+    gdb-multiarch \
+    libc6-dbg \
+    manpages-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure GDB for container debugging
+RUN echo "set auto-load safe-path /" >> /root/.gdbinit && \
+    echo "set confirm off" >> /root/.gdbinit
+
+# Create development user
+RUN useradd -m -s /bin/bash -u 1000 dev && \
+    usermod -aG sudo dev && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set up bash environment with colors
+RUN echo 'export PS1="\[\e[32m\]StormDB-Linux\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]$ "' >> /root/.bashrc && \
+    echo 'alias ll="ls -la"' >> /root/.bashrc
+
+# Testing stage - for CI/CD
+FROM development AS testing
+
+# Copy source code for testing
+COPY . /workspace/
+
+# Ensure proper permissions
+RUN chown -R dev:dev /workspace
+
+# Build and test
+RUN cd /workspace && \
+    make clean && \
+    make info && \
+    make all && \
+    make debug && \
+    ./bin/stormdb --version && \
+    ./bin/stormdb-debug --version && \
+    echo "✅ Linux build successful"
+
+# Production stage - minimal runtime
+ARG PRODUCTION_BASE_IMAGE
+FROM ${PRODUCTION_BASE_IMAGE:-ubuntu:22.04} AS production
+
+# Configure Tencent mirrors
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.tencent.com/ubuntu/|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://mirrors.tencent.com/ubuntu/|g' /etc/apt/sources.list
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libyaml-0-2 \
+    libpq5 \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user for security
+RUN useradd -r -s /bin/false stormdb
+
+# Copy built binary from testing stage
+COPY --from=testing /workspace/bin/stormdb /usr/local/bin/stormdb
+
+# Set permissions
+RUN chmod +x /usr/local/bin/stormdb
+
+# Switch to non-root user
+USER stormdb
+
+# Default command
+CMD ["stormdb", "--help"]

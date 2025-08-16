@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-test:
+    name: Build and Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deps (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libyaml-dev libpq-dev
+
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install pkg-config libyaml libpq
+          # Ensure headers and libs are discoverable for libpq
+          echo "PKG_CONFIG_PATH=$(brew --prefix libpq)/lib/pkgconfig" >> $GITHUB_ENV
+          echo "LDFLAGS=-L$(brew --prefix libpq)/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I$(brew --prefix libpq)/include" >> $GITHUB_ENV
+
+      - name: Build debug
+        run: |
+          make clean
+          make debug
+
+      - name: Run smoke tests
+        run: |
+          make test
+
+      - name: Run ASAN test
+        run: |
+          make test-asan
+
+  ubsan:
+    name: UBSAN (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libyaml-dev libpq-dev
+
+      - name: Build UBSAN and test
+        run: |
+          make ubsan
+          make test-ubsan

@@ -1,0 +1,60 @@
+# Build artifacts
+obj/
+bin/
+build-cross/
+release-*/
+*.tar.gz
+
+# IDE and editor files
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/.ropeproject
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+valgrind*.log
+core.*
+
+# Git files
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test results
+test-results/
+
+# Docker files (avoid recursion)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Development scripts (not needed in container)
+scripts/
+
+# Configuration examples
+config/
+examples/
+
+# Backup files
+*.bak
+*.backup
+*~

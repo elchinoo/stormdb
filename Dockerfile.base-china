@@ -1,0 +1,44 @@
+# China-optimized base development image with all dependencies pre-installed
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Use Tencent mirrors for faster downloads in China
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.tencent.com/ubuntu/|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://mirrors.tencent.com/ubuntu/|g' /etc/apt/sources.list
+
+# Install all development dependencies at once
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    make \
+    gdb \
+    valgrind \
+    libyaml-dev \
+    libpq-dev \
+    libssl-dev \
+    pkg-config \
+    curl \
+    git \
+    vim \
+    tree \
+    htop \
+    strace \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create development user and workspace
+RUN useradd -m -s /bin/bash dev
+WORKDIR /workspace
+
+# Set up environment
+ENV CC=gcc
+ENV CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror"
+
+# Add labels for identification
+LABEL description="StormDB China-optimized development base image with all dependencies"
+LABEL version="1.0"
+LABEL maintainer="StormDB Development Team"
+
+CMD ["/bin/bash"]

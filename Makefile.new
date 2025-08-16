@@ -1,0 +1,504 @@
+# ========================================================================
+# StormDB Cross-Platform Makefile
+# Supports: Windows (MinGW/MSYS2), macOS, Linux
+# Architectures: x86_64, ARM64, ARM32
+# ========================================================================
+
+# Platform Detection
+UNAME_S := $(shell uname -s 2>/dev/null || echo "Windows")
+UNAME_M := $(shell uname -m 2>/dev/null || echo "x86_64")
+
+# Default values
+CC := gcc
+CXX := g++
+AR := ar
+PLATFORM := unknown
+ARCH := unknown
+EXEC_EXT :=
+LIB_EXT := .so
+PLATFORM_DEFS :=
+PLATFORM_LIBS :=
+PLATFORM_LDFLAGS :=
+
+# Platform-specific configuration
+ifeq ($(OS),Windows_NT)
+    # Windows (MinGW/MSYS2)
+    PLATFORM := windows
+    EXEC_EXT := .exe
+    LIB_EXT := .dll
+    PLATFORM_DEFS := -DPLATFORM_WINDOWS -DWIN32_LEAN_AND_MEAN
+    PLATFORM_LIBS := -lws2_32 -ladvapi32 -lpsapi -lshlwapi
+    PLATFORM_LDFLAGS := -static-libgcc -static-libstdc++
+    
+    # Windows architecture detection
+    ifeq ($(PROCESSOR_ARCHITEW6432),AMD64)
+        ARCH := x86_64
+    else
+        ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
+            ARCH := x86_64
+        else ifeq ($(PROCESSOR_ARCHITECTURE),x86)
+            ARCH := x86
+        else
+            ARCH := $(PROCESSOR_ARCHITECTURE)
+        endif
+    endif
+else
+    # Unix-like systems
+    ifeq ($(UNAME_S),Linux)
+        PLATFORM := linux
+        PLATFORM_DEFS := -DPLATFORM_LINUX -D_GNU_SOURCE
+        PLATFORM_LIBS := -ldl -lrt
+        LIB_EXT := .so
+    else ifeq ($(UNAME_S),Darwin)
+        PLATFORM := macos
+        PLATFORM_DEFS := -DPLATFORM_MACOS -D_DARWIN_C_SOURCE
+        PLATFORM_LIBS := -ldl
+        LIB_EXT := .dylib
+    else
+        PLATFORM := unix
+        PLATFORM_DEFS := -DPLATFORM_UNIX
+        PLATFORM_LIBS := -ldl
+    endif
+    
+    # Unix architecture detection
+    ifeq ($(UNAME_M),x86_64)
+        ARCH := x86_64
+    else ifeq ($(UNAME_M),amd64)
+        ARCH := x86_64
+    else ifeq ($(UNAME_M),aarch64)
+        ARCH := arm64
+    else ifeq ($(UNAME_M),arm64)
+        ARCH := arm64
+    else ifeq ($(UNAME_M),armv7l)
+        ARCH := arm
+    else ifeq ($(UNAME_M),i386)
+        ARCH := x86
+    else ifeq ($(UNAME_M),i686)
+        ARCH := x86
+    else
+        ARCH := $(UNAME_M)
+    endif
+endif
+
+# Compiler detection and configuration
+CC_VERSION := $(shell $(CC) --version 2>/dev/null | head -n1)
+ifneq ($(findstring clang,$(CC_VERSION)),)
+    COMPILER := clang
+    COMPILER_FAMILY := clang
+else ifneq ($(findstring gcc,$(CC_VERSION)),)
+    COMPILER := gcc
+    COMPILER_FAMILY := gcc
+else ifneq ($(findstring Microsoft,$(CC_VERSION)),)
+    COMPILER := msvc
+    COMPILER_FAMILY := msvc
+else
+    COMPILER := unknown
+    COMPILER_FAMILY := unknown
+endif
+
+# Base compiler flags
+BASE_CFLAGS := -std=c11 -Wall -Wextra -pedantic
+ifeq ($(COMPILER_FAMILY),gcc)
+    BASE_CFLAGS += -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes
+else ifeq ($(COMPILER_FAMILY),clang)
+    BASE_CFLAGS += -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes
+endif
+
+# Build type configurations
+DEFAULT_CFLAGS := $(BASE_CFLAGS) -O2 -g
+DEBUG_CFLAGS := $(BASE_CFLAGS) -O0 -g3 -DDEBUG -fno-omit-frame-pointer
+RELEASE_CFLAGS := $(BASE_CFLAGS) -O3 -DNDEBUG -fomit-frame-pointer
+
+# Sanitizer configurations (platform-dependent)
+ifeq ($(PLATFORM),windows)
+    # Limited sanitizer support on Windows
+    ASAN_CFLAGS := $(DEBUG_CFLAGS) -fsanitize=address
+    ASAN_LDFLAGS := -fsanitize=address
+    UBSAN_CFLAGS := $(DEBUG_CFLAGS) -fsanitize=undefined
+    UBSAN_LDFLAGS := -fsanitize=undefined
+    # TSAN and MSAN not supported on Windows
+    TSAN_CFLAGS := $(DEBUG_CFLAGS)
+    TSAN_LDFLAGS :=
+    MSAN_CFLAGS := $(DEBUG_CFLAGS)
+    MSAN_LDFLAGS :=
+else
+    # Full sanitizer support on Unix-like systems
+    ASAN_CFLAGS := $(DEBUG_CFLAGS) -fsanitize=address -fno-common
+    ASAN_LDFLAGS := -fsanitize=address
+    TSAN_CFLAGS := $(DEBUG_CFLAGS) -fsanitize=thread
+    TSAN_LDFLAGS := -fsanitize=thread
+    UBSAN_CFLAGS := $(DEBUG_CFLAGS) -fsanitize=undefined -fsanitize=nullability -fsanitize=implicit-conversion
+    UBSAN_LDFLAGS := -fsanitize=undefined
+    
+    # MSAN only on Linux with Clang
+    ifeq ($(PLATFORM),linux)
+        ifeq ($(COMPILER_FAMILY),clang)
+            MSAN_CFLAGS := $(DEBUG_CFLAGS) -fsanitize=memory -fsanitize-memory-track-origins=2
+            MSAN_LDFLAGS := -fsanitize=memory
+        else
+            MSAN_CFLAGS := $(DEBUG_CFLAGS)
+            MSAN_LDFLAGS :=
+        endif
+    else
+        MSAN_CFLAGS := $(DEBUG_CFLAGS)
+        MSAN_LDFLAGS :=
+    endif
+endif
+
+# Combined sanitizers
+ASAN_UBSAN_CFLAGS := $(DEBUG_CFLAGS) -fsanitize=address -fsanitize=undefined
+ASAN_UBSAN_LDFLAGS := -fsanitize=address -fsanitize=undefined
+
+# Dependencies detection
+HAS_PKGCONFIG := $(shell command -v pkg-config 2>/dev/null)
+ifdef HAS_PKGCONFIG
+    YAML_CFLAGS := $(shell pkg-config --cflags yaml-0.1 2>/dev/null)
+    YAML_LIBS := $(shell pkg-config --libs yaml-0.1 2>/dev/null)
+    PQ_CFLAGS := $(shell pkg-config --cflags libpq 2>/dev/null)
+    PQ_LIBS := $(shell pkg-config --libs libpq 2>/dev/null)
+else
+    # Fallback for systems without pkg-config
+    YAML_CFLAGS := 
+    YAML_LIBS := -lyaml
+    PQ_CFLAGS := 
+    PQ_LIBS := -lpq
+endif
+
+# Final flags configuration
+CFLAGS := $(DEFAULT_CFLAGS)
+CPPFLAGS := $(PLATFORM_DEFS) $(YAML_CFLAGS) $(PQ_CFLAGS) -Iinclude
+LDFLAGS := $(PLATFORM_LDFLAGS)
+LIBS := -lpthread $(YAML_LIBS) $(PQ_LIBS) $(PLATFORM_LIBS)
+
+# Directories
+SRCDIR := src
+INCDIR := include
+OBJDIR := obj
+BINDIR := bin
+TESTDIR := tests
+PLATFORMDIR := $(SRCDIR)/platform
+
+# Source files
+CORE_SOURCES := $(wildcard $(SRCDIR)/core/*.c)
+LOGGING_SOURCES := $(wildcard $(SRCDIR)/logging/*.c)
+DATABASE_SOURCES := $(wildcard $(SRCDIR)/database/*.c)
+PLUGIN_SOURCES := $(wildcard $(SRCDIR)/plugin/*.c)
+PLATFORM_SOURCES := $(wildcard $(PLATFORMDIR)/*.c)
+MAIN_SOURCE := $(SRCDIR)/main.c
+
+ALL_SOURCES := $(CORE_SOURCES) $(LOGGING_SOURCES) $(DATABASE_SOURCES) \
+               $(PLUGIN_SOURCES) $(PLATFORM_SOURCES) $(MAIN_SOURCE)
+
+# Object files for different build types
+OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+DEBUG_OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/debug/%.o)
+ASAN_OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/asan/%.o)
+TSAN_OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/tsan/%.o)
+MSAN_OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/msan/%.o)
+UBSAN_OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/ubsan/%.o)
+ASAN_UBSAN_OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/asan-ubsan/%.o)
+RELEASE_OBJECTS := $(ALL_SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/release/%.o)
+
+# Target binaries
+TARGET := $(BINDIR)/stormdb$(EXEC_EXT)
+DEBUG_TARGET := $(BINDIR)/stormdb-debug$(EXEC_EXT)
+ASAN_TARGET := $(BINDIR)/stormdb-asan$(EXEC_EXT)
+TSAN_TARGET := $(BINDIR)/stormdb-tsan$(EXEC_EXT)
+MSAN_TARGET := $(BINDIR)/stormdb-msan$(EXEC_EXT)
+UBSAN_TARGET := $(BINDIR)/stormdb-ubsan$(EXEC_EXT)
+ASAN_UBSAN_TARGET := $(BINDIR)/stormdb-asan-ubsan$(EXEC_EXT)
+RELEASE_TARGET := $(BINDIR)/stormdb-release$(EXEC_EXT)
+
+# Test configuration
+TEST_CONFIG := config/stormdb.yaml
+
+# Default target
+.PHONY: all
+all: $(TARGET)
+	@echo "Built StormDB for $(PLATFORM)/$(ARCH) using $(COMPILER)"
+
+# Platform info
+.PHONY: info
+info:
+	@echo "Platform Information:"
+	@echo "  OS: $(PLATFORM)"
+	@echo "  Architecture: $(ARCH)"
+	@echo "  Compiler: $(COMPILER) ($(COMPILER_FAMILY))"
+	@echo "  Executable extension: '$(EXEC_EXT)'"
+	@echo "  Library extension: '$(LIB_EXT)'"
+	@echo ""
+	@echo "Build Configuration:"
+	@echo "  CFLAGS: $(CFLAGS)"
+	@echo "  CPPFLAGS: $(CPPFLAGS)"
+	@echo "  LDFLAGS: $(LDFLAGS)"
+	@echo "  LIBS: $(LIBS)"
+
+# Create directories
+$(OBJDIR):
+	@mkdir -p $(OBJDIR)
+	@mkdir -p $(OBJDIR)/core $(OBJDIR)/logging $(OBJDIR)/database
+	@mkdir -p $(OBJDIR)/plugin $(OBJDIR)/platform
+	@mkdir -p $(OBJDIR)/debug/core $(OBJDIR)/debug/logging $(OBJDIR)/debug/database
+	@mkdir -p $(OBJDIR)/debug/plugin $(OBJDIR)/debug/platform
+	@mkdir -p $(OBJDIR)/asan/core $(OBJDIR)/asan/logging $(OBJDIR)/asan/database
+	@mkdir -p $(OBJDIR)/asan/plugin $(OBJDIR)/asan/platform
+	@mkdir -p $(OBJDIR)/tsan/core $(OBJDIR)/tsan/logging $(OBJDIR)/tsan/database
+	@mkdir -p $(OBJDIR)/tsan/plugin $(OBJDIR)/tsan/platform
+	@mkdir -p $(OBJDIR)/msan/core $(OBJDIR)/msan/logging $(OBJDIR)/msan/database
+	@mkdir -p $(OBJDIR)/msan/plugin $(OBJDIR)/msan/platform
+	@mkdir -p $(OBJDIR)/ubsan/core $(OBJDIR)/ubsan/logging $(OBJDIR)/ubsan/database
+	@mkdir -p $(OBJDIR)/ubsan/plugin $(OBJDIR)/ubsan/platform
+	@mkdir -p $(OBJDIR)/asan-ubsan/core $(OBJDIR)/asan-ubsan/logging $(OBJDIR)/asan-ubsan/database
+	@mkdir -p $(OBJDIR)/asan-ubsan/plugin $(OBJDIR)/asan-ubsan/platform
+	@mkdir -p $(OBJDIR)/release/core $(OBJDIR)/release/logging $(OBJDIR)/release/database
+	@mkdir -p $(OBJDIR)/release/plugin $(OBJDIR)/release/platform
+
+$(BINDIR):
+	@mkdir -p $(BINDIR)
+
+# Compilation rules
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/debug/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(DEBUG_CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/asan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(ASAN_CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/tsan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(TSAN_CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/msan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(MSAN_CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/ubsan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(UBSAN_CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/asan-ubsan/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(ASAN_UBSAN_CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/release/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(RELEASE_CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+# Linking rules
+$(TARGET): $(OBJECTS) | $(BINDIR)
+	$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
+
+# Build targets
+.PHONY: debug asan tsan msan ubsan asan-ubsan release
+debug: $(DEBUG_TARGET)
+asan: $(ASAN_TARGET)
+tsan: $(TSAN_TARGET)
+msan: $(MSAN_TARGET)
+ubsan: $(UBSAN_TARGET)
+asan-ubsan: $(ASAN_UBSAN_TARGET)
+release: $(RELEASE_TARGET)
+
+$(DEBUG_TARGET): $(DEBUG_OBJECTS) | $(BINDIR)
+	$(CC) $(LDFLAGS) $(DEBUG_OBJECTS) $(LIBS) -o $@
+	@echo "Debug build completed: $@"
+
+$(ASAN_TARGET): $(ASAN_OBJECTS) | $(BINDIR)
+	$(CC) $(ASAN_LDFLAGS) $(ASAN_OBJECTS) $(LIBS) -o $@
+	@echo "AddressSanitizer build completed: $@"
+
+$(TSAN_TARGET): $(TSAN_OBJECTS) | $(BINDIR)
+ifeq ($(PLATFORM),windows)
+	@echo "ThreadSanitizer not supported on Windows, building debug version instead"
+	$(CC) $(LDFLAGS) $(TSAN_OBJECTS) $(LIBS) -o $@
+else
+	$(CC) $(TSAN_LDFLAGS) $(TSAN_OBJECTS) $(LIBS) -o $@
+endif
+	@echo "ThreadSanitizer build completed: $@"
+
+$(MSAN_TARGET): $(MSAN_OBJECTS) | $(BINDIR)
+ifeq ($(PLATFORM),linux)
+    ifeq ($(COMPILER_FAMILY),clang)
+	$(CC) $(MSAN_LDFLAGS) $(MSAN_OBJECTS) $(LIBS) -o $@
+	@echo "MemorySanitizer build completed: $@"
+    else
+	@echo "MemorySanitizer requires Clang on Linux, building debug version instead"
+	$(CC) $(LDFLAGS) $(MSAN_OBJECTS) $(LIBS) -o $@
+    endif
+else
+	@echo "MemorySanitizer only supported on Linux with Clang, building debug version instead"
+	$(CC) $(LDFLAGS) $(MSAN_OBJECTS) $(LIBS) -o $@
+endif
+
+$(UBSAN_TARGET): $(UBSAN_OBJECTS) | $(BINDIR)
+	$(CC) $(UBSAN_LDFLAGS) $(UBSAN_OBJECTS) $(LIBS) -o $@
+	@echo "UndefinedBehaviorSanitizer build completed: $@"
+
+$(ASAN_UBSAN_TARGET): $(ASAN_UBSAN_OBJECTS) | $(BINDIR)
+	$(CC) $(ASAN_UBSAN_LDFLAGS) $(ASAN_UBSAN_OBJECTS) $(LIBS) -o $@
+	@echo "ASAN+UBSAN build completed: $@"
+
+$(RELEASE_TARGET): $(RELEASE_OBJECTS) | $(BINDIR)
+	$(CC) $(LDFLAGS) $(RELEASE_OBJECTS) $(LIBS) -o $@
+	@echo "Release build completed: $@"
+
+# Testing targets
+.PHONY: test-asan test-tsan test-msan test-ubsan test-asan-ubsan test-all-sanitizers
+test-asan: $(ASAN_TARGET)
+	@echo "=== AddressSanitizer Test ==="
+ifeq ($(PLATFORM),windows)
+	@echo "Running ASAN test (limited Windows support)..."
+	$(ASAN_TARGET) --version
+else
+	@echo "Running ASAN test..."
+	ASAN_OPTIONS="abort_on_error=1:detect_stack_use_after_return=1" $(ASAN_TARGET) --version
+endif
+	@echo "ASAN test completed successfully!"
+
+test-tsan: $(TSAN_TARGET)
+	@echo "=== ThreadSanitizer Test ==="
+ifeq ($(PLATFORM),windows)
+	@echo "ThreadSanitizer not supported on Windows, running basic test..."
+	$(TSAN_TARGET) --version
+else
+	@echo "Running TSAN test..."
+	TSAN_OPTIONS="halt_on_error=1:abort_on_error=1" $(TSAN_TARGET) --version
+endif
+	@echo "TSAN test completed successfully!"
+
+test-msan: $(MSAN_TARGET)
+	@echo "=== MemorySanitizer Test ==="
+ifeq ($(PLATFORM),linux)
+    ifeq ($(COMPILER_FAMILY),clang)
+	@echo "Running MSAN test..."
+	MSAN_OPTIONS="halt_on_error=1:abort_on_error=1" $(MSAN_TARGET) --version
+	@echo "MSAN test completed successfully!"
+    else
+	@echo "MemorySanitizer requires Clang on Linux - test skipped"
+    endif
+else
+	@echo "MemorySanitizer only supported on Linux with Clang - test skipped"
+endif
+
+test-ubsan: $(UBSAN_TARGET)
+	@echo "=== UndefinedBehaviorSanitizer Test ==="
+	@echo "Running UBSAN test..."
+	UBSAN_OPTIONS="halt_on_error=1:abort_on_error=1" $(UBSAN_TARGET) --version
+	@echo "UBSAN test completed successfully!"
+
+test-asan-ubsan: $(ASAN_UBSAN_TARGET)
+	@echo "=== ASAN+UBSAN Test ==="
+	@echo "Running ASAN+UBSAN test..."
+ifeq ($(PLATFORM),windows)
+	$(ASAN_UBSAN_TARGET) --version
+else
+	ASAN_OPTIONS="abort_on_error=1" UBSAN_OPTIONS="halt_on_error=1" $(ASAN_UBSAN_TARGET) --version
+endif
+	@echo "ASAN+UBSAN test completed successfully!"
+
+test-all-sanitizers: test-asan test-tsan test-msan test-ubsan test-asan-ubsan
+	@echo "=== All sanitizer tests completed! ==="
+
+# Memory checking
+.PHONY: memcheck memcheck-debug valgrind-check
+memcheck: $(TARGET)
+	@echo "=== Memory Check ==="
+ifeq ($(PLATFORM),linux)
+	@if command -v valgrind >/dev/null 2>&1; then \
+		echo "Running Valgrind memory check..."; \
+		valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+			--verbose --log-file=valgrind.log $(TARGET) --version; \
+		echo "Valgrind check completed. See valgrind.log"; \
+	else \
+		echo "Valgrind not available, using AddressSanitizer instead..."; \
+		$(MAKE) test-asan; \
+	fi
+else
+	@echo "Valgrind not available on $(PLATFORM), using AddressSanitizer instead..."
+	$(MAKE) test-asan
+endif
+
+# Clean targets
+.PHONY: clean clean-all distclean
+clean:
+	@echo "Cleaning build artifacts..."
+	rm -rf $(OBJDIR) $(BINDIR)
+
+clean-all: clean
+	@echo "Cleaning all generated files..."
+	rm -f valgrind*.log *.log
+
+distclean: clean-all
+	@echo "Cleaning distribution files..."
+	rm -f config.cache config.log config.status
+
+# Installation (platform-specific)
+.PHONY: install uninstall
+install: $(TARGET)
+	@echo "Installing StormDB..."
+ifeq ($(PLATFORM),windows)
+	@echo "Windows installation not implemented yet"
+else
+	install -d /usr/local/bin
+	install $(TARGET) /usr/local/bin/
+	@echo "StormDB installed to /usr/local/bin/"
+endif
+
+uninstall:
+	@echo "Uninstalling StormDB..."
+ifeq ($(PLATFORM),windows)
+	@echo "Windows uninstallation not implemented yet"
+else
+	rm -f /usr/local/bin/stormdb$(EXEC_EXT)
+	@echo "StormDB uninstalled"
+endif
+
+# Help
+.PHONY: help
+help:
+	@echo "StormDB Cross-Platform Makefile"
+	@echo "Platform: $(PLATFORM)/$(ARCH) using $(COMPILER)"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  all           - Build the main binary (default)"
+	@echo "  debug         - Build debug version"
+	@echo "  release       - Build optimized release version"
+	@echo "  asan          - Build with AddressSanitizer"
+	@echo "  tsan          - Build with ThreadSanitizer (Unix only)"
+	@echo "  msan          - Build with MemorySanitizer (Linux+Clang only)"
+	@echo "  ubsan         - Build with UndefinedBehaviorSanitizer"
+	@echo "  asan-ubsan    - Build with ASAN+UBSAN"
+	@echo ""
+	@echo "Testing targets:"
+	@echo "  test-asan     - Test AddressSanitizer build"
+	@echo "  test-tsan     - Test ThreadSanitizer build"
+	@echo "  test-msan     - Test MemorySanitizer build"
+	@echo "  test-ubsan    - Test UndefinedBehaviorSanitizer build"
+	@echo "  test-asan-ubsan - Test ASAN+UBSAN build"
+	@echo "  test-all-sanitizers - Test all available sanitizers"
+	@echo "  memcheck      - Memory check (Valgrind on Linux, ASAN elsewhere)"
+	@echo ""
+	@echo "Utility targets:"
+	@echo "  info          - Show platform and build information"
+	@echo "  clean         - Remove build artifacts"
+	@echo "  clean-all     - Remove all generated files"
+	@echo "  install       - Install StormDB (Unix only)"
+	@echo "  uninstall     - Uninstall StormDB (Unix only)"
+	@echo "  help          - Show this help"
+	@echo ""
+	@echo "Platform support:"
+	@echo "  Windows: MinGW/MSYS2 (limited sanitizer support)"
+	@echo "  macOS:   Full support except MemorySanitizer"
+	@echo "  Linux:   Full support including all sanitizers"
+
+# Dependencies
+-include $(OBJECTS:.o=.d)
+-include $(DEBUG_OBJECTS:.o=.d)
+-include $(ASAN_OBJECTS:.o=.d)
+-include $(TSAN_OBJECTS:.o=.d)
+-include $(MSAN_OBJECTS:.o=.d)
+-include $(UBSAN_OBJECTS:.o=.d)
+-include $(ASAN_UBSAN_OBJECTS:.o=.d)
+-include $(RELEASE_OBJECTS:.o=.d)
+
+# Generate dependency files
+$(OBJDIR)/%.d: $(SRCDIR)/%.c | $(OBJDIR)
+	@$(CC) $(CPPFLAGS) -MM -MT $(OBJDIR)/$*.o $< > $@
+
+.PHONY: all debug asan tsan msan ubsan asan-ubsan release test-asan test-tsan test-msan test-ubsan test-asan-ubsan test-all-sanitizers memcheck clean clean-all distclean install uninstall info help

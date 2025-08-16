@@ -1,0 +1,133 @@
+# ========================================================================
+# StormDB Docker Compose Configuration
+# Multi-platform development, testing, and debugging environment
+# ========================================================================
+
+services:
+  # Development environment with full toolchain
+  stormdb-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: stormdb-dev
+    volumes:
+      - .:/workspace
+      - stormdb-cache:/workspace/obj
+      - stormdb-bin:/workspace/bin
+    working_dir: /workspace
+    environment:
+      - CC=gcc
+      - DEBIAN_FRONTEND=noninteractive
+    command: bash
+    stdin_open: true
+    tty: true
+    cap_add:
+      - SYS_PTRACE  # Required for debugging
+    security_opt:
+      - seccomp:unconfined  # Required for some debugging tools
+
+  # VS Code development environment
+  stormdb-vscode:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: vscode
+    container_name: stormdb-vscode
+    volumes:
+      - .:/workspace
+      - stormdb-cache:/workspace/obj
+      - stormdb-bin:/workspace/bin
+    working_dir: /workspace
+    ports:
+      - "2222:22"  # SSH for VS Code Remote
+    environment:
+      - CC=gcc
+      - DEBIAN_FRONTEND=noninteractive
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+
+  # Testing environment for CI/CD
+  stormdb-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: testing
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    container_name: stormdb-test
+    volumes:
+      - ./test-results:/workspace/test-results
+    environment:
+      - CC=gcc
+      - DEBIAN_FRONTEND=noninteractive
+
+  # Cross-compilation environment
+  stormdb-cross:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cross-compile
+    container_name: stormdb-cross
+    volumes:
+      - .:/workspace
+      - stormdb-cross-cache:/workspace/obj-cross
+    working_dir: /workspace
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    command: bash
+    stdin_open: true
+    tty: true
+
+  # Production runtime
+  stormdb-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: stormdb-prod
+    volumes:
+      - ./config:/config:ro
+    environment:
+      - STORMDB_CONFIG=/config/stormdb.yaml
+    restart: unless-stopped
+
+  # Database for testing
+  postgres-test:
+    image: postgres:15
+    container_name: stormdb-postgres
+    environment:
+      POSTGRES_DB: stormdb_test
+      POSTGRES_USER: stormdb
+      POSTGRES_PASSWORD: stormdb_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./test/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stormdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  stormdb-cache:
+    driver: local
+  stormdb-bin:
+    driver: local
+  stormdb-cross-cache:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  default:
+    name: stormdb-network

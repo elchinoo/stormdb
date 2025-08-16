@@ -1,0 +1,127 @@
+# ========================================================================
+# StormDB Optimized Multi-Platform Container (Alpine-based)
+# Smaller, faster, more secure base with minimal dependencies
+# ========================================================================
+
+# Use Alpine Linux for minimal size and security
+FROM alpine:3.19 AS base
+
+# Install basic development tools
+RUN apk add --no-cache \
+    build-base \
+    gcc \
+    musl-dev \
+    linux-headers \
+    make \
+    pkgconfig \
+    git \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# Set up working directory
+WORKDIR /workspace
+ENV CC=gcc
+ENV CXX=g++
+
+# Development stage - adds debugging and additional tools
+FROM base AS development
+
+# Install development and debugging tools
+RUN apk add --no-cache \
+    gdb \
+    clang \
+    clang-dev \
+    llvm \
+    yaml-dev \
+    postgresql-dev \
+    postgresql-client \
+    valgrind \
+    strace \
+    ltrace \
+    curl \
+    wget \
+    vim \
+    nano \
+    htop \
+    && rm -rf /var/cache/apk/*
+
+# Configure GDB for container debugging
+RUN echo "set auto-load safe-path /" >> /root/.gdbinit
+
+# Create development user
+RUN addgroup -g 1000 dev && \
+    adduser -D -s /bin/bash -u 1000 -G dev dev && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers || true
+
+# Testing stage - optimized for CI/CD
+FROM development AS testing
+
+# Copy source code
+COPY . /workspace/
+
+# Build all variants for testing
+RUN make clean && \
+    make info && \
+    make all && \
+    make debug && \
+    make release
+
+# Run basic tests (skip sanitizers that may not work on Alpine)
+RUN make info && \
+    bin/stormdb --version && \
+    bin/stormdb-debug --version && \
+    bin/stormdb-release --version
+
+# Production stage - minimal runtime
+FROM alpine:3.19 AS production
+
+# Install only runtime dependencies
+RUN apk add --no-cache \
+    yaml \
+    libpq \
+    postgresql-client \
+    musl \
+    && rm -rf /var/cache/apk/*
+
+# Create app user for security
+RUN adduser -D -s /bin/false stormdb
+
+# Copy built binary
+COPY --from=testing /workspace/bin/stormdb-release /usr/local/bin/stormdb
+
+# Set permissions
+RUN chmod +x /usr/local/bin/stormdb
+
+# Switch to non-root user
+USER stormdb
+
+# Default command
+CMD ["stormdb", "--help"]
+
+# Cross-compilation stage
+FROM development AS cross-compile
+
+# Note: Alpine cross-compilation is more limited
+# For full cross-compilation, consider using Ubuntu base
+RUN echo "Alpine cross-compilation setup - limited compared to Ubuntu"
+
+# VS Code development stage
+FROM development AS vscode
+
+# Install OpenSSH for VS Code remote development
+RUN apk add --no-cache \
+    openssh \
+    sudo \
+    && rm -rf /var/cache/apk/*
+
+# Configure SSH for VS Code remote development
+RUN ssh-keygen -A && \
+    echo 'root:stormdb' | chpasswd && \
+    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# Expose SSH port
+EXPOSE 22
+
+# Start SSH service
+CMD ["/usr/sbin/sshd", "-D"]

@@ -1,0 +1,137 @@
+==175== Memcheck, a memory error detector
+==175== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==175== Using Valgrind-3.18.1-42b08ed5bd-20211015 and LibVEX; rerun with -h for copyright info
+==175== Command: bin/stormdb --version
+==175== Parent PID: 174
+==175== 
+--175-- 
+--175-- Valgrind options:
+--175--    --leak-check=full
+--175--    --show-leak-kinds=all
+--175--    --track-origins=yes
+--175--    --verbose
+--175--    --log-file=valgrind.log
+--175-- Contents of /proc/version:
+--175--   Linux version 6.10.14-linuxkit (root@buildkitsandbox) (gcc (Alpine 13.2.1_git20240309) 13.2.1 20240309, GNU ld (GNU Binutils) 2.42) #1 SMP Sat May 17 08:28:57 UTC 2025
+--175-- 
+--175-- Arch and hwcaps: ARM64, LittleEndian, v8-fhm-dpbcvadp-sha3-rdm-atomics-bf16-fp16-vfp16
+--175-- Page sizes: currently 4096, max supported 65536
+--175-- Valgrind library directory: /usr/libexec/valgrind
+--175-- Reading syms from /workspace/bin/stormdb
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+--175--   Considering /usr/lib/debug/.build-id/49/4a2ec622d7bf359c224715aa85710018df74f9.debug ..
+--175--   .. build-id is valid
+--175-- Reading syms from /usr/libexec/valgrind/memcheck-arm64-linux
+--175--    object doesn't have a symbol table
+--175--    object doesn't have a dynamic symbol table
+--175-- Scheduler: using generic scheduler lock implementation.
+--175-- Reading suppressions file: /usr/libexec/valgrind/default.supp
+==175== embedded gdbserver: reading from /tmp/vgdb-pipe-from-vgdb-to-175-by-???-on-c9b4e88ec573
+==175== embedded gdbserver: writing to   /tmp/vgdb-pipe-to-vgdb-from-175-by-???-on-c9b4e88ec573
+==175== embedded gdbserver: shared mem   /tmp/vgdb-pipe-shared-mem-vgdb-175-by-???-on-c9b4e88ec573
+==175== 
+==175== TO CONTROL THIS PROCESS USING vgdb (which you probably
+==175== don't want to do, unless you know exactly what you're doing,
+==175== or are doing some strange experiment):
+==175==   /usr/bin/vgdb --pid=175 ...command...
+==175== 
+==175== TO DEBUG THIS PROCESS USING GDB: start GDB like this
+==175==   /path/to/gdb bin/stormdb
+==175== and then give GDB the following command
+==175==   target remote | /usr/bin/vgdb --pid=175
+==175== --pid is optional if only one valgrind process is running
+==175== 
+--175-- REDIR: 0x401ee40 (ld-linux-aarch64.so.1:strlen) redirected to 0x580b918c (???)
+--175-- REDIR: 0x401de40 (ld-linux-aarch64.so.1:strcmp) redirected to 0x580b91e0 (???)
+--175-- REDIR: 0x401dd80 (ld-linux-aarch64.so.1:index) redirected to 0x580b91b4 (???)
+--175-- Reading syms from /usr/libexec/valgrind/vgpreload_core-arm64-linux.so
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/libexec/valgrind/vgpreload_memcheck-arm64-linux.so
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libyaml-0.so.2.0.6
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libpq.so.5.14
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libc.so.6
+--175--   Considering /usr/lib/debug/.build-id/a1/0ee556ec5706640b27d9a9c346cb29e9516cec.debug ..
+--175--   .. build-id is valid
+==175== WARNING: new redirection conflicts with existing -- ignoring it
+--175--     old: 0x049be330 (memalign            ) R-> (1011.0) 0x0486a540 memalign
+--175--     new: 0x049be330 (memalign            ) R-> (1017.0) 0x0486a520 aligned_alloc
+==175== WARNING: new redirection conflicts with existing -- ignoring it
+--175--     old: 0x049be330 (memalign            ) R-> (1011.0) 0x0486a540 memalign
+--175--     new: 0x049be330 (memalign            ) R-> (1017.0) 0x0486a500 aligned_alloc
+==175== WARNING: new redirection conflicts with existing -- ignoring it
+--175--     old: 0x049be330 (memalign            ) R-> (1011.0) 0x0486a540 memalign
+--175--     new: 0x049be330 (memalign            ) R-> (1017.0) 0x0486a520 aligned_alloc
+==175== WARNING: new redirection conflicts with existing -- ignoring it
+--175--     old: 0x049be330 (memalign            ) R-> (1011.0) 0x0486a540 memalign
+--175--     new: 0x049be330 (memalign            ) R-> (1017.0) 0x0486a500 aligned_alloc
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libssl.so.3
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libcrypto.so.3
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libgssapi_krb5.so.2.2
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libldap-2.5.so.0.1.14
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libkrb5.so.3.3
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libk5crypto.so.3.1
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libcom_err.so.2.1
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libkrb5support.so.0.1
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/liblber-2.5.so.0.1.14
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libsasl2.so.2.0.25
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libgnutls.so.30.31.0
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libkeyutils.so.1.9
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libresolv.so.2
+--175--   Considering /usr/lib/debug/.build-id/37/d83d555fe504ca8ef2e468976f8de157f62378.debug ..
+--175--   .. build-id is valid
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libp11-kit.so.0.3.0
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libidn2.so.0.3.7
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libunistring.so.2.2.0
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libtasn1.so.6.6.2
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libnettle.so.8.4
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libhogweed.so.6.4
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libgmp.so.10.4.1
+--175--    object doesn't have a symbol table
+--175-- Reading syms from /usr/lib/aarch64-linux-gnu/libffi.so.8.1.0
+--175--    object doesn't have a symbol table
+--175-- REDIR: 0x49c1620 (libc.so.6:memchr) redirected to 0x4840710 (_vgnU_ifunc_wrapper)
+--175-- REDIR: 0x49c0650 (libc.so.6:strlen) redirected to 0x4840710 (_vgnU_ifunc_wrapper)
+--175-- REDIR: 0x49c1f70 (libc.so.6:memcpy) redirected to 0x4840710 (_vgnU_ifunc_wrapper)
+--175-- REDIR: 0x49c1850 (libc.so.6:memmove) redirected to 0x4840710 (_vgnU_ifunc_wrapper)
+--175-- REDIR: 0x49c1990 (libc.so.6:memset) redirected to 0x4840710 (_vgnU_ifunc_wrapper)
+--175-- REDIR: 0x49c0a40 (libc.so.6:rindex) redirected to 0x486ac40 (rindex)
+--175-- REDIR: 0x49c98c0 (libc.so.6:__GI_strlen) redirected to 0x486b2a0 (__GI_strlen)
+--175-- REDIR: 0x49bff40 (libc.so.6:index) redirected to 0x486ae20 (index)
+--175-- REDIR: 0x49c0000 (libc.so.6:strcmp) redirected to 0x486c2d0 (strcmp)
+--175-- REDIR: 0x49bd630 (libc.so.6:malloc) redirected to 0x4864fe0 (malloc)
+--175-- REDIR: 0x49c7b40 (libc.so.6:__GI_memcpy) redirected to 0x486cf00 (__GI_memcpy)
+--175-- REDIR: 0x49be460 (libc.so.6:calloc) redirected to 0x4869e90 (calloc)
+--175-- REDIR: 0x49c9940 (libc.so.6:__strlen_asimd) redirected to 0x486b274 (strlen)
+--175-- REDIR: 0x4a238c0 (libc.so.6:__memcpy_chk) redirected to 0x4870050 (__memcpy_chk)
+--175-- REDIR: 0x49bdbc4 (libc.so.6:free) redirected to 0x4867a60 (free)
+--175-- REDIR: 0x49c07e4 (libc.so.6:strncmp) redirected to 0x486ba40 (strncmp)
+--175-- REDIR: 0x49c3700 (libc.so.6:strchrnul) redirected to 0x486f914 (strchrnul)
+==175== 
+==175== HEAP SUMMARY:
+==175==     in use at exit: 0 bytes in 0 blocks
+==175==   total heap usage: 1,299 allocs, 1,299 frees, 122,112 bytes allocated
+==175== 
+==175== All heap blocks were freed -- no leaks are possible
+==175== 
+==175== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

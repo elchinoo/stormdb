@@ -1,0 +1,101 @@
+# ========================================================================
+# StormDB Podman Compose Configuration
+# Optimized for Podman with rootless containers and Alpine images
+# ========================================================================
+
+services:
+  # Development environment (rootless-friendly)
+  stormdb-dev:
+    image: localhost/stormdb:latest-dev-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+      target: development
+    container_name: stormdb-dev-alpine
+    volumes:
+      - .:/workspace:Z  # SELinux label for rootless Podman
+      - stormdb-cache:/tmp/stormdb-cache:Z
+    working_dir: /workspace
+    ports:
+      - "2222:22"
+    environment:
+      - TERM=xterm-256color
+      - STORMDB_ENV=development
+    stdin_open: true
+    tty: true
+    networks:
+      - stormdb-net
+    security_opt:
+      - label=disable  # Disable SELinux for development convenience
+
+  # Testing environment
+  stormdb-test:
+    image: localhost/stormdb:latest-test-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+      target: testing
+    container_name: stormdb-test-alpine
+    volumes:
+      - .:/workspace:Z
+      - stormdb-test-results:/workspace/test-results:Z
+    working_dir: /workspace
+    environment:
+      - STORMDB_ENV=testing
+    depends_on:
+      - postgres-test
+    networks:
+      - stormdb-net
+
+  # Production container
+  stormdb-prod:
+    image: localhost/stormdb:latest-prod-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+      target: production
+    container_name: stormdb-prod-alpine
+    environment:
+      - STORMDB_ENV=production
+    depends_on:
+      - postgres-test
+    networks:
+      - stormdb-net
+    restart: unless-stopped
+    user: "1000:1000"  # Run as non-root user
+
+  # PostgreSQL test database (rootless-compatible)
+  postgres-test:
+    image: docker.io/postgres:16-alpine
+    container_name: postgres-test-alpine
+    environment:
+      POSTGRES_DB: stormdb_test
+      POSTGRES_USER: stormdb
+      POSTGRES_PASSWORD: stormdb_test_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data:Z
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - stormdb-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stormdb -d stormdb_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# Named volumes for persistence
+volumes:
+  stormdb-cache:
+    driver: local
+  stormdb-test-results:
+    driver: local
+  postgres-test-data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  stormdb-net:
+    driver: bridge

@@ -1,0 +1,102 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            "name": "Linux Debug",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src",
+                "/usr/include",
+                "/usr/local/include",
+                "/usr/include/yaml-0.1",
+                "/usr/include/postgresql"
+            ],
+            "defines": [
+                "_DEBUG",
+                "DEBUG",
+                "PLATFORM_LINUX",
+                "_GNU_SOURCE"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerArgs": [
+                "-Wall",
+                "-Wextra",
+                "-pedantic",
+                "-Werror",
+                "-Wformat=2",
+                "-Wstrict-prototypes",
+                "-Wmissing-prototypes"
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/include",
+                    "${workspaceFolder}/src",
+                    "/usr/include",
+                    "/usr/local/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": "${workspaceFolder}/.vscode/browse.vc.db"
+            }
+        },
+        {
+            "name": "Linux Release",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src",
+                "/usr/include",
+                "/usr/local/include",
+                "/usr/include/yaml-0.1",
+                "/usr/include/postgresql"
+            ],
+            "defines": [
+                "NDEBUG",
+                "PLATFORM_LINUX",
+                "_GNU_SOURCE"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerArgs": [
+                "-Wall",
+                "-Wextra",
+                "-pedantic",
+                "-Werror",
+                "-O3"
+            ]
+        },
+        {
+            "name": "Linux Clang",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src",
+                "/usr/include",
+                "/usr/local/include",
+                "/usr/include/yaml-0.1",
+                "/usr/include/postgresql"
+            ],
+            "defines": [
+                "_DEBUG",
+                "DEBUG",
+                "PLATFORM_LINUX",
+                "_GNU_SOURCE"
+            ],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64",
+            "compilerArgs": [
+                "-Wall",
+                "-Wextra",
+                "-pedantic",
+                "-Werror",
+                "-Wformat=2",
+                "-Wstrict-prototypes",
+                "-Wmissing-prototypes"
+            ]
+        }
+    ]
+}

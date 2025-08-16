@@ -1,0 +1,51 @@
+# ========================================================================
+# StormDB Local Development Container
+# Uses Ubuntu base for local development when external registries fail
+# ========================================================================
+
+FROM ubuntu:22.04 AS local-dev
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Update package lists and install essential development tools
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    gdb \
+    valgrind \
+    clang \
+    llvm \
+    git \
+    vim \
+    nano \
+    curl \
+    wget \
+    bash-completion \
+    pkg-config \
+    libyaml-dev \
+    libpq-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure GDB for container use
+RUN echo "set auto-load safe-path /" >> /root/.gdbinit
+
+# Create development user
+RUN useradd -m -s /bin/bash -u 1000 dev && \
+    usermod -aG sudo dev && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set up working directory
+WORKDIR /workspace
+
+# Set default environment
+ENV CC=gcc
+ENV CXX=g++
+ENV STORMDB_ENV=development
+
+# Default command
+CMD ["/bin/bash"]
