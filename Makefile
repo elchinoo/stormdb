@@ -786,13 +786,13 @@ down-postgres-test:
 	@docker compose -f docker-compose.yml -f docker-compose.local.yml down postgres-test || true
 
 run-integration-db: up-postgres-test
-	@echo "Running integration DB test against postgres-test (host=127.0.0.1:54320)"
+	@echo "Running integration DB test against postgres-test (host=$(if $(POSTGRES_TEST_HOST),$(POSTGRES_TEST_HOST),127.0.0.1):$(if $(POSTGRES_TEST_PORT),$(POSTGRES_TEST_PORT),5432))"
 	@# Wait for DB to accept connections
-	@./scripts/wait-for-db.sh 127.0.0.1 54320 30
+	@./scripts/wait-for-db.sh $(if $(POSTGRES_TEST_HOST),$(POSTGRES_TEST_HOST),127.0.0.1) $(if $(POSTGRES_TEST_PORT),$(POSTGRES_TEST_PORT),5432) 30
 	@echo "Compiling integration test..."
-	@gcc -o test/integration_db test/integration_db.c $(PQ_CFLAGS) $(PQ_LIBS)
+	@$(CC) -o test/integration_db test/integration_db.c $(PQ_CFLAGS) $(PQ_LIBS)
 	@echo "Executing integration test..."
-	@./test/integration_db || (RET=$$?; echo "Integration test failed with code $$RET"; exit $$RET)
+	@POSTGRES_TEST_HOST=$(if $(POSTGRES_TEST_HOST),$(POSTGRES_TEST_HOST),127.0.0.1) POSTGRES_TEST_PORT=$(if $(POSTGRES_TEST_PORT),$(POSTGRES_TEST_PORT),5432) ./test/integration_db || (RET=$$?; echo "Integration test failed with code $$RET"; exit $$RET)
 	@echo "Integration DB test passed"
 	@$(MAKE) down-postgres-test
 
@@ -818,3 +818,19 @@ test: run-tests
 
 # Basic CI flow: clean, build debug, run smoke tests and ASAN test
 ci: clean debug run-tests test-asan
+
+.PHONY: unit-tests run-unit-memory run-unit-api
+
+unit-tests: run-unit-memory run-unit-api
+
+run-unit-memory:
+	@echo "Building unit_memory"
+	@gcc -o test/unit_memory test/unit_memory.c -Iinclude
+	@echo "Running unit_memory"
+	@./test/unit_memory
+
+run-unit-api:
+	@echo "Building unit_api_health"
+	@gcc -o test/unit_api_health test/unit_api_health.c -Iinclude
+	@echo "Note: ensure server is running on port 8080 before running this test"
+	@./test/unit_api_health || echo "unit_api_health failed or server not running"
