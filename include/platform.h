@@ -276,6 +276,10 @@ void platform_print_info(void);
 bool platform_init(void);
 void platform_cleanup(void);
 
+/* New: handle-based helpers (store strings in memory manager handles) */
+memory_handle_t platform_get_current_directory_handle(void);
+memory_handle_t platform_get_executable_path_handle(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -200,6 +200,27 @@ char* platform_get_executable_path(void) {
     return NULL;
 }
 
+// New handle-based helpers
+memory_handle_t platform_get_current_directory_handle(void) {
+    char *s = platform_get_current_directory();
+    if (!s) return 0;
+    size_t len = strlen(s) + 1;
+    memory_handle_t h = memory_alloc_handle(len);
+    if (h) memory_write_handle(h, 0, s, len);
+    free(s);
+    return h;
+}
+
+memory_handle_t platform_get_executable_path_handle(void) {
+    char *s = platform_get_executable_path();
+    if (!s) return 0;
+    size_t len = strlen(s) + 1;
+    memory_handle_t h = memory_alloc_handle(len);
+    if (h) memory_write_handle(h, 0, s, len);
+    free(s);
+    return h;
+}
+
 char* platform_join_path(const char* base, const char* component) {
     if (!base || !component) return NULL;
     

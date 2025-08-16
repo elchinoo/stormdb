@@ -22,7 +22,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libyaml-dev libpq-dev
+          sudo apt-get install -y build-essential pkg-config libyaml-dev libpq-dev docker-compose
 
       - name: Install deps (macOS)
         if: runner.os == 'macOS'
@@ -63,3 +63,52 @@ jobs:
         run: |
           make ubsan
           make test-ubsan
+
+  integration:
+    name: Integration Tests (Ubuntu)
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:20.10.16-dind
+        privileged: true
+        options: >-
+          --privileged
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for multi-arch)
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libyaml-dev libpq-dev docker-compose
+
+      - name: Build debug
+        run: |
+          make clean
+          make debug
+
+      - name: Run unit memory test
+        run: |
+          gcc -o test/unit_memory test/unit_memory.c -Iinclude
+          ./test/unit_memory
+
+      - name: Start postgres-test and run integration
+        run: |
+          docker compose up -d postgres-test
+          sleep 5
+          make run-integration-db POSTGRES_TEST_PORT=5432
+
+      - name: Run API health test (requires server)
+        run: |
+          # start server in background inside container environment
+          ./bin/stormdb -c config/stormdb.yaml &
+          sleep 2
+          gcc -o test/unit_api_health test/unit_api_health.c
+          ./test/unit_api_health
+          pkill stormdb || true
